@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Fondo circular oscuro minimalista -->
+  <circle cx="256" cy="256" r="256" fill="#181818" />
+  
+  <!-- Letra M geométrica limpia en tono crema/blanco -->
+  <path d="M 150 350 L 150 162 L 190 162 L 256 260 L 322 162 L 362 162 L 362 350 L 322 350 L 322 230 L 256 320 L 190 230 L 190 350 Z" fill="#E8E6E3" />
+  
+  <!-- Punto de acento analógico rojo (Rams style) -->
+  <circle cx="390" cy="335" r="15" fill="#D23F3A" />
+</svg>

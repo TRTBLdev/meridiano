@@ -1,0 +1,278 @@
+/* Reset Base */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--font-ui);
+  color: var(--color-text-main);
+  background-color: var(--color-bg-base);
+  min-height: 100vh;
+  overflow-x: hidden;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* -------------------------------------------------------------
+   GRADIENTES ORGÁNICOS FLOTANTES (NIEBLA EJE Z)
+------------------------------------------------------------- */
+.gradient-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.blur-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.7;
+  animation: float-blob 30s infinite alternate ease-in-out;
+}
+
+.blob-1 {
+  width: 60vw;
+  height: 60vw;
+  background: radial-gradient(circle, var(--color-accent-lavender) 0%, rgba(255,255,255,0) 70%);
+  top: -10vw;
+  left: -15vw;
+}
+
+.blob-2 {
+  width: 60vw;
+  height: 60vw;
+  background: radial-gradient(circle, var(--color-accent-pink) 0%, rgba(255,255,255,0) 70%);
+  bottom: -15vw;
+  right: -15vw;
+  animation-duration: 35s;
+  animation-delay: -8s;
+}
+
+@keyframes float-blob {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(4vw, 5vh) scale(1.05); }
+  100% { transform: translate(-2vw, -2vh) scale(0.95); }
+}
+
+/* Contenedor principal SPA */
+#app {
+  width: 100%;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.fade-in {
+  animation: soft-fade-in 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes soft-fade-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* -------------------------------------------------------------
+   VISTA DE INICIO (PILARES BRUMOSOS Y FLOTANTES)
+------------------------------------------------------------- */
+.dashboard-layout {
+  display: grid;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Barra de Navegación Lateral Fija */
+.nav-bar {
+  display: flex;
+  background: transparent;
+  z-index: 10;
+  transition: all 0.3s ease;
+}
+
+.nav-logo {
+  font-family: var(--font-digital);
+  font-weight: 700;
+  text-align: center;
+  color: var(--color-text-main);
+  cursor: pointer;
+}
+
+.nav-links {
+  display: flex;
+  list-style: none;
+  width: 100%;
+  justify-content: space-around;
+  align-items: center;
+}
+.main-viewport {
+  padding: 64px 48px;
+  overflow-y: auto;
+  height: 100%;
+  width: 100%;
+}
+
+.viewport-inner {
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+}
+
+/* -------------------------------------------------------------
+   MEDIAS QUERIES: RESPONSIVIDAD (SCROLL VERTICAL CONTINUO ÚNICO)
+------------------------------------------------------------- */
+
+/* ==========================================
+   1. MÓVIL (< 600px)
+   ========================================== */
+@media (max-width: 767px) {
+  .dashboard-layout {
+    display: block;
+    height: auto;
+    min-height: 100vh;
+    overflow-y: auto;
+    padding-bottom: 64px;
+  }
+  
+  .nav-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100vw;
+    height: 52px;
+    border-top: 1px solid var(--glass-border);
+    background: rgba(250, 249, 246, 0.85);
+    backdrop-filter: var(--glass-blur);
+  }
+  
+  .nav-logo {
+    display: none;
+  }
+  
+  .nav-item {
+    padding: 6px;
+    font-size: 0.65rem;
+  }
+  
+  .nav-item svg {
+    width: 18px;
+    height: 18px;
+    margin-bottom: 0px;
+  }
+  
+  .main-viewport {
+    padding: 32px 16px;
+    height: auto;
+    overflow: visible;
+  }
+
+  .welcome-quote-center .quote-text {
+    font-size: 1.2rem;
+  }
+  
+  .hilo-agua-panel {
+    padding: 32px 16px;
+    border-top: 1px solid rgba(46, 43, 40, 0.08);
+  }
+
+  .sound-tuner-overlay {
+    bottom: 68px;
+    top: auto;
+    left: 16px;
+    right: auto;
+    width: calc(100vw - 32px);
+    transform: translateY(15px);
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .sound-tuner-overlay.visible {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* ==========================================
+   2. TABLET Y DESKTOP (>= 768px)
+   Una sola columna de contenido a la derecha,
+   scroll continuo vertical. Nav bar fija a la izq.
+   ========================================== */
+@media (min-width: 768px) {
+  .dashboard-layout {
+    grid-template-columns: 200px 1fr; /* Columna fija e Columna fluida única */
+    grid-template-rows: 1fr;
+    height: 100vh;
+  }
+  
+  .nav-bar {
+    grid-column: 1;
+    flex-direction: column;
+    padding: 48px 16px;
+    height: 100vh;
+    border-right: 1px solid var(--glass-border);
+    position: sticky;
+    top: 0;
+  }
+  
+  .nav-logo {
+    font-size: 1.3rem;
+    margin-bottom: 56px;
+  }
+  
+  .nav-links {
+    flex-direction: column;
+    gap: 32px;
+    align-items: center;
+  }
+  
+  .nav-item {
+    width: 100%;
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .nav-item span {
+    font-size: 0.8rem;
+  }
+  
+  /* Scroll principal único vertical de todo el dashboard */
+  .main-viewport {
+    grid-column: 2;
+    overflow-y: auto;
+    height: 100vh;
+    padding: 80px 64px;
+    width: 100%;
+  }
+
+  .hilo-agua-panel {
+    border-top: 1px solid rgba(46, 43, 40, 0.08); /* Línea divisoria muy fina */
+    margin-top: 48px;
+    padding: 64px 0 0;
+  }
+}
+
+/* Desktop ampliado */
+@media (min-width: 1200px) {
+  .dashboard-layout {
+    grid-template-columns: 240px 1fr;
+  }
+  
+  .main-viewport {
+    padding: 96px 80px;
+  }
+
+  .viewport-inner {
+    max-width: 860px;
+  }
+}

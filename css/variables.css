@@ -1,0 +1,64 @@
+/* -------------------------------------------------------------
+   SISTEMA DE DISEÑO DE MERIDIANO (ESTÉTICA MINIMALISTA DIETER RAMS)
+------------------------------------------------------------- */
+
+/* Variables / Design Tokens */
+:root {
+  /* Paleta Braun Dieter Rams (Limpio, funcional, blanco-grisáceo, acento rojo y verde) */
+  --color-bg-base: #FAF9F6;           /* Blanco Alabastro limpio y liso */
+  --color-text-main: #2E2B28;         /* Carbón oscuro Rams */
+  --color-text-muted: #8E8A84;        /* Gris piedra */
+  --color-accent-red: #D23F3A;        /* Puntero rojo analógico */
+  --color-accent-green: #2E7D32;      /* LED verde piloto */
+  
+  /* Gradientes de Niebla (Eje Z - Espacialidad) */
+  --color-accent-lavender: rgba(186, 164, 230, 0.1);
+  --color-accent-pink: rgba(240, 150, 180, 0.08);
+  --color-accent-blue: rgba(130, 200, 240, 0.08);
+  --color-accent-mint: rgba(130, 220, 200, 0.08);
+
+  /* Glassmorphism Eje Z (Paneles y menús flotantes) */
+  --glass-bg: rgba(250, 249, 246, 0.45);
+  --glass-border: rgba(255, 255, 255, 0.65);
+  --glass-shadow: 0 16px 48px rgba(46, 43, 40, 0.04);
+  --glass-blur: blur(28px);
+  --glass-inset: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+
+  /* Fuentes */
+  --font-ui: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-digital: 'Share Tech Mono', monospace;
+}
+
+/* =============================================================
+   MODO OSCURO GLOBAL OVERRIDES (DIETER RAMS DARK THEME)
+   ============================================================= */
+body.dark-theme {
+  --color-bg-base: #121212;
+  --color-text-main: #FAF9F6;
+  --color-text-muted: #8E8A84;
+  
+  --color-accent-lavender: rgba(186, 164, 230, 0.15);
+  --color-accent-pink: rgba(240, 150, 180, 0.12);
+  --color-accent-blue: rgba(130, 200, 240, 0.12);
+  --color-accent-mint: rgba(130, 220, 200, 0.12);
+
+  --glass-bg: rgba(20, 20, 20, 0.5); /* Más transparente */
+  --glass-border: rgba(255, 255, 255, 0.05);
+  --glass-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+  --glass-inset: none; /* Eliminar bordes blancos de tarjetas en tema oscuro */
+}
+
+/* =============================================================
+   TIMER INSTRUMENT SYSTEM
+   Shared Braun/Rams-inspired layer for active practice timers.
+   ============================================================= */
+:root {
+  --timer-surface: rgba(250, 249, 246, 0.82);
+  --timer-surface-dark: rgba(10, 10, 10, 0.48);
+  --timer-line: rgba(46, 43, 40, 0.16);
+  --timer-line-strong: rgba(46, 43, 40, 0.32);
+  --timer-line-dark: rgba(255, 255, 255, 0.10);
+  --timer-control-size: 42px;
+  --timer-radius: 3px;
+  --timer-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}

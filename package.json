@@ -1,0 +1,21 @@
+{
+  "name": "mind-meridiano",
+  "version": "1.0.0",
+  "description": "Orquestador de reposo y sanación - MERIDIANO PWA",
+  "main": "index.html",
+  "scripts": {
+    "dev": "http-server -p 8080 -c-1"
+  },
+  "keywords": [
+    "pwa",
+    "wabi-sabi",
+    "local-first",
+    "yoga",
+    "meditation"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}

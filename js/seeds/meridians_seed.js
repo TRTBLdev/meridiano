@@ -1,0 +1,17 @@
+export const defaultMeridians = [
+  { id: 'LU', name: 'Pulmón', english_name: 'Lung', chinese_pinyin: 'Feijing', element: 'Metal', yin_yang: 'Yin', total_points: 11 },
+  { id: 'LI', name: 'Intestino Grueso', english_name: 'Large Intestine', chinese_pinyin: 'Dachangjing', element: 'Metal', yin_yang: 'Yang', total_points: 20 },
+  { id: 'ST', name: 'Estómago', english_name: 'Stomach', chinese_pinyin: 'Weijing', element: 'Earth', yin_yang: 'Yang', total_points: 45 },
+  { id: 'SP', name: 'Bazo', english_name: 'Spleen', chinese_pinyin: 'Pijing', element: 'Earth', yin_yang: 'Yin', total_points: 21 },
+  { id: 'HT', name: 'Corazón', english_name: 'Heart', chinese_pinyin: 'Xinjing', element: 'Fire', yin_yang: 'Yin', total_points: 9 },
+  { id: 'SI', name: 'Intestino Delgado', english_name: 'Small Intestine', chinese_pinyin: 'Xiaochangjing', element: 'Fire', yin_yang: 'Yang', total_points: 19 },
+  { id: 'BL', name: 'Vejiga', english_name: 'Bladder', chinese_pinyin: 'Pangguangjing', element: 'Water', yin_yang: 'Yang', total_points: 67 },
+  { id: 'KI', name: 'Riñón', english_name: 'Kidney', chinese_pinyin: 'Shenjing', element: 'Water', yin_yang: 'Yin', total_points: 27 },
+  { id: 'PC', name: 'Pericardio (Maestro Corazón)', english_name: 'Pericardium', chinese_pinyin: 'Xinbaojing', element: 'Fire', yin_yang: 'Yin', total_points: 9 },
+  { id: 'TE', name: 'Triple Calentador', english_name: 'Triple Energizer', chinese_pinyin: 'Sanjiaojing', element: 'Fire', yin_yang: 'Yang', total_points: 23 },
+  { id: 'GB', name: 'Vesícula Biliar', english_name: 'Gallbladder', chinese_pinyin: 'Danjing', element: 'Wood', yin_yang: 'Yang', total_points: 44 },
+  { id: 'LR', name: 'Hígado', english_name: 'Liver', chinese_pinyin: 'Ganjing', element: 'Wood', yin_yang: 'Yin', total_points: 14 },
+  { id: 'CV', name: 'Vaso Concepción', english_name: 'Conception Vessel', chinese_pinyin: 'Renmai', element: 'Ninguno', yin_yang: 'Yin', total_points: 24 },
+  { id: 'GV', name: 'Vaso Gobernador (Du Mai)', english_name: 'Governing Vessel', chinese_pinyin: 'Dumai', element: 'Ninguno', yin_yang: 'Yang', total_points: 28 },
+  { id: 'EX', name: 'Puntos Extra', english_name: 'Extra Points', chinese_pinyin: 'Waiqi', element: 'Ninguno', yin_yang: 'Ninguno', total_points: 0 },
+];

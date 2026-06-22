@@ -1,0 +1,8 @@
+/* -------------------------------------------------------------
+   SISTEMA DE DISEÑO DE MERIDIANO (AESTHETIC DIETER RAMS)
+   Main stylesheet importing modular pieces.
+------------------------------------------------------------- */
+
+@import url('variables.css');
+@import url('layout.css');
+@import url('components.css');
