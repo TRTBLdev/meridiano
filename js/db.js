@@ -194,7 +194,7 @@ export async function seedDatabase() {
    MÉTODOS HELPER PARA TRANSACCIONES
 ============================================================= */
 
-function countItems(db, storeName) {
+export function countItems(db, storeName) {
   return new Promise((resolve) => {
     const tx = db.transaction(storeName, 'readonly');
     const store = tx.objectStore(storeName);

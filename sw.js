@@ -1,4 +1,4 @@
-const CACHE_NAME = 'meridiano-cache-v18';
+const CACHE_NAME = 'meridiano-cache-v19';
 const ASSETS = [
   './',
   './index.html',
@@ -21,6 +21,7 @@ const ASSETS = [
   './js/components/dashboard.js',
   './js/components/acupuncture.js',
   './js/components/syllabus.js',
+  './js/components/config.js',
   './js/components/breathwork.js',
   './js/components/meditation.js',
   './js/components/yoga.js',

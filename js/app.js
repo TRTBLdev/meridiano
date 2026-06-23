@@ -7,6 +7,7 @@ import { renderSyllabusScreen } from './components/syllabus.js';
 import { renderBreathworkScreen } from './components/breathwork.js';
 import { renderMeditationScreen } from './components/meditation.js';
 import { renderYogaScreen } from './components/yoga.js';
+import { renderConfigScreen } from './components/config.js';
 
 
 // Estado global de la aplicación
@@ -271,6 +272,8 @@ function handleNavigation(target) {
 
   } else if (target === 'syllabus') {
     renderSyllabusScreen(appContainer, state.db, handleNavigation);
+  } else if (target === 'config') {
+    renderConfigScreen(appContainer, state.db, handleNavigation);
   }
 }
 
