@@ -3534,68 +3534,70 @@ body.dark-theme .breath-dropdown-options {
   mix-blend-mode: screen;
 }
 
-.yoga-lobby-screen .nav-bar {
-  position: fixed;
-  inset: 0;
-  z-index: 20;
-  pointer-events: none;
-  background: transparent !important;
-  border: 0 !important;
-}
+@media (min-width: 768px) {
+  .yoga-lobby-screen .nav-bar {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    pointer-events: none;
+    background: transparent !important;
+    border: 0 !important;
+  }
 
-.yoga-lobby-screen .nav-logo {
-  position: absolute;
-  top: 72px;
-  left: 44px;
-  width: 44px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  border: none;
-  color: #F1F0ED;
-  font-size: 1.25rem;
-  line-height: 1;
-  pointer-events: auto;
-}
+  .yoga-lobby-screen .nav-logo {
+    position: absolute;
+    top: 72px;
+    left: 44px;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border: none;
+    color: #F1F0ED;
+    font-size: 1.25rem;
+    line-height: 1;
+    pointer-events: auto;
+  }
 
-.yoga-lobby-screen .nav-links {
-  position: absolute;
-  left: 44px;
-  bottom: 70px;
-  width: auto;
-  pointer-events: auto;
-}
+  .yoga-lobby-screen .nav-links {
+    position: absolute;
+    left: 44px;
+    bottom: 70px;
+    width: auto;
+    pointer-events: auto;
+  }
 
-.yoga-lobby-screen .nav-item {
-  flex-direction: row;
-  gap: 12px;
-  padding: 0;
-  color: rgba(232, 230, 227, 0.58);
-  border-radius: 0;
-  font-family: var(--font-digital);
-  font-size: 0.86rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
+  .yoga-lobby-screen .nav-item {
+    flex-direction: row;
+    gap: 12px;
+    padding: 0;
+    color: rgba(232, 230, 227, 0.58);
+    border-radius: 0;
+    font-family: var(--font-digital);
+    font-size: 0.86rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
 
-.yoga-lobby-screen .nav-item svg {
-  width: 24px;
-  height: 24px;
-  margin: 0;
-  stroke: rgba(232, 230, 227, 0.62);
-}
+  .yoga-lobby-screen .nav-item svg {
+    width: 24px;
+    height: 24px;
+    margin: 0;
+    stroke: rgba(232, 230, 227, 0.62);
+  }
 
-.yoga-lobby-screen .nav-item:hover,
-.yoga-lobby-screen .nav-item:hover svg {
-  color: #F1F0ED;
-  stroke: #F1F0ED;
-}
+  .yoga-lobby-screen .nav-item:hover,
+  .yoga-lobby-screen .nav-item:hover svg {
+    color: #F1F0ED;
+    stroke: #F1F0ED;
+  }
 
-.yoga-lobby-screen .main-viewport {
-  min-height: 100vh;
-  height: auto;
-  padding: 96px 44px 96px !important;
-  overflow-y: auto;
+  .yoga-lobby-screen .main-viewport {
+    min-height: 100vh;
+    height: auto;
+    padding: 96px 44px 96px !important;
+    overflow-y: auto;
+  }
 }
 
 .yoga-lobby-screen .glass-panel {
