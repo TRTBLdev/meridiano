@@ -6,7 +6,7 @@ import { defaultBreathwork } from './seeds/breathwork_seeds.js';
 import { defaultMeditation } from './seeds/meditation_seeds.js';
 import { defaultAcupunctureSequences } from './seeds/acupuncture_sequences_seed.js';
 
-const DB_VERSION = 7;
+const DB_VERSION = 9;
 
 /**
  * Abre la conexión a IndexedDB y crea las tablas/almacenes necesarios.
@@ -99,6 +99,28 @@ export async function seedDatabase() {
   console.log('[DB] Seeding default database items for Wabi-Sabi experience...');
 
   // 0. Sembrar Meridianos Lookup (MTC)
+  const needsMeridiansReseed = await new Promise((resolve) => {
+    const tx = db.transaction('meridians', 'readonly');
+    const store = tx.objectStore('meridians');
+    const req = store.get('CV');
+    req.onsuccess = () => {
+      const res = req.result;
+      if (!res) {
+        resolve(true);
+      } else {
+        resolve(!res.pinyin_code || !res.description);
+      }
+    };
+    req.onerror = () => resolve(false);
+  });
+
+  if (needsMeridiansReseed) {
+    console.log('[DB] Clearing old meridians to apply new fields (pinyin_code, description)...');
+    const txClear = db.transaction('meridians', 'readwrite');
+    txClear.objectStore('meridians').clear();
+    await new Promise(r => txClear.oncomplete = r);
+  }
+
   const meridiansCount = await countItems(db, 'meridians');
   if (meridiansCount === 0) {
     await saveBatch(db, 'meridians', defaultMeridians);
@@ -138,7 +160,7 @@ export async function seedDatabase() {
   const needsReseed = await new Promise((resolve) => {
     const tx = db.transaction('acupuncture_points', 'readonly');
     const store = tx.objectStore('acupuncture_points');
-    const req = store.get('acu-hegu');
+    const req = store.get('acu-li4');
     req.onsuccess = () => {
       const res = req.result;
       if (!res) {
@@ -146,14 +168,15 @@ export async function seedDatabase() {
       } else {
         const hasNoMeridian = !res.meridian_id;
         const isCorrupt = res.location && res.location.includes("'");
-        resolve(hasNoMeridian || isCorrupt);
+        const hasNoTraditionalCode = !res.traditional_code;
+        resolve(hasNoMeridian || isCorrupt || hasNoTraditionalCode);
       }
     };
     req.onerror = () => resolve(false);
   });
 
   if (needsReseed) {
-    console.log('[DB] Clearing old acupuncture points to apply normalized WHO schema (Spanish corrected)...');
+    console.log('[DB] Clearing old acupuncture points to apply normalized WHO schema (Spanish corrected & traditional_code added)...');
     const txClearPoints = db.transaction('acupuncture_points', 'readwrite');
     txClearPoints.objectStore('acupuncture_points').clear();
     await new Promise(r => txClearPoints.oncomplete = r);
@@ -184,6 +207,16 @@ export async function seedDatabase() {
       await deleteData(db, 'acupuncture_sequences', 'seq-trapecios');
     } catch (e) {
       console.warn('[DB] Failed to delete obsolete massage presets:', e);
+    }
+
+    // Sobrescribir/actualizar siempre los presets oficiales con los datos semilla limpios y corregidos
+    try {
+      for (const preset of defaultAcupunctureSequences) {
+        await putData(db, 'acupuncture_sequences', preset);
+      }
+      console.log('[DB] Default acupuncture sequences updated to latest seeds successfully.');
+    } catch (e) {
+      console.warn('[DB] Failed to update default acupuncture sequences:', e);
     }
   }
 

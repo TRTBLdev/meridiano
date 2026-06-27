@@ -6,12 +6,12 @@ export const defaultAcupunctureSequences = [
     suggestedFreq: 6, // Theta
     baseFreq: 432,
     points: [
-      { pointId: 'acu-ren17', duration: 120, transitionAfter: 15, side: null },
-      { pointId: 'acu-ren12', duration: 120, transitionAfter: 15, side: null },
-      { pointId: 'acu-fenglong', duration: 120, transitionAfter: 15, side: 'Izquierda' },
-      { pointId: 'acu-fenglong', duration: 120, transitionAfter: 15, side: 'Derecha' },
-      { pointId: 'acu-taichong', duration: 120, transitionAfter: 15, side: 'Izquierda' },
-      { pointId: 'acu-taichong', duration: 120, transitionAfter: 0, side: 'Derecha' }
+      { pointId: 'acu-cv17', duration: 120, transitionAfter: 15, side: null },
+      { pointId: 'acu-cv12', duration: 120, transitionAfter: 15, side: null },
+      { pointId: 'acu-st40', duration: 120, transitionAfter: 15, side: 'Izquierda' },
+      { pointId: 'acu-st40', duration: 120, transitionAfter: 15, side: 'Derecha' },
+      { pointId: 'acu-lr3', duration: 120, transitionAfter: 15, side: 'Izquierda' },
+      { pointId: 'acu-lr3', duration: 120, transitionAfter: 0, side: 'Derecha' }
     ]
   },
   {
@@ -22,8 +22,8 @@ export const defaultAcupunctureSequences = [
     baseFreq: 432,
     points: [
       { pointId: 'acu-yintang', duration: 300, transitionAfter: 15, side: null },
-      { pointId: 'acu-neiguan', duration: 120, transitionAfter: 15, side: 'Izquierda' },
-      { pointId: 'acu-neiguan', duration: 120, transitionAfter: 15, side: 'Derecha' },
+      { pointId: 'acu-pc6', duration: 120, transitionAfter: 15, side: 'Izquierda' },
+      { pointId: 'acu-pc6', duration: 120, transitionAfter: 15, side: 'Derecha' },
       { pointId: 'acu-ht7', duration: 120, transitionAfter: 15, side: 'Izquierda' },
       { pointId: 'acu-ht7', duration: 120, transitionAfter: 15, side: 'Derecha' },
       { pointId: 'acu-sishencong', duration: 180, transitionAfter: 0, side: null }
@@ -36,12 +36,12 @@ export const defaultAcupunctureSequences = [
     suggestedFreq: 7.83, // Schumann
     baseFreq: 432,
     points: [
-      { pointId: 'acu-fenglong', duration: 180, transitionAfter: 15, side: 'Izquierda' },
-      { pointId: 'acu-fenglong', duration: 180, transitionAfter: 15, side: 'Derecha' },
-      { pointId: 'acu-zusanli', duration: 180, transitionAfter: 15, side: 'Izquierda' },
-      { pointId: 'acu-zusanli', duration: 180, transitionAfter: 15, side: 'Derecha' },
-      { pointId: 'acu-yinlingquan', duration: 180, transitionAfter: 15, side: 'Izquierda' },
-      { pointId: 'acu-yinlingquan', duration: 180, transitionAfter: 0, side: 'Derecha' }
+      { pointId: 'acu-st40', duration: 180, transitionAfter: 15, side: 'Izquierda' },
+      { pointId: 'acu-st40', duration: 180, transitionAfter: 15, side: 'Derecha' },
+      { pointId: 'acu-st36', duration: 180, transitionAfter: 15, side: 'Izquierda' },
+      { pointId: 'acu-st36', duration: 180, transitionAfter: 15, side: 'Derecha' },
+      { pointId: 'acu-sp9', duration: 180, transitionAfter: 15, side: 'Izquierda' },
+      { pointId: 'acu-sp9', duration: 180, transitionAfter: 0, side: 'Derecha' }
     ]
   },
   {
@@ -52,10 +52,10 @@ export const defaultAcupunctureSequences = [
     baseFreq: 432,
     points: [
       { pointId: 'acu-yintang', duration: 120, transitionAfter: 15, side: null },
-      { pointId: 'acu-neiguan', duration: 120, transitionAfter: 15, side: 'Izquierda' },
-      { pointId: 'acu-neiguan', duration: 120, transitionAfter: 15, side: 'Derecha' },
-      { pointId: 'acu-shenmen-oreja', duration: 60, transitionAfter: 15, side: 'Izquierda' },
-      { pointId: 'acu-shenmen-oreja', duration: 60, transitionAfter: 0, side: 'Derecha' }
+      { pointId: 'acu-pc6', duration: 120, transitionAfter: 15, side: 'Izquierda' },
+      { pointId: 'acu-pc6', duration: 120, transitionAfter: 15, side: 'Derecha' },
+      { pointId: 'acu-ht7', duration: 60, transitionAfter: 15, side: 'Izquierda' },
+      { pointId: 'acu-ht7', duration: 60, transitionAfter: 0, side: 'Derecha' }
     ]
   }
 ];

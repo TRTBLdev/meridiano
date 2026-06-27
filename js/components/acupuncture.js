@@ -304,7 +304,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, appCont
                   <div class="acu-timeline-point">
                     <span class="acu-timeline-point-number">${idx + 1}</span>
                     <div class="acu-timeline-point-details">
-                      <span class="acu-timeline-point-name" style="font-size:0.8rem; font-weight:600;">${escapeHTML(pointData.name)} (${escapeHTML(pointData.code)}) ${step.side ? `[Lado: ${escapeHTML(step.side)}]` : ''}</span>
+                      <span class="acu-timeline-point-name" style="font-size:0.8rem; font-weight:600;">${escapeHTML(pointData.name)} (${escapeHTML(pointData.code)}${pointData.traditional_code && pointData.traditional_code !== pointData.code ? ` / ${escapeHTML(pointData.traditional_code)}` : ''}) ${step.side ? `[Lado: ${escapeHTML(step.side)}]` : ''}</span>
                       <span class="acu-timeline-point-times" style="font-size:0.7rem; color:var(--color-text-muted);">${escapeHTML(durationLabel)} estímulo + ${escapeHTML(step.transitionAfter)}s transición (${escapeHTML(pointData.headType)})</span>
                     </div>
                   </div>
@@ -481,67 +481,6 @@ export async function renderAcupunctureScreen(container, db, onNavigate, appCont
                 </button>
               </div>
 
-              <!-- Trigger formulario inline plano y sin borde -->
-              <button type="button" class="acu-inline-form-trigger" id="btn-toggle-inline-form" style="margin-top:16px; align-self: flex-start; border: none !important; background: transparent; cursor: pointer; font-family: var(--font-main); font-weight: 500; font-size: 0.8rem; padding: 6px 12px; color: var(--color-text-muted);">
-                [ NUEVO PUNTO EN CATÁLOGO ]
-              </button>
-
-              <!-- Formulario de punto personalizado inline (oculto por defecto) -->
-              <div class="acu-inline-form" id="inline-point-form" style="display: none;">
-                <div class="acu-form-row">
-                  <div class="acu-form-group">
-                    <label>Nombre del Punto</label>
-                    <input type="text" id="form-point-name" class="acu-form-input" placeholder="Ej. Fengchi">
-                  </div>
-                  <div class="acu-form-group">
-                    <label>Código MTC Internacional</label>
-                    <input type="text" id="form-point-code" class="acu-form-input" placeholder="Ej. GB 20">
-                  </div>
-                </div>
-                <div class="acu-form-row">
-                  <div class="acu-form-group">
-                    <label>Canal / Meridiano</label>
-                    <select id="form-point-meridian" class="acu-select-flat" style="font-size: 0.8rem; padding: 2px 0;">
-                      <option value="Intestino Grueso">Intestino Grueso</option>
-                      <option value="Estómago">Estómago</option>
-                      <option value="Bazo">Bazo</option>
-                      <option value="Corazón">Corazón</option>
-                      <option value="Pericardio">Pericardio</option>
-                      <option value="Vesícula Biliar">Vesícula Biliar</option>
-                      <option value="Hígado">Hígado</option>
-                      <option value="Vaso Concepción">Vaso Concepción</option>
-                      <option value="Vaso Gobernador (Du Mai)">Vaso Gobernador (Du Mai)</option>
-                    </select>
-                  </div>
-                  <div class="acu-form-group">
-                    <label>Cabezal Recomendado</label>
-                    <select id="form-point-head" class="acu-select-flat" style="font-size: 0.8rem; padding: 2px 0;">
-                      <option value="Esferoidal">Esferoidal (Punta de bolígrafo)</option>
-                      <option value="Nodo">Nodo (Domo / Plano)</option>
-                      <option value="Rodillo">Rodillo (Barrido)</option>
-                      <option value="Precisión">Precisión (Punta de metal desnudo)</option>
-                      <option value="Espátula">Espátula (Gua Sha)</option>
-                    </select>
-                  </div>
-                </div>
-                <div class="acu-form-group">
-                  <label>Ubicación Anatomómica</label>
-                  <input type="text" id="form-point-location" class="acu-form-input" placeholder="Ej. En la base del cráneo, en la depresión posterior...">
-                </div>
-                <div class="acu-form-group">
-                  <label>Beneficios Principales</label>
-                  <input type="text" id="form-point-benefits" class="acu-form-input" placeholder="Ej. Libera tensión cervical, disipa cefaleas de estrés.">
-                </div>
-                <div class="acu-form-row">
-                  <div class="acu-form-group">
-                    <label>Tiempo Estándar (Segundos)</label>
-                    <input type="number" id="form-point-duration" class="acu-form-input" value="120" min="10">
-                  </div>
-                  <div style="display: flex; align-items: flex-end; justify-content: flex-end;">
-                    <button type="button" id="btn-save-inline-point" style="border: none !important; background: transparent; cursor: pointer; font-family: var(--font-main); font-weight: 500; font-size: 0.75rem; padding: 6px 12px; color: var(--color-text-main);">[ GUARDAR Y SELECCIONAR ]</button>
-                  </div>
-                </div>
-              </div>
             </div>
 
             <!-- Botones Guardar y Salir -->
@@ -558,7 +497,6 @@ export async function renderAcupunctureScreen(container, db, onNavigate, appCont
 
     const stepsListEl = layout.querySelector('#builder-steps-list');
     const sideSelect = layout.querySelector('#add-step-side-select');
-    const inlineForm = layout.querySelector('#inline-point-form');
 
     // Sliders de tiempo
     const durSlider = layout.querySelector('#add-step-duration-slider');
@@ -634,7 +572,9 @@ export async function renderAcupunctureScreen(container, db, onNavigate, appCont
             ${pointsInMeridian.map(p => `
               <div class="dropdown-point-item" data-id="${escapeAttribute(p.id)}" style="padding:6px; font-size:0.78rem; cursor:pointer; color:var(--color-text-main); transition:all 0.15s; display:flex; justify-content:space-between; align-items:center;">
                 <span>${escapeHTML(p.name)}</span>
-                <span style="font-family:var(--font-digital); font-size:0.7rem; color:var(--color-accent-red); opacity:0.85;">${escapeHTML(p.code)}</span>
+                <span style="font-family:var(--font-digital); font-size:0.7rem; color:var(--color-accent-red); opacity:0.85;">
+                  ${escapeHTML(p.code)}${p.traditional_code && p.traditional_code !== p.code ? ` / ${escapeHTML(p.traditional_code)}` : ''}
+                </span>
               </div>
             `).join('')}
           </div>
@@ -676,7 +616,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, appCont
       if (!p) return;
 
       selectedPointId = p.id;
-      selectedLabel.textContent = `${p.name} (${p.code})`;
+      selectedLabel.textContent = `${p.name} (${p.code}${p.traditional_code && p.traditional_code !== p.code ? ` / ${p.traditional_code}` : ''})`;
 
       // Auto-cargar duración recomendada del punto en el slider
       durSlider.value = p.duration || 120;
@@ -764,7 +704,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, appCont
           <!-- Detalles del paso -->
           <div class="acu-step-details" style="display:flex; flex-wrap:wrap; gap:16px; width:100%; align-items:center;">
             <div style="flex:2; min-width:140px; display:flex; flex-direction:column; gap:2px;">
-              <span class="acu-step-point-title" style="font-size:0.85rem; font-weight:600;">${escapeHTML(pointData.name)} (${escapeHTML(pointData.code)})</span>
+              <span class="acu-step-point-title" style="font-size:0.85rem; font-weight:600;">${escapeHTML(pointData.name)} (${escapeHTML(pointData.code)}${pointData.traditional_code && pointData.traditional_code !== pointData.code ? ` / ${escapeHTML(pointData.traditional_code)}` : ''})</span>
               <span style="font-size:0.6rem; color:var(--color-text-muted);">${escapeHTML(pointData.headType)}</span>
             </div>
 
@@ -851,68 +791,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, appCont
 
     renderBuilderSteps();
 
-    // Toggle inline form
-    layout.querySelector('#btn-toggle-inline-form').addEventListener('click', () => {
-      const isVisible = inlineForm.style.display !== 'none';
-      inlineForm.style.display = isVisible ? 'none' : 'flex';
-    });
 
-    // Guardar punto personalizado inline
-    layout.querySelector('#btn-save-inline-point').addEventListener('click', async () => {
-      const nameIn = layout.querySelector('#form-point-name').value.trim();
-      const codeIn = layout.querySelector('#form-point-code').value.trim();
-      const meridianIn = layout.querySelector('#form-point-meridian').value;
-      const headIn = layout.querySelector('#form-point-head').value;
-      const locationIn = layout.querySelector('#form-point-location').value.trim();
-      const benefitsIn = layout.querySelector('#form-point-benefits').value.trim();
-      const durationIn = Math.max(10, parseInt(layout.querySelector('#form-point-duration').value) || 120);
-
-      if (!nameIn || !codeIn || !locationIn) {
-        alert('Por favor, rellena los campos básicos: Nombre, Código y Ubicación.');
-        return;
-      }
-
-      const newPointId = 'point-' + Date.now();
-      const matchedMeridian = meridiansList.find(m => m.name === meridianIn || m.id === meridianIn);
-      const meridianIdVal = matchedMeridian ? matchedMeridian.id : 'EX';
-
-      const newPointObj = {
-        id: newPointId,
-        name: nameIn,
-        code: codeIn,
-        meridian_id: meridianIdVal,
-        meridian: meridianIn,
-        headType: headIn,
-        location: locationIn,
-        benefits: benefitsIn || 'Estimulación técnica con TENS.',
-        duration: durationIn,
-        custom: true
-      };
-
-      try {
-        await addData(db, 'acupuncture_points', newPointObj);
-
-        // Actualizar catálogo local
-        await loadData();
-
-        // Repoblar el select y seleccionar el nuevo punto
-        populateCustomDropdown();
-        selectPoint(newPointId);
-
-        // Limpiar inputs del formulario
-        layout.querySelector('#form-point-name').value = '';
-        layout.querySelector('#form-point-code').value = '';
-        layout.querySelector('#form-point-location').value = '';
-        layout.querySelector('#form-point-benefits').value = '';
-
-        // Esconder formulario
-        inlineForm.style.display = 'none';
-        alert(`Punto "${nameIn}" añadido al catálogo correctamente.`);
-      } catch (err) {
-        console.error('Error al guardar punto:', err);
-        alert('Error al guardar el punto personalizado.');
-      }
-    });
 
     // Agregar paso
     layout.querySelector('#btn-add-step-trigger').addEventListener('click', () => {
@@ -1205,7 +1084,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, appCont
 
         if (nextPoint) {
           pointHead.textContent = `Siguiente Cabezal: ${nextPoint.headType}`;
-          pointLocation.textContent = `Prepárate para colocar el electro-pen en el punto: ${nextPoint.name} (${nextPoint.code}). Ubicado en: ${nextPoint.location}`;
+          pointLocation.textContent = `Prepárate para colocar el electro-pen en el punto: ${nextPoint.name} (${nextPoint.code}${nextPoint.traditional_code && nextPoint.traditional_code !== nextPoint.code ? ` / ${nextPoint.traditional_code}` : ''}). Ubicado en: ${nextPoint.location}`;
           pointBenefits.textContent = `Limpia la zona y aplica gel conductor en la nueva ubicación. Configura la pluma al nivel 1.`;
         } else {
           pointHead.textContent = 'Finalizando';
@@ -1217,7 +1096,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, appCont
         stateBadge.className = 'acu-state-badge stimulating';
 
         if (point) {
-          pointCode.textContent = point.code;
+          pointCode.textContent = point.traditional_code && point.traditional_code !== point.code ? `${point.code} / ${point.traditional_code}` : point.code;
           pointName.textContent = `${point.name} ${step.side ? `(${step.side})` : ''}`;
           pointMeridian.textContent = point.meridian || 'Canal Energético';
           pointHead.textContent = `Cabezal Sugerido: ${point.headType}`;

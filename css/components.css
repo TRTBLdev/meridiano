@@ -2008,6 +2008,25 @@ body.dark-theme .acu-fullscreen-bg.grid-36 .acu-dot.dot-on {
   box-shadow: 0 0 7px var(--dot-glow, rgba(232, 230, 227, 0.55)) !important;
 }
 
+/* Puntos de fondo inactivos claros para temporizadores que siempre son oscuros */
+.timer-shell .acu-fullscreen-bg.grid-36 .acu-dot,
+#yoga-dots-grid .acu-dot {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Forzar visualización correcta de la matriz de puntos del reloj digital en pantallas oscuras fijas */
+.timer-shell .dot-matrix-dot.active,
+.yoga-timer-dot-display .dot-matrix-dot.active {
+  background-color: #FAF9F6 !important;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.6) !important;
+}
+
+.timer-shell .dot-matrix-dot,
+.yoga-timer-dot-display .dot-matrix-dot {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+
 /* Botón Play estilizado en cabecera de acordeón */
 .btn-play-header {
   background: none;

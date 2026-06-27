@@ -18,7 +18,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
   // Estados de edición e inserción
   let editingItem = null; // Guardará el objeto del item que se está editando
   let editingStore = ''; // Almacén activo en edición ('acupuncture_points', 'meridians', 'breathwork_patterns', 'yoga_postures', 'yoga_blocks')
-  
+
   // Estado del buscador
   let pointSearchQuery = '';
   let activeMeridianFilter = 'ALL';
@@ -42,7 +42,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
         'CV': 13, 'GV': 14, 'EX': 15, 'AU': 16, 'MS': 17
       };
       meridiansList.sort((a, b) => (meridianOrderMap[a.id] || 99) - (meridianOrderMap[b.id] || 99));
-      
+
       // Ordenar puntos alfabéticamente
       catalogPoints.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
     } catch (err) {
@@ -147,30 +147,34 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
         <!-- Formulario de Inserción / Edición -->
         <div class="glass-panel" style="padding: 20px; margin-bottom: 24px;">
           <h3 style="font-size:0.9rem; font-weight:600; margin-bottom:14px; text-transform:uppercase; font-family:var(--font-digital); color:var(--color-text-main);">
-            ${editingItem && editingStore === 'acupuncture_points' ? 'Editar Punto' : 'Agregar Nuevo Punto al Catálogo'}
+            ${editingItem && editingStore === 'acupuncture_points' ? 'Editar Punto Extra' : 'Agregar Nuevo Punto Extra al Catálogo'}
           </h3>
           <form id="form-acu-point" style="display:flex; flex-direction:column; gap:12px;">
             <div style="display:flex; flex-wrap:wrap; gap:16px;">
               <div style="flex:1; min-width:180px; display:flex; flex-direction:column; gap:4px;">
                 <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Nombre del Punto</label>
-                <input type="text" id="acu-p-name" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Hegu (Fondo de la Boca)" required>
+                <input type="text" id="acu-p-name" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Yintang (Palacio del Sello)" required>
               </div>
               <div style="width:120px; display:flex; flex-direction:column; gap:4px;">
                 <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Código MTC / OMS</label>
-                <input type="text" id="acu-p-code" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. LI 4" required>
+                <input type="text" id="acu-p-code" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Ex-HN 3" required>
+              </div>
+              <div style="width:140px; display:flex; flex-direction:column; gap:4px;">
+                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Código Tradicional / Pinyin</label>
+                <input type="text" id="acu-p-trad-code" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Yintang" required>
               </div>
               <div style="width:140px; display:flex; flex-direction:column; gap:4px;">
                 <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Canal / Meridiano</label>
-                <select id="acu-p-meridian" class="acu-select-flat" style="padding: 6px;">
-                  ${meridiansList.map(m => `<option value="${escapeAttribute(m.id)}">${escapeHTML(m.name)} (${escapeHTML(m.id)})</option>`).join('')}
+                <select id="acu-p-meridian" class="acu-select-flat" style="padding: 6px;" disabled>
+                  <option value="EX" selected>Puntos Extra (EX)</option>
                 </select>
               </div>
               <div style="width:140px; display:flex; flex-direction:column; gap:4px;">
                 <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Cabezal de Electro Pen</label>
                 <select id="acu-p-head" class="acu-select-flat" style="padding: 6px;">
                   <option value="Esferoidal">Esferoidal (Ball)</option>
-                  <option value="Nodo">Nodo (Domo)</option>
-                  <option value="Precisión">Precisión (Punta de metal)</option>
+                  <option value="Domo">Domo (Plano)</option>
+                  <option value="Nodo">Nodo (Sin Cabezal)</option>
                 </select>
               </div>
               <div style="width:100px; display:flex; flex-direction:column; gap:4px;">
@@ -186,7 +190,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
             
             <div style="display:flex; flex-direction:column; gap:4px;">
               <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Beneficios Clínicos / Indicaciones</label>
-              <input type="text" id="acu-p-benefits" class="acu-input-flat" style="padding: 6px; font-size:0.8rem;" placeholder="Ej. Alivia cefaleas, dispersa el viento facial y calma el dolor general." required>
+              <input type="text" id="acu-p-benefits" class="acu-input-flat" style="padding: 6px; font-size:0.8rem;" placeholder="Ej. Alivia la ansiedad, cefaleas frontales, insomnio y congestión nasal." required>
             </div>
 
             <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:8px;">
@@ -194,7 +198,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
                 <button type="button" id="btn-cancel-edit" style="background:none; border:none; color:var(--color-text-muted); font-size:0.75rem; cursor:pointer;">[ CANCELAR ]</button>
                 <button type="submit" style="background:none; border:none; color:var(--color-accent-green); font-size:0.75rem; cursor:pointer; font-weight:600;">[ GUARDAR CAMBIOS ]</button>
               ` : `
-                <button type="submit" style="background:none; border:none; color:var(--color-text-main); font-size:0.75rem; cursor:pointer; font-weight:600;">[ AGREGAR PUNTO ]</button>
+                <button type="submit" style="background:none; border:none; color:var(--color-text-main); font-size:0.75rem; cursor:pointer; font-weight:600;">[ AGREGAR PUNTO EXTRA ]</button>
               `}
             </div>
           </form>
@@ -202,7 +206,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
 
         <!-- Buscador y Filtro por Canal -->
         <div style="display:flex; flex-wrap:wrap; gap:16px; align-items:center; margin-bottom:16px;">
-          <input type="text" id="acu-search-input" class="acu-input-flat" style="flex:1; min-width:200px; padding:6px 12px; font-size:0.8rem;" placeholder="Buscar punto por código o nombre..." value="${escapeAttribute(pointSearchQuery)}">
+          <input type="text" id="acu-search-input" class="acu-input-flat" style="flex:1; min-width:200px; padding:6px 12px; font-size:0.8rem;" placeholder="Buscar punto por código (estándar o tradicional) o nombre..." value="${escapeAttribute(pointSearchQuery)}">
           
           <select id="acu-meridian-filter" class="acu-select-flat" style="padding:6px; font-size:0.8rem;">
             <option value="ALL" ${activeMeridianFilter === 'ALL' ? 'selected' : ''}>Todos los Canales</option>
@@ -218,7 +222,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
       if (editingItem && editingStore === 'acupuncture_points') {
         layout.querySelector('#acu-p-name').value = editingItem.name || '';
         layout.querySelector('#acu-p-code').value = editingItem.code || '';
-        layout.querySelector('#acu-p-meridian').value = editingItem.meridian_id || '';
+        layout.querySelector('#acu-p-trad-code').value = editingItem.traditional_code || '';
         layout.querySelector('#acu-p-head').value = editingItem.headType || 'Esferoidal';
         layout.querySelector('#acu-p-dur').value = editingItem.duration || 120;
         layout.querySelector('#acu-p-loc').value = editingItem.location || '';
@@ -247,15 +251,14 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
       // Guardar / Editar Punto
       layout.querySelector('#form-acu-point').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const mId = layout.querySelector('#acu-p-meridian').value;
-        const selectedMeridian = meridiansList.find(m => m.id === mId);
-        
+
         const pointData = {
           id: editingItem && editingStore === 'acupuncture_points' ? editingItem.id : 'point-' + Date.now(),
           name: layout.querySelector('#acu-p-name').value.trim(),
           code: layout.querySelector('#acu-p-code').value.trim(),
-          meridian_id: mId,
-          meridian: selectedMeridian ? selectedMeridian.name : '',
+          traditional_code: layout.querySelector('#acu-p-trad-code').value.trim(),
+          meridian_id: 'EX',
+          meridian: 'Puntos Extra',
           headType: layout.querySelector('#acu-p-head').value,
           duration: parseInt(layout.querySelector('#acu-p-dur').value) || 120,
           location: layout.querySelector('#acu-p-loc').value.trim(),
@@ -266,7 +269,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
         try {
           await putData(db, 'acupuncture_points', pointData);
           editingItem = null;
-          alert('Punto de acupuntura guardado en la base de datos.');
+          alert('Punto extra guardado en la base de datos.');
           refresh();
         } catch (err) {
           console.error(err);
@@ -276,102 +279,16 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
 
       renderFilteredPointsList();
     } else {
-      // --- SUB-PESTAÑA MERIDIANOS ---
+      // --- SUB-PESTAÑA MERIDIANOS (LECTURA ÚNICAMENTE) ---
       subContentEl.innerHTML = `
-        <!-- Formulario Meridianos -->
-        <div class="glass-panel" style="padding: 20px; margin-bottom: 24px;">
-          <h3 style="font-size:0.9rem; font-weight:600; margin-bottom:14px; text-transform:uppercase; font-family:var(--font-digital); color:var(--color-text-main);">
-            ${editingItem && editingStore === 'meridians' ? 'Editar Canal de Meridiano' : 'Registrar Nuevo Canal Energético'}
-          </h3>
-          <form id="form-acu-meridian" style="display:flex; flex-direction:column; gap:12px;">
-            <div style="display:flex; flex-wrap:wrap; gap:16px;">
-              <div style="width:100px; display:flex; flex-direction:column; gap:4px;">
-                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">ID / Código (OMS)</label>
-                <input type="text" id="acu-m-id" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. LU" ${editingItem && editingStore === 'meridians' ? 'disabled' : ''} required>
-              </div>
-              <div style="flex:1.5; min-width:140px; display:flex; flex-direction:column; gap:4px;">
-                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Nombre en Español</label>
-                <input type="text" id="acu-m-name" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Pulmón" required>
-              </div>
-              <div style="flex:1; min-width:140px; display:flex; flex-direction:column; gap:4px;">
-                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Nombre Pinyin</label>
-                <input type="text" id="acu-m-pinyin" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Feijing">
-              </div>
-              <div style="width:120px; display:flex; flex-direction:column; gap:4px;">
-                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Elemento MTC</label>
-                <select id="acu-m-element" class="acu-select-flat" style="padding: 6px;">
-                  <option value="Metal">Metal</option>
-                  <option value="Earth">Tierra (Earth)</option>
-                  <option value="Water">Agua (Water)</option>
-                  <option value="Fire">Fuego (Fire)</option>
-                  <option value="Wood">Madera (Wood)</option>
-                  <option value="Ninguno">Ninguno</option>
-                </select>
-              </div>
-              <div style="width:100px; display:flex; flex-direction:column; gap:4px;">
-                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Yin / Yang</label>
-                <select id="acu-m-yinyang" class="acu-select-flat" style="padding: 6px;">
-                  <option value="Yin">Yin</option>
-                  <option value="Yang">Yang</option>
-                  <option value="Ninguno">Ninguno</option>
-                </select>
-              </div>
-              <div style="width:90px; display:flex; flex-direction:column; gap:4px;">
-                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Puntos Totales</label>
-                <input type="number" id="acu-m-points" class="acu-input-flat" style="padding: 6px;" min="0" value="11" required>
-              </div>
-            </div>
-
-            <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:8px;">
-              ${editingItem && editingStore === 'meridians' ? `
-                <button type="button" id="btn-cancel-edit" style="background:none; border:none; color:var(--color-text-muted); font-size:0.75rem; cursor:pointer;">[ CANCELAR ]</button>
-                <button type="submit" style="background:none; border:none; color:var(--color-accent-green); font-size:0.75rem; cursor:pointer; font-weight:600;">[ GUARDAR CAMBIOS ]</button>
-              ` : `
-                <button type="submit" style="background:none; border:none; color:var(--color-text-main); font-size:0.75rem; cursor:pointer; font-weight:600;">[ REGISTRAR MERIDIANO ]</button>
-              `}
-            </div>
-          </form>
+        <!-- Info Informativa -->
+        <div style="font-size: 0.75rem; color: var(--color-text-muted); margin-bottom: 16px; font-family: var(--font-digital); text-transform: uppercase; letter-spacing: 0.05em;">
+          Catálogo de Canales Energéticos
         </div>
 
         <!-- Listado de Meridianos -->
         <div class="acu-points-tab-list" id="meridians-editor-list"></div>
       `;
-
-      if (editingItem && editingStore === 'meridians') {
-        layout.querySelector('#acu-m-id').value = editingItem.id || '';
-        layout.querySelector('#acu-m-name').value = editingItem.name || '';
-        layout.querySelector('#acu-m-pinyin').value = editingItem.chinese_pinyin || '';
-        layout.querySelector('#acu-m-element').value = editingItem.element || 'Metal';
-        layout.querySelector('#acu-m-yinyang').value = editingItem.yin_yang || 'Yin';
-        layout.querySelector('#acu-m-points').value = editingItem.total_points || 0;
-
-        layout.querySelector('#btn-cancel-edit').addEventListener('click', () => {
-          editingItem = null;
-          refresh();
-        });
-      }
-
-      layout.querySelector('#form-acu-meridian').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const meridianData = {
-          id: editingItem && editingStore === 'meridians' ? editingItem.id : layout.querySelector('#acu-m-id').value.trim().toUpperCase(),
-          name: layout.querySelector('#acu-m-name').value.trim(),
-          chinese_pinyin: layout.querySelector('#acu-m-pinyin').value.trim(),
-          element: layout.querySelector('#acu-m-element').value,
-          yin_yang: layout.querySelector('#acu-m-yinyang').value,
-          total_points: parseInt(layout.querySelector('#acu-m-points').value) || 0
-        };
-
-        try {
-          await putData(db, 'meridians', meridianData);
-          editingItem = null;
-          alert('Canal de meridiano guardado con éxito.');
-          refresh();
-        } catch (err) {
-          console.error(err);
-          alert('Error al guardar el meridiano.');
-        }
-      });
 
       renderMeridiansList();
     }
@@ -382,7 +299,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
     if (!listEl) return;
 
     listEl.innerHTML = '';
-    
+
     // Filtrar los puntos
     const query = pointSearchQuery.toLowerCase().trim();
     let filtered = catalogPoints;
@@ -391,7 +308,11 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
       filtered = filtered.filter(p => p.meridian_id === activeMeridianFilter);
     }
     if (query.length > 0) {
-      filtered = filtered.filter(p => p.name.toLowerCase().includes(query) || p.code.toLowerCase().includes(query));
+      filtered = filtered.filter(p =>
+        p.name.toLowerCase().includes(query) ||
+        p.code.toLowerCase().includes(query) ||
+        (p.traditional_code && p.traditional_code.toLowerCase().includes(query))
+      );
     }
 
     if (filtered.length === 0) {
@@ -409,7 +330,9 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
             <span style="font-weight:600; font-size:0.88rem; color:var(--color-text-main);">${escapeHTML(p.name)}</span>
           </div>
           <div style="display:flex; align-items:center; gap:12px;">
-            <span style="font-family:var(--font-mono); color:var(--color-accent-red); font-size:0.75rem; font-weight:600;">${escapeHTML(p.code)}</span>
+            <span style="font-family:var(--font-mono); color:var(--color-accent-red); font-size:0.75rem; font-weight:600;">
+              ${escapeHTML(p.code)}${p.traditional_code && p.traditional_code !== p.code ? ` / ${escapeHTML(p.traditional_code)}` : ''}
+            </span>
             <span style="font-size:0.62rem; color:var(--color-text-muted); font-family:var(--font-mono); text-transform:uppercase;">${escapeHTML(p.headType)}</span>
           </div>
         </div>
@@ -423,10 +346,12 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
             <div style="font-size:0.78rem; color:var(--color-text-main); line-height:1.4;">${escapeHTML(p.benefits)}</div>
           </div>
           <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; border-top:1px dotted rgba(46,43,40,0.05); padding-top:8px;">
-            <span style="font-size:0.65rem; color:var(--color-text-muted);">Canal: ${escapeHTML(p.meridian)} (${escapeHTML(p.meridian_id)}) | Duración: ${escapeHTML(p.duration)}s</span>
+            <span style="font-size:0.65rem; color:var(--color-text-muted);">Canal: ${escapeHTML(p.meridian)} (${escapeHTML(p.meridian_id)}) ${p.traditional_code && p.traditional_code !== p.code ? `| Tradicional: ${escapeHTML(p.traditional_code)}` : ''} | Duración: ${escapeHTML(p.duration)}s</span>
             <div style="display:flex; gap:12px;">
-              <button class="btn-edit-pt" style="background:none; border:none; color:var(--color-text-main); font-size:0.62rem; cursor:pointer;">[ EDITAR ]</button>
-              <button class="btn-delete-pt" style="background:none; border:none; color:var(--color-accent-red); font-size:0.62rem; cursor:pointer;">[ ELIMINAR ]</button>
+              ${p.meridian_id === 'EX' ? `
+                <button class="btn-edit-pt" style="background:none; border:none; color:var(--color-text-main); font-size:0.62rem; cursor:pointer;">[ EDITAR ]</button>
+                <button class="btn-delete-pt" style="background:none; border:none; color:var(--color-accent-red); font-size:0.62rem; cursor:pointer;">[ ELIMINAR ]</button>
+              ` : ''}
             </div>
           </div>
         </div>
@@ -442,21 +367,27 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
         arrow.style.transform = isExpanded ? 'rotate(90deg)' : 'none';
       });
 
-      card.querySelector('.btn-edit-pt').addEventListener('click', (e) => {
-        e.stopPropagation();
-        editingItem = p;
-        editingStore = 'acupuncture_points';
-        refresh();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      });
-
-      card.querySelector('.btn-delete-pt').addEventListener('click', async (e) => {
-        e.stopPropagation();
-        if (confirm(`¿Seguro que deseas eliminar el punto "${p.name}" (${p.code}) de la base de datos?`)) {
-          await deleteData(db, 'acupuncture_points', p.id);
+      const btnEdit = card.querySelector('.btn-edit-pt');
+      if (btnEdit) {
+        btnEdit.addEventListener('click', (e) => {
+          e.stopPropagation();
+          editingItem = p;
+          editingStore = 'acupuncture_points';
           refresh();
-        }
-      });
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+      }
+
+      const btnDelete = card.querySelector('.btn-delete-pt');
+      if (btnDelete) {
+        btnDelete.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          if (confirm(`¿Seguro que deseas eliminar el punto "${p.name}" (${p.code}) de la base de datos?`)) {
+            await deleteData(db, 'acupuncture_points', p.id);
+            refresh();
+          }
+        });
+      }
 
       listEl.appendChild(card);
     });
@@ -472,34 +403,18 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
       const card = document.createElement('div');
       card.className = 'acu-point-card';
       card.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <div>
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap: 16px;">
+          <div style="flex: 1;">
             <span style="font-weight:600; font-size:0.88rem; color:var(--color-text-main);">${escapeHTML(m.name)} ${m.chinese_pinyin ? `(${escapeHTML(m.chinese_pinyin)})` : ''}</span>
+            <span style="font-family:var(--font-mono); font-size:0.75rem; color:var(--color-text-muted); margin-left: 8px;">[Trad: ${escapeHTML(m.pinyin_code || '')}]</span>
             <div style="font-size:0.65rem; color:var(--color-text-muted); margin-top:2px;">Elemento: ${escapeHTML(m.element)} | Energía: ${escapeHTML(m.yin_yang)} | Puntos esperados: ${escapeHTML(m.total_points)}</div>
+            <p style="font-size:0.75rem; color:var(--color-text-main); margin: 6px 0 0 0; line-height: 1.4;">${escapeHTML(m.description || 'Sin descripción.')}</p>
           </div>
-          <div style="display:flex; align-items:center; gap:16px;">
+          <div style="display:flex; align-items:center; gap:16px; flex-shrink: 0;">
             <span style="font-family:var(--font-digital); color:var(--color-accent-red); font-size:0.9rem; font-weight:600;">${escapeHTML(m.id)}</span>
-            <div style="display:flex; gap:10px;">
-              <button class="btn-edit-mer" style="background:none; border:none; color:var(--color-text-main); font-size:0.62rem; cursor:pointer;">[ EDITAR ]</button>
-              <button class="btn-delete-mer" style="background:none; border:none; color:var(--color-accent-red); font-size:0.62rem; cursor:pointer;">[ BORRAR ]</button>
-            </div>
           </div>
         </div>
       `;
-
-      card.querySelector('.btn-edit-mer').addEventListener('click', () => {
-        editingItem = m;
-        editingStore = 'meridians';
-        refresh();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      });
-
-      card.querySelector('.btn-delete-mer').addEventListener('click', async () => {
-        if (confirm(`¿Seguro que deseas eliminar el canal "${m.name}" de la base de datos? Esto no eliminará sus puntos, pero se quedarán sin canal asociado.`)) {
-          await deleteData(db, 'meridians', m.id);
-          refresh();
-        }
-      });
 
       listEl.appendChild(card);
     });
@@ -826,7 +741,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
       `;
 
       const blockPosturesBuilderEl = subContentEl.querySelector('#block-postures-builder');
-      
+
       function renderBlockBuilderPostures() {
         blockPosturesBuilderEl.innerHTML = '';
         if (blockPosturesList.length === 0) {
@@ -879,7 +794,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
       subContentEl.querySelector('#btn-add-asana-to-block').addEventListener('click', () => {
         const asanaId = subContentEl.querySelector('#select-asana-to-add').value;
         const holdTime = parseInt(subContentEl.querySelector('#input-asana-hold').value) || 120;
-        
+
         if (asanaId) {
           blockPosturesList.push({ postureId: asanaId, holdTime });
           renderBlockBuilderPostures();
@@ -901,7 +816,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
 
       layout.querySelector('#form-block').addEventListener('submit', async (e) => {
         e.preventDefault();
-        
+
         if (blockPosturesList.length === 0) {
           alert('Por favor, añade al menos una postura al bloque antes de guardar.');
           return;
@@ -931,7 +846,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
 
   function renderPosturesList(listEl) {
     listEl.innerHTML = '';
-    
+
     yogaPostures.forEach(p => {
       const card = document.createElement('div');
       card.className = 'acu-point-card';
@@ -1040,16 +955,16 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
           </thead>
           <tbody>
             <tr>
-              <td class="acu-head-name-col">Puntero Precisión (Metal)</td>
-              <td>Punta fina del lápiz sin cabezal. Concentra la densidad de corriente. Especialmente indicado para auriculoterapia profunda o localización de puntos en zonas pequeñas y oídos.</td>
+              <td class="acu-head-name-col">Puntero Nodo (Sin Cabezal)</td>
+              <td>La punta directa del lápiz (sin cabezal) o accesorio de punta fina, perfecta para puntos muy estrechos, dedos de las manos, de los pies y localizaciones anatómicas de extrema precisión.</td>
             </tr>
             <tr>
               <td class="acu-head-name-col">Cabezal Esferoidal (Ball)</td>
               <td>Punta esférica estándar. Distribuye la estimulación TENS de forma profunda y concéntrica. Idóneo para la búsqueda de puntos gatillo y estímulo de contracción muscular.</td>
             </tr>
             <tr>
-              <td class="acu-head-name-col">Cabezal de Nodo (Domo)</td>
-              <td>Superficie plana circular. Dispersa la energía de forma más suave y superficial. Para estimulación en zonas óseas cercanas o áreas sensibles (rostro, abdomen y pecho).</td>
+              <td class="acu-head-name-col">Cabezal de Domo (Plano)</td>
+              <td>El cabezal plano o de cúpula ancha, ideal para dispersar la corriente, suavizar el estímulo en zonas muy sensibles (como la cara, el cuello o el pliegue transversal de la muñeca) y calmar el sistema nervioso de manera gentil.</td>
             </tr>
           </tbody>
         </table>
