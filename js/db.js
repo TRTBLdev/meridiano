@@ -306,18 +306,35 @@ export function deleteData(db, storeName, id) {
 /**
  * Exporta toda la base de datos IndexedDB a un objeto JSON consolidado.
  */
-export async function exportDatabase(db) {
-  const stores = [
-    'sessions_log',
-    'yoga_postures',
-    'yoga_blocks',
-    'yoga_sequences',
-    'meditation_presets',
-    'breathwork_patterns',
-    'acupuncture_points',
-    'acupuncture_sequences',
-    'meridians'
-  ];
+export async function exportDatabase(db, mode = 'all') {
+  let stores = [];
+
+  if (mode === 'history') {
+    stores = ['sessions_log'];
+  } else if (mode === 'content') {
+    stores = [
+      'yoga_postures',
+      'yoga_blocks',
+      'yoga_sequences',
+      'meditation_presets',
+      'breathwork_patterns',
+      'acupuncture_points',
+      'acupuncture_sequences',
+      'meridians'
+    ];
+  } else {
+    stores = [
+      'sessions_log',
+      'yoga_postures',
+      'yoga_blocks',
+      'yoga_sequences',
+      'meditation_presets',
+      'breathwork_patterns',
+      'acupuncture_points',
+      'acupuncture_sequences',
+      'meridians'
+    ];
+  }
 
   const backup = {
     version: '1.1',

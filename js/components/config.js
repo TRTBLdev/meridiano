@@ -69,11 +69,19 @@ export async function renderConfigScreen(container, db, onNavigate) {
                   [ 02 / EXPORTAR RESPALDO ]
                 </h3>
                 <p style="font-size: 0.75rem; color: var(--color-text-muted); margin-bottom: 16px; line-height: 1.4;">
-                  Descargue una copia completa de sus datos locales (historial de prácticas, secuencias personalizadas y presets) en un archivo consolidado en formato .json.
+                  Descargue una copia de sus datos locales (historial de prácticas, secuencias personalizadas y presets) en un archivo consolidado en formato .json.
                 </p>
-                <button id="btn-export-db" class="btn-braun-tab active" style="font-family: var(--font-digital); text-transform: uppercase; padding: 8px 16px; cursor: pointer; border-radius: 0;">
-                  Descargar Copia (.json)
-                </button>
+                <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                  <button id="btn-export-history" class="btn-braun-tab active" style="font-family: var(--font-digital); text-transform: uppercase; padding: 8px 16px; cursor: pointer; border-radius: 0;">
+                    Historial de Prácticas
+                  </button>
+                  <button id="btn-export-content" class="btn-braun-tab active" style="font-family: var(--font-digital); text-transform: uppercase; padding: 8px 16px; cursor: pointer; border-radius: 0;">
+                    Contenido Personalizado
+                  </button>
+                  <button id="btn-export-all" class="btn-braun-tab active" style="font-family: var(--font-digital); text-transform: uppercase; padding: 8px 16px; cursor: pointer; border-radius: 0;">
+                    Todo
+                  </button>
+                </div>
               </div>
 
               <div style="border-top: 1px dashed rgba(46, 43, 40, 0.08); padding-top: 24px;">
@@ -159,25 +167,29 @@ export async function renderConfigScreen(container, db, onNavigate) {
   });
 
   // 2. Exportación de base de datos
-  layout.querySelector('#btn-export-db').addEventListener('click', async () => {
+  async function handleExport(mode, filenamePrefix) {
     try {
-      const backup = await exportDatabase(db);
+      const backup = await exportDatabase(db, mode);
       const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backup, null, 2));
       const downloadAnchor = document.createElement('a');
       const dateStr = new Date().toISOString().slice(0, 10);
       
       downloadAnchor.setAttribute("href", dataStr);
-      downloadAnchor.setAttribute("download", `meridiano_backup_${dateStr}.json`);
+      downloadAnchor.setAttribute("download", `${filenamePrefix}_${dateStr}.json`);
       document.body.appendChild(downloadAnchor);
       downloadAnchor.click();
       downloadAnchor.remove();
       
-      console.log('[Config] Base de datos exportada con éxito.');
+      console.log(`[Config] Base de datos (${mode}) exportada con éxito.`);
     } catch (err) {
       console.error('[Config] Error al exportar:', err);
       alert('Ocurrió un error al intentar exportar la base de datos.');
     }
-  });
+  }
+
+  layout.querySelector('#btn-export-history').addEventListener('click', () => handleExport('history', 'meridiano_history'));
+  layout.querySelector('#btn-export-content').addEventListener('click', () => handleExport('content', 'meridiano_content'));
+  layout.querySelector('#btn-export-all').addEventListener('click', () => handleExport('all', 'meridiano_backup'));
 
   // 3. Importación de base de datos
   const fileInput = layout.querySelector('#file-import-db');

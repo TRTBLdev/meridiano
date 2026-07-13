@@ -4,8 +4,13 @@ import { escapeAttribute, escapeHTML } from '../utils/sanitize.js';
 import {
   bindWakeLockPreference,
   createWakeLockController,
-  populateTimerDots
+  populateTimerDots,
+  renderSynthPanel,
+  bindSynthPanel
 } from './timerShell.js';
+import { createSynthEngine, playQuartzBowlRing } from '../utils/synth.js';
+import { getFreqLabel, valueToFreq, freqToValue } from '../utils/freqUtils.js';
+
 
 /**
  * Componente modular para el módulo de acupuntura TENS con Electro Pen.
@@ -16,8 +21,9 @@ import {
  * @param {Function} onNavigate Navegación global
  * @param {Object} appController Enlace para controlar el sintonizador de sonido global
  */
-export async function renderAcupunctureScreen(container, db, onNavigate, appController) {
+export async function renderAcupunctureScreen(container, db, onNavigate) {
   // Estado local del componente
+  const synth = createSynthEngine();
   let catalogPoints = [];
   let sequences = [];
   let activeView = 'lobby'; // 'lobby', 'builder', 'timer'
@@ -51,60 +57,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, appCont
   let activeMeridianTab = 'LI'; // Código OMS para Intestino Grueso (Hegu)
   let meridiansList = [];
 
-  const FREQ_DESCRIPTIONS = {
-    174: '174 Hz — Alivio del dolor',
-    285: '285 Hz — Regeneración de tejidos',
-    396: '396 Hz — Liberar miedo y culpa',
-    417: '417 Hz — Facilitar el cambio',
-    432: '432 Hz — Calma y armonía natural',
-    528: '528 Hz — Transformación y milagro',
-    639: '639 Hz — Conexión y relaciones',
-    741: '741 Hz — Despertar de la intuición',
-    852: '852 Hz — Retorno al orden espiritual',
-    963: '963 Hz — Conexión universal / Unidad'
-  };
 
-  function getFreqLabel(freq) {
-    const freqNum = parseFloat(freq);
-    for (const key of Object.keys(FREQ_DESCRIPTIONS)) {
-      if (Math.abs(parseFloat(key) - freqNum) < 0.05) {
-        return FREQ_DESCRIPTIONS[key];
-      }
-    }
-    const displayVal = freqNum % 1 === 0 ? freqNum.toFixed(0) : freqNum.toFixed(1);
-    return `${displayVal} Hz`;
-  }
-
-  function valueToFreq(v) {
-    if (v <= 25) {
-      return 0.5 + (v / 25) * 3.5;
-    } else if (v <= 50) {
-      return 4.0 + ((v - 25) / 25) * 4.0;
-    } else if (v <= 75) {
-      return 8.0 + ((v - 50) / 25) * 4.0;
-    } else {
-      return 12.0 + ((v - 75) / 25) * 18.0;
-    }
-  }
-
-  function freqToValue(f) {
-    if (f <= 4.0) {
-      return ((f - 0.5) / 3.5) * 25;
-    } else if (f <= 8.0) {
-      return 25 + ((f - 4.0) / 4.0) * 25;
-    } else if (f <= 12.0) {
-      return 50 + ((f - 8.0) / 4.0) * 25;
-    } else {
-      return 75 + ((f - 12.0) / 18.0) * 25;
-    }
-  }
-
-  function getWaveStateName(freq) {
-    if (freq <= 4.0) return 'DELTA';
-    if (freq <= 8.0) return 'THETA';
-    if (freq <= 12.0) return 'ALPHA';
-    return 'BETA';
-  }
 
   // Cargar datos iniciales
   async function loadData() {
@@ -142,13 +95,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, appCont
     }
   }
 
-  // Cierra el sintonizador global flotante si está abierto
-  function closeGlobalTuner() {
-    const overlay = document.getElementById('sound-tuner-overlay');
-    if (overlay) {
-      overlay.classList.remove('visible');
-    }
-  }
+
 
   // Helper para color de meridianos
   function getMeridianColor(meridian) {
@@ -228,6 +175,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, appCont
 
     // Eventos de Navegación
     layout.querySelector('#btn-back-home').addEventListener('click', () => {
+      synth.destroy();
       onNavigate('inicio');
     });
 
@@ -873,10 +821,9 @@ export async function renderAcupunctureScreen(container, db, onNavigate, appCont
     }, 0);
 
     // Obtener parámetros iniciales del sintonizador o sugeridos
-    const tunerState = appController.getAudioState();
-    localBaseFreq = currentSequence.baseFreq || tunerState.baseFreq || 432;
-    localFreq = currentSequence.suggestedFreq || tunerState.diffFreq || 6.0;
-    localAudioMode = tunerState.audioMode || 'binaural';
+    localBaseFreq = currentSequence.baseFreq || 432;
+    localFreq = currentSequence.suggestedFreq || 6.0;
+    localAudioMode = 'binaural';
     localAudioActive = false; // empezamos silenciado por cortesía, pero sugerido al lado
 
     // Cargar la duración del primer paso
@@ -941,81 +888,16 @@ export async function renderAcupunctureScreen(container, db, onNavigate, appCont
           </div>
           
           <!-- Panel de Sintetizador Incrustado y Colapsable -->
-          <div class="acu-tuner-accordion" id="meditation-tuner-panel" style="margin-bottom: 20px; width: 100%;">
-            <div class="tuner-accordion-header" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding:8px 12px; background:rgba(46,43,40,0.04); border:1px solid rgba(46,43,40,0.08); border-radius:4px;">
-              <div style="display:flex; align-items:center; gap:8px;">
-                <span class="tuner-arrow" style="font-size:0.65rem; transition: transform 0.2s; display:inline-block;">▶</span>
-                <span style="font-family: var(--font-digital); font-size: 0.7rem; font-weight:600; color:var(--color-text-main); text-transform: uppercase; letter-spacing:0.05em;">Sintetizador</span>
-              </div>
-              <div style="display:flex; align-items:center; gap:12px;" id="tuner-header-right">
-                <span id="tuner-header-status" style="font-family: var(--font-digital); font-size: 0.72rem; font-weight:600; color:var(--color-text-muted); margin-right:4px;">Off</span>
-                <!-- Switch de audio (detiene el click propagation para no colapsar/expandir) -->
-                <label class="braun-switch" style="pointer-events: auto; margin:0;" onclick="event.stopPropagation();">
-                  <input type="checkbox" id="timer-audio-switch" ${localAudioActive ? 'checked' : ''}>
-                  <span class="braun-switch-slider"></span>
-                </label>
-              </div>
-            </div>
-            
-            <div id="tuner-accordion-content" style="display:none; padding:16px 12px; border: 1px solid rgba(46,43,40,0.08); border-top:none; background:rgba(255,255,255,0.25); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); border-bottom-left-radius:4px; border-bottom-right-radius:4px; flex-direction:column; gap:14px; width:100%;">
-              <!-- Modo de Onda -->
-              <div>
-                <span style="font-size: 0.6rem; color: var(--color-text-muted); display:block; margin-bottom:4px; text-transform:uppercase; font-weight:600;">Modo de Onda</span>
-                <div style="display: flex; gap: 16px; font-size: 0.75rem;">
-                  <label style="cursor: pointer; display: flex; align-items: center; gap: 6px;">
-                    <input type="radio" name="timer-audio-mode" value="binaural" ${localAudioMode === 'binaural' ? 'checked' : ''} style="accent-color: var(--color-accent-red);">
-                    Binaural
-                  </label>
-                  <label style="cursor: pointer; display: flex; align-items: center; gap: 6px;">
-                    <input type="radio" name="timer-audio-mode" value="isochronic" ${localAudioMode === 'isochronic' ? 'checked' : ''} style="accent-color: var(--color-accent-red);">
-                    Isocrónico
-                  </label>
-                </div>
-              </div>
-
-              <!-- Tono Base -->
-              <div style="position: relative;">
-                <span style="font-size: 0.6rem; color: var(--color-text-muted); display:block; margin-bottom:4px; text-transform:uppercase; font-weight:600;">Tono Base (Frecuencia)</span>
-                <div class="custom-tuner-dropdown" id="timer-base-dropdown-container" style="position:relative; width:100%; margin-bottom:6px;">
-                  <button type="button" class="tuner-dropdown-trigger" id="timer-base-dropdown-trigger" style="width:100%; text-align:left; display:flex; justify-content:space-between; align-items:center; padding:6px 10px; font-size:0.75rem; background:transparent; border:1px solid rgba(0,0,0,0.12); cursor:pointer; color:var(--color-text-main);">
-                    <span id="timer-base-selected-text">${getFreqLabel(localBaseFreq)}</span>
-                    <svg class="dropdown-chevron" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
-                      <polyline points="6 9 12 15 18 9"></polyline>
-                    </svg>
-                  </button>
-                  <div class="tuner-dropdown-options" id="timer-base-dropdown-options" style="position:absolute; bottom:100%; left:0; width:100%; max-height:160px; overflow-y:auto; z-index:1100; display:none; background:var(--color-bg-base); border:1px solid rgba(0,0,0,0.15); box-shadow:0 -4px 16px rgba(0,0,0,0.12); padding:4px 0; border-radius:4px;">
-                    <div class="timer-dropdown-option" data-value="7.83" style="padding:6px 10px; font-size:0.75rem; cursor:pointer;"><strong>7.83 Hz</strong> — Resonancia Schumann</div>
-                    <div class="timer-dropdown-option" data-value="174" style="padding:6px 10px; font-size:0.75rem; cursor:pointer;"><strong>174 Hz</strong> — Alivio del dolor</div>
-                    <div class="timer-dropdown-option" data-value="285" style="padding:6px 10px; font-size:0.75rem; cursor:pointer;"><strong>285 Hz</strong> — Regeneración de tejidos</div>
-                    <div class="timer-dropdown-option" data-value="396" style="padding:6px 10px; font-size:0.75rem; cursor:pointer;"><strong>396 Hz</strong> — Liberar miedo y culpa</div>
-                    <div class="timer-dropdown-option" data-value="417" style="padding:6px 10px; font-size:0.75rem; cursor:pointer;"><strong>417 Hz</strong> — Facilitar el cambio</div>
-                    <div class="timer-dropdown-option" data-value="432" style="padding:6px 10px; font-size:0.75rem; cursor:pointer;"><strong>432 Hz</strong> — Calma y armonía natural</div>
-                    <div class="timer-dropdown-option" data-value="528" style="padding:6px 10px; font-size:0.75rem; cursor:pointer;"><strong>528 Hz</strong> — Transformación y milagro</div>
-                    <div class="timer-dropdown-option" data-value="639" style="padding:6px 10px; font-size:0.75rem; cursor:pointer;"><strong>639 Hz</strong> — Conexión y relaciones</div>
-                    <div class="timer-dropdown-option" data-value="741" style="padding:6px 10px; font-size:0.75rem; cursor:pointer;"><strong>741 Hz</strong> — Desintoxicación (Limpieza)</div>
-                    <div class="timer-dropdown-option" data-value="852" style="padding:6px 10px; font-size:0.75rem; cursor:pointer;"><strong>852 Hz</strong> — Despertar de la intuición</div>
-                    <div class="timer-dropdown-option" data-value="963" style="padding:6px 10px; font-size:0.75rem; cursor:pointer;"><strong>963 Hz</strong> — Conexión universal / Unidad</div>
-                  </div>
-                </div>
-                <input type="range" id="timer-base-slider" class="tuner-slider" min="5" max="1000" step="0.1" value="${localBaseFreq}">
-              </div>
-
-              <!-- Estado Cerebral / Diferencial -->
-              <div>
-                <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px;">
-                  <span style="font-size: 0.6rem; color: var(--color-text-muted); text-transform:uppercase; font-weight:600;">Estado Cerebral</span>
-                  <span id="timer-diff-readout" style="font-family: var(--font-digital); font-size: 0.75rem; font-weight:600; color:var(--color-accent-red);">${localFreq.toFixed(1)} Hz</span>
-                </div>
-                <input type="range" id="timer-diff-slider" class="tuner-slider" min="0" max="100" step="1" value="${freqToValue(localFreq)}">
-                <div style="display: flex; justify-content: space-between; font-size: 0.55rem; color: var(--color-text-muted); margin-top: 4px;">
-                  <span>DELTA (Sueño)</span>
-                  <span>THETA</span>
-                  <span>ALPHA</span>
-                  <span>BETA</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          ${renderSynthPanel({
+            idPrefix: 'timer',
+            baseFreq: localBaseFreq,
+            diffFreq: localFreq,
+            audioMode: localAudioMode,
+            isAudioActive: localAudioActive,
+            compact: true,
+            dark: true,
+            statusWithWave: false
+          })}
           
           <!-- Controles de Timer (Iniciar/Pausar, Saltar, Detener con Iconos SVG) -->
           <div class="acu-panel-controls" style="gap: 24px;">
@@ -1057,7 +939,6 @@ export async function renderAcupunctureScreen(container, db, onNavigate, appCont
     const pointBenefits = timerScreen.querySelector('#timer-point-benefits');
     const countdownMatrix = timerScreen.querySelector('#timer-countdown-matrix');
     const progressEl = timerScreen.querySelector('#timer-step-progress');
-    const audioSwitch = timerScreen.querySelector('#timer-audio-switch');
     const btnPlay = timerScreen.querySelector('#btn-timer-play');
     const btnSkip = timerScreen.querySelector('#btn-timer-skip');
     const btnExit = timerScreen.querySelector('#btn-timer-exit');
@@ -1204,7 +1085,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, appCont
 
       if (activeTimeLeft <= 0) {
         // Tocar campana tibetana corta al cambiar de fase
-        appController.playCompletionBell();
+        playQuartzBowlRing();
 
         const step = currentSequence.points[activeSeqIndex];
 
@@ -1250,11 +1131,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, appCont
       }
       releaseWakeLock();
       // Silenciar sintetizador al salir del temporizador
-      if (localAudioActive) {
-        appController.stopAudio();
-      }
-      // Cerrar tuner flotante
-      closeGlobalTuner();
+      synth.stop();
     }
 
     // Guardar sesión y salir
@@ -1267,13 +1144,22 @@ export async function renderAcupunctureScreen(container, db, onNavigate, appCont
       });
       const totalMin = Math.ceil(totalSeconds / 60);
 
-      // Guardar log en IndexedDB
-      if (appController.saveSession) {
-        await appController.saveSession(totalMin, `Secuencia: ${currentSequence.name}`);
+      // Guardar log en IndexedDB directamente
+      try {
+        await addData(db, 'sessions_log', {
+          type: 'acupuncture',
+          date: new Date().toISOString(),
+          duration: totalMin,
+          notes: `Secuencia: ${currentSequence.name}`,
+          details: 'Digitopuntura Hegu'
+        });
+      } catch (e) {
+        console.error('[DB] Error logging session:', e);
       }
 
       alert('¡Secuencia de Electroterapia TENS completada con éxito!');
       activeView = 'lobby';
+      synth.destroy();
       refresh();
     }
 
@@ -1320,122 +1206,27 @@ export async function renderAcupunctureScreen(container, db, onNavigate, appCont
 
     syncTimerDisplay();
     updateCountdownDisplay();
-    const headerStatus = timerScreen.querySelector('#tuner-header-status');
-
-    const syncTunerHeaderStatus = () => {
-      if (localAudioActive) {
-        headerStatus.textContent = `${localFreq.toFixed(1)} Hz`;
-        headerStatus.style.color = 'var(--color-accent-green)';
-      } else {
-        headerStatus.textContent = 'Off';
-        headerStatus.style.color = 'var(--color-text-muted)';
-      }
+    // Vincular panel del sintetizador
+    const getSynthState = () => ({
+      baseFreq: localBaseFreq,
+      diffFreq: localFreq,
+      audioMode: localAudioMode,
+      isAudioActive: localAudioActive
+    });
+    const setSynthState = (update) => {
+      if (update.baseFreq !== undefined) localBaseFreq = update.baseFreq;
+      if (update.diffFreq !== undefined) localFreq = update.diffFreq;
+      if (update.audioMode !== undefined) localAudioMode = update.audioMode;
+      if (update.isAudioActive !== undefined) localAudioActive = update.isAudioActive;
     };
 
-    // Controles de audio interactivos en pantalla (Sintetizador Empotrado)
-    audioSwitch.addEventListener('change', (e) => {
-      localAudioActive = e.target.checked;
-      if (localAudioActive) {
-        appController.startAudio(localBaseFreq, localFreq, localAudioMode);
-      } else {
-        appController.stopAudio();
-      }
-      syncTunerHeaderStatus();
+    bindSynthPanel({
+      root: timerScreen,
+      idPrefix: 'timer',
+      getState: getSynthState,
+      setState: setSynthState,
+      synthEngine: synth
     });
-
-    // Accordion toggle
-    const tunerHeader = timerScreen.querySelector('.tuner-accordion-header');
-    const tunerContent = timerScreen.querySelector('#tuner-accordion-content');
-    const tunerArrow = timerScreen.querySelector('.tuner-arrow');
-
-    tunerHeader.addEventListener('click', (e) => {
-      if (e.target.closest('.braun-switch')) return;
-      const isVisible = tunerContent.style.display === 'flex';
-      tunerContent.style.display = isVisible ? 'none' : 'flex';
-      tunerArrow.style.transform = isVisible ? 'none' : 'rotate(90deg)';
-    });
-
-    // Radio buttons for mode (timer-audio-mode)
-    const modeRadios = timerScreen.querySelectorAll('input[name="timer-audio-mode"]');
-    modeRadios.forEach(radio => {
-      radio.addEventListener('change', (e) => {
-        localAudioMode = e.target.value;
-        if (localAudioActive) {
-          appController.startAudio(localBaseFreq, localFreq, localAudioMode);
-        }
-      });
-    });
-
-    // Base slider and dropdown controls
-    const baseSlider = timerScreen.querySelector('#timer-base-slider');
-    const baseTrigger = timerScreen.querySelector('#timer-base-dropdown-trigger');
-    const baseOptionsContainer = timerScreen.querySelector('#timer-base-dropdown-options');
-    const baseOptions = timerScreen.querySelectorAll('.timer-dropdown-option');
-    const baseSelectedText = timerScreen.querySelector('#timer-base-selected-text');
-
-    baseTrigger.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const isVisible = baseOptionsContainer.style.display === 'block';
-      baseOptionsContainer.style.display = isVisible ? 'none' : 'block';
-      baseTrigger.classList.toggle('open', !isVisible);
-    });
-
-    document.addEventListener('click', (e) => {
-      if (baseOptionsContainer && !e.target.closest('#timer-base-dropdown-container')) {
-        baseOptionsContainer.style.display = 'none';
-        baseTrigger.classList.remove('open');
-      }
-    });
-
-    baseOptions.forEach(opt => {
-      opt.addEventListener('click', () => {
-        localBaseFreq = parseFloat(opt.getAttribute('data-value'));
-        baseSlider.value = localBaseFreq;
-        baseSelectedText.textContent = getFreqLabel(localBaseFreq);
-        if (localAudioActive) {
-          appController.updateAudioFreqs(localBaseFreq, localFreq);
-        }
-        baseOptionsContainer.style.display = 'none';
-        baseTrigger.classList.remove('open');
-
-        baseOptions.forEach(o => {
-          if (parseFloat(o.getAttribute('data-value')) === localBaseFreq) o.classList.add('active');
-          else o.classList.remove('active');
-        });
-      });
-    });
-
-    baseSlider.addEventListener('input', () => {
-      localBaseFreq = parseFloat(baseSlider.value);
-      baseSelectedText.textContent = getFreqLabel(localBaseFreq);
-      if (localAudioActive) {
-        appController.updateAudioFreqs(localBaseFreq, localFreq);
-      }
-      baseOptions.forEach(o => {
-        const val = parseFloat(o.getAttribute('data-value'));
-        if (Math.abs(val - localBaseFreq) < 0.05) o.classList.add('active');
-        else o.classList.remove('active');
-      });
-    });
-
-    // Diff/cerebral slider and readout (Mapeo no lineal corregido)
-    const diffSlider = timerScreen.querySelector('#timer-diff-slider');
-    const diffReadout = timerScreen.querySelector('#timer-diff-readout');
-
-    diffSlider.addEventListener('input', () => {
-      const val = parseInt(diffSlider.value);
-      localFreq = valueToFreq(val);
-
-      diffReadout.textContent = `${localFreq.toFixed(1)} Hz`;
-      syncTunerHeaderStatus();
-
-      if (localAudioActive) {
-        appController.updateAudioFreqs(localBaseFreq, localFreq);
-      }
-    });
-
-    // Sincronizar estado inicial
-    syncTunerHeaderStatus();
 
     // Control de Pause / Play (Toggles SVG Icon)
     btnPlay.addEventListener('click', () => {
@@ -1489,6 +1280,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, appCont
 
       if (confirm('¿Deseas detener y cancelar la sesión actual? (NO se guardará en el historial)')) {
         stopTimerLoop();
+        synth.destroy();
         onNavigate('inicio');
       } else {
         if (!wasPaused) {

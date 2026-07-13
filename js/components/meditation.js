@@ -5,16 +5,16 @@ import {
   bindWakeLockPreference,
   createTimerShell,
   createWakeLockController,
-  freqToValue,
-  getFreqLabel,
-  getWaveStateName,
   populateTimerDots,
   renderSynthPanel,
-  renderWakeLockPreference,
-  valueToFreq
+  renderWakeLockPreference
 } from './timerShell.js';
+import { createSynthEngine, playQuartzBowlRing } from '../utils/synth.js';
+import { getFreqLabel, valueToFreq, freqToValue } from '../utils/freqUtils.js';
 
-export async function renderMeditationScreen(container, db, onNavigate, appController) {
+
+export async function renderMeditationScreen(container, db, onNavigate) {
+  const synth = createSynthEngine();
   let activeView = 'lobby';
 
   let durationMins = 5;
@@ -42,15 +42,6 @@ export async function renderMeditationScreen(container, db, onNavigate, appContr
   let isPaused = false;
   const wakeLockController = createWakeLockController();
 
-  const syncWithGlobalTuner = () => {
-    if (!appController || typeof appController.getAudioState !== 'function') return;
-    const tunerState = appController.getAudioState();
-    localBaseFreq = tunerState.baseFreq;
-    localFreq = tunerState.diffFreq;
-    localAudioMode = tunerState.audioMode;
-    localAudioActive = tunerState.isAudioActive;
-  };
-
   const render = () => {
     container.innerHTML = '';
     if (activeView === 'timer') renderTimer();
@@ -58,7 +49,6 @@ export async function renderMeditationScreen(container, db, onNavigate, appContr
   };
 
   function renderLobby() {
-    syncWithGlobalTuner();
     const lobbyEl = document.createElement('div');
     lobbyEl.className = 'dashboard-layout fade-in';
     lobbyEl.innerHTML = `
@@ -236,7 +226,10 @@ export async function renderMeditationScreen(container, db, onNavigate, appContr
       });
     });
 
-    lobbyEl.querySelector('#btn-back-home').addEventListener('click', () => onNavigate('inicio'));
+    lobbyEl.querySelector('#btn-back-home').addEventListener('click', () => {
+      synth.destroy();
+      onNavigate('inicio');
+    });
     lobbyEl.querySelector('#btn-med-start').addEventListener('click', startMeditation);
     renderIntervalSettings();
   }
@@ -353,19 +346,7 @@ export async function renderMeditationScreen(container, db, onNavigate, appContr
     const flowIcon = timerEl.querySelector('#svg-med-flow-icon');
     const flowLabel = timerEl.querySelector('#lbl-med-flow');
 
-    const getAudioState = () => ({
-      baseFreq: localBaseFreq,
-      diffFreq: localFreq,
-      audioMode: localAudioMode,
-      isAudioActive: localAudioActive
-    });
 
-    const setAudioState = (next) => {
-      if (next.baseFreq !== undefined) localBaseFreq = next.baseFreq;
-      if (next.diffFreq !== undefined) localFreq = next.diffFreq;
-      if (next.audioMode !== undefined) localAudioMode = next.audioMode;
-      if (next.isAudioActive !== undefined) localAudioActive = next.isAudioActive;
-    };
 
     const getElapsedMs = () => (
       isPaused ? phaseElapsedBeforePause : phaseElapsedBeforePause + (Date.now() - phaseStartTime)
@@ -397,7 +378,7 @@ export async function renderMeditationScreen(container, db, onNavigate, appContr
     const synthController = bindSynthPanel({
       root: timerEl,
       idPrefix: 'med-active',
-      appController,
+      synthEngine: synth,
       statusWithWave: false,
       getState: getAudioState,
       setState: setAudioState,
@@ -456,16 +437,14 @@ export async function renderMeditationScreen(container, db, onNavigate, appContr
     const cleanupTimer = async () => {
       clearInterval(timerInterval);
       stopAnimationLoop();
-      if (localAudioActive && appController) appController.stopAudio();
+      synth.stop();
       await wakeLockController.release();
     };
 
     const finishMeditation = async () => {
       await cleanupTimer();
-      if (appController.playQuartzBowl) {
-        appController.playQuartzBowl(432, 4.5);
-        setTimeout(() => appController.playQuartzBowl(432, 4.0), 2000);
-      }
+      playQuartzBowlRing(432, 4.5);
+      setTimeout(() => playQuartzBowlRing(432, 4.0), 2000);
 
       const durationMin = Math.max(1, Math.round(totalDuration / 60));
       const details = intervalType === 'equidistant'
@@ -492,13 +471,13 @@ export async function renderMeditationScreen(container, db, onNavigate, appContr
     };
 
     const ringIfNeeded = () => {
-      if (timeLeft <= 0 || !appController.playQuartzBowl) return;
+      if (timeLeft <= 0) return;
       const shouldRing = (
         (intervalType === 'equidistant' && bellIntervalSeconds > 0 && elapsedSeconds % bellIntervalSeconds === 0) ||
         (intervalType === 'random' && randomTimes.includes(elapsedSeconds)) ||
         (intervalType === 'sequential' && blockBoundaries.slice(0, -1).includes(elapsedSeconds))
       );
-      if (shouldRing) appController.playQuartzBowl(648, 3.0);
+      if (shouldRing) playQuartzBowlRing(648, 3.0);
     };
 
     timerInterval = setInterval(() => {
@@ -520,7 +499,7 @@ export async function renderMeditationScreen(container, db, onNavigate, appContr
       timeLeft = Math.max(0, totalDuration - elapsedSeconds);
       phaseStartTime = Date.now();
       phaseElapsedBeforePause = elapsedSeconds * 1000;
-      if (appController.playQuartzBowl && timeLeft > 0) appController.playQuartzBowl(648, 2.4);
+      if (timeLeft > 0) playQuartzBowlRing(648, 2.4);
       updateDisplay();
       updateGrid();
       if (timeLeft <= 0) finishMeditation();
@@ -542,7 +521,7 @@ export async function renderMeditationScreen(container, db, onNavigate, appContr
       controls.style.opacity = '1';
     });
 
-    if (appController.playQuartzBowl) appController.playQuartzBowl(432, 4.0);
+    playQuartzBowlRing(432, 4.0);
     wakeLockController.request();
     updateDisplay();
     synthController.sync();

@@ -4,8 +4,12 @@ import { escapeHTML } from '../utils/sanitize.js';
 import {
   bindWakeLockPreference,
   createWakeLockController,
-  populateTimerDots
+  populateTimerDots,
+  renderSynthPanel,
+  bindSynthPanel
 } from './timerShell.js';
+import { createSynthEngine, playQuartzBowlRing } from '../utils/synth.js';
+import { getFreqLabel, valueToFreq, freqToValue } from '../utils/freqUtils.js';
 
 // Datos estáticos de respaldo por si falla la base de datos o está vacía
 const FALLBACK_POSTURES = [
@@ -52,7 +56,8 @@ const FALLBACK_SEQUENCES = [
  * @param {Function} onNavigate Función para navegar
  * @param {Object} appController Enlace para interactuar con el sintetizador global
  */
-export async function renderYogaScreen(container, db, onNavigate, appController) {
+export async function renderYogaScreen(container, db, onNavigate) {
+  const synth = createSynthEngine();
   let activeView = 'lobby'; // 'lobby', 'editor' o 'timer'
 
   // Catálogos cargados de la base de datos
@@ -84,109 +89,6 @@ export async function renderYogaScreen(container, db, onNavigate, appController)
   let isPaused = false;
   const wakeLockController = createWakeLockController();
   let chimePlayedForCurrentPhase = false; // evitar repetición de chime a la mitad
-
-  // Descripciones de Frecuencia Solfeggio
-  const FREQ_DESCRIPTIONS = {
-    174: '174 Hz — Alivio del dolor',
-    285: '285 Hz — Regeneración de tejidos',
-    396: '396 Hz — Liberar miedo y culpa',
-    417: '417 Hz — Facilitar el cambio',
-    432: '432 Hz — Calma y armonía natural',
-    528: '528 Hz — Transformación y milagro',
-    639: '639 Hz — Conexión y relaciones',
-    741: '741 Hz — Despertar de la intuición',
-    852: '852 Hz — Retorno al orden espiritual',
-    963: '963 Hz — Conexión universal / Unidad'
-  };
-
-  function getFreqLabel(freq) {
-    const freqNum = parseFloat(freq);
-    for (const key of Object.keys(FREQ_DESCRIPTIONS)) {
-      if (Math.abs(parseFloat(key) - freqNum) < 0.05) {
-        return FREQ_DESCRIPTIONS[key];
-      }
-    }
-    return `${freqNum % 1 === 0 ? freqNum.toFixed(0) : freqNum.toFixed(1)} Hz`;
-  }
-
-  function getWaveStateName(freq) {
-    if (freq <= 4.0) return 'DELTA';
-    if (freq <= 8.0) return 'THETA';
-    if (freq <= 12.0) return 'ALPHA';
-    return 'BETA';
-  }
-
-  function valueToFreq(v) {
-    if (v <= 25) return 0.5 + (v / 25) * 3.5;
-    if (v <= 50) return 4.0 + ((v - 25) / 25) * 4.0;
-    if (v <= 75) return 8.0 + ((v - 50) / 25) * 4.0;
-    return 12.0 + ((v - 75) / 25) * 18.0;
-  }
-
-  function freqToValue(f) {
-    if (f <= 4.0) return ((f - 0.5) / 3.5) * 25;
-    if (f <= 8.0) return 25 + ((f - 4.0) / 4.0) * 25;
-    if (f <= 12.0) return 50 + ((f - 8.0) / 4.0) * 25;
-    return 75 + ((f - 12.0) / 18.0) * 25;
-  }
-
-  // Safe Audio Controller Wrappers to prevent TypeErrors when audio context or controller functions are missing
-  const safeAudioStart = (base, diff, mode) => {
-    try {
-      if (appController && typeof appController['startAudio'] === 'function') {
-        appController['startAudio'](base, diff, mode);
-      }
-    } catch (err) {
-      console.warn('[Yoga Audio] Failed to start audio:', err);
-    }
-  };
-
-  const safeAudioStop = () => {
-    try {
-      if (appController && typeof appController['stopAudio'] === 'function') {
-        appController['stopAudio']();
-      }
-    } catch (err) {
-      console.warn('[Yoga Audio] Failed to stop audio:', err);
-    }
-  };
-
-  const safeAudioUpdate = (base, diff) => {
-    try {
-      if (appController && typeof appController['updateAudioFreqs'] === 'function') {
-        appController['updateAudioFreqs'](base, diff);
-      }
-    } catch (err) {
-      console.warn('[Yoga Audio] Failed to update audio freqs:', err);
-    }
-  };
-
-  const safePlayCompletionBell = () => {
-    try {
-      if (appController && typeof appController['playCompletionBell'] === 'function') {
-        appController['playCompletionBell']();
-      }
-    } catch (err) {
-      console.warn('[Yoga Audio] Failed to play completion bell:', err);
-    }
-  };
-
-  // Sincronizar estado inicial con el sintetizador global
-  const syncWithGlobalTuner = () => {
-    try {
-      if (appController && typeof appController.getAudioState === 'function') {
-        const tunerState = appController.getAudioState();
-        if (tunerState) {
-          localBaseFreq = tunerState.baseFreq !== undefined ? tunerState.baseFreq : localBaseFreq;
-          localFreq = tunerState.diffFreq !== undefined ? tunerState.diffFreq : localFreq;
-          localAudioMode = tunerState.audioMode !== undefined ? tunerState.audioMode : localAudioMode;
-          localAudioActive = tunerState.isAudioActive !== undefined ? tunerState.isAudioActive : localAudioActive;
-        }
-      }
-    } catch (err) {
-      console.warn('[Yoga Audio] Failed to sync tuner state:', err);
-    }
-  };
 
 
   // Helper para leer almacenes de IndexedDB
@@ -664,9 +566,7 @@ export async function renderYogaScreen(container, db, onNavigate, appController)
 
     // Volver a inicio
     lobbyEl.querySelector('#btn-back-home').addEventListener('click', () => {
-      if (localAudioActive) {
-        safeAudioStop();
-      }
+      synth.destroy();
       onNavigate('inicio');
     });
 
@@ -1162,97 +1062,17 @@ export async function renderYogaScreen(container, db, onNavigate, appController)
         <div id="yoga-timer-controls" style="pointer-events: auto; width: 90%; max-width: 400px; margin: 0 auto; box-sizing: border-box;">
           
           <!-- Acceso al Sintetizador local -->
-          <div class="acu-tuner-accordion" id="yoga-active-tuner" style="margin-bottom: 24px; width: 100%; text-align: left; border: 1px solid rgba(255,255,255,0.06); border-radius: 4px; padding: 12px; background: rgba(255,255,255,0.02); cursor: pointer; transition: all 0.3s ease;">
-            <!-- COLLAPSED HEADER -->
-            <div id="yoga-tuner-collapsed-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span id="yoga-tuner-dot" style="color: rgba(255,255,255,0.42); font-size: 0.72rem; transition: transform 0.2s; display:inline-block;">&#9656;</span>
-                <span style="font-family: var(--font-digital); font-size: 0.68rem; font-weight: 600; color: #E8E6E3; letter-spacing: 0.12em; text-transform: uppercase;">SINTETIZADOR</span>
-              </div>
-              <div style="display: flex; align-items: center; gap: 10px;" onclick="event.stopPropagation();">
-                <span id="yoga-tuner-freq-val" style="font-family: var(--font-digital); font-size: 0.68rem; color: var(--color-text-muted); font-weight: 600; margin-right: 4px;">${localFreq.toFixed(1)} Hz</span>
-                <label class="braun-switch" style="margin: 0;">
-                  <input type="checkbox" id="yoga-collapsed-audio-switch" ${localAudioActive ? 'checked' : ''}>
-                  <span class="braun-switch-slider"></span>
-                </label>
-              </div>
-            </div>
-            <!-- COLLAPSED GREEN PROGRESS BAR -->
-            <div id="yoga-tuner-collapsed-progress" style="margin-top: 10px; height: 1px; background: rgba(255, 255, 255, 0.08); width: 100%;">
-              <div id="yoga-tuner-progress-bar" style="height: 100%; background: var(--color-accent-green); width: 0%;"></div>
-            </div>
-
-            <!-- EXPANDED CONTENT -->
-            <div id="yoga-active-tuner-content" style="display: none; flex-direction: column; gap: 14px; width: 100%; margin-top: 12px; border-top: 1px dashed rgba(255,255,255,0.08); padding-top: 12px;">
-              
-              <!-- Expanded Header -->
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                <span style="font-family: var(--font-digital); font-size: 0.68rem; font-weight: 600; color: #E8E6E3; letter-spacing: 0.08em;">SINTETIZADOR DE FONDO</span>
-                <div style="display: flex; align-items: center; gap: 10px;" onclick="event.stopPropagation();">
-                  <span id="yoga-expanded-tuner-status" style="font-family: var(--font-digital); font-size: 0.68rem; font-weight: 600; color: var(--color-accent-green); margin-right: 4px;">${localFreq.toFixed(1)} Hz</span>
-                  <label class="braun-switch" style="margin: 0;">
-                    <input type="checkbox" id="yoga-active-audio-switch" ${localAudioActive ? 'checked' : ''}>
-                    <span class="braun-switch-slider"></span>
-                  </label>
-                </div>
-              </div>
-
-              <!-- Modo -->
-              <div style="font-size: 0.7rem; color: #E8E6E3;">
-                <span style="font-size: 0.58rem; color: var(--color-text-muted); display: block; margin-bottom: 4px; text-transform: uppercase; font-weight: 600;">Modo</span>
-                <div style="display: flex; gap: 16px;">
-                  <label style="cursor: pointer; display: flex; align-items: center; gap: 6px;">
-                    <input type="radio" name="yoga-active-audio-mode" value="binaural" ${localAudioMode === 'binaural' ? 'checked' : ''} style="accent-color: var(--color-accent-green);">
-                    Binaural
-                  </label>
-                  <label style="cursor: pointer; display: flex; align-items: center; gap: 6px;">
-                    <input type="radio" name="yoga-active-audio-mode" value="isochronic" ${localAudioMode === 'isochronic' ? 'checked' : ''} style="accent-color: var(--color-accent-green);">
-                    Isocrónico
-                  </label>
-                </div>
-              </div>
-
-              <!-- Tono Base -->
-              <div>
-                <span style="font-size: 0.58rem; color: var(--color-text-muted); display: block; margin-bottom: 4px; text-transform: uppercase; font-weight: 600;">Tono Base</span>
-                
-                <div class="custom-tuner-dropdown" id="yoga-active-base-dropdown-container" style="position: relative; width: 100%; margin-bottom: 6px;" onclick="event.stopPropagation();">
-                  <button type="button" class="tuner-dropdown-trigger" id="yoga-active-base-dropdown-trigger" style="width: 100%; text-align: left; display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; font-size: 0.75rem; background: transparent; border: 1px solid rgba(255,255,255,0.12); cursor: pointer; color: #E8E6E3; border-radius: 4px;">
-                    <span id="yoga-active-base-selected-text">${getFreqLabel(localBaseFreq)}</span>
-                    <svg class="dropdown-chevron" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
-                      <polyline points="6 9 12 15 18 9"></polyline>
-                    </svg>
-                  </button>
-                  <div class="tuner-dropdown-options" id="yoga-active-base-dropdown-options" style="position: absolute; bottom: 100%; left: 0; width: 100%; max-height: 160px; overflow-y: auto; z-index: 1100; display: none; background: #181818; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 -4px 16px rgba(0,0,0,0.4); padding: 4px 0; border-radius: 4px;">
-                    <div class="yoga-active-dropdown-option" data-value="7.83" style="padding: 6px 10px; font-size: 0.75rem; cursor: pointer; color: #E8E6E3;"><strong>7.83 Hz</strong> — Resonancia Schumann</div>
-                    <div class="yoga-active-dropdown-option" data-value="174" style="padding: 6px 10px; font-size: 0.75rem; cursor: pointer; color: #E8E6E3;"><strong>174 Hz</strong> — Alivio del dolor</div>
-                    <div class="yoga-active-dropdown-option" data-value="285" style="padding: 6px 10px; font-size: 0.75rem; cursor: pointer; color: #E8E6E3;"><strong>285 Hz</strong> — Regeneración de tejidos</div>
-                    <div class="yoga-active-dropdown-option" data-value="396" style="padding: 6px 10px; font-size: 0.75rem; cursor: pointer; color: #E8E6E3;"><strong>396 Hz</strong> — Liberar miedo y culpa</div>
-                    <div class="yoga-active-dropdown-option" data-value="417" style="padding: 6px 10px; font-size: 0.75rem; cursor: pointer; color: #E8E6E3;"><strong>417 Hz</strong> — Facilitar el cambio</div>
-                    <div class="yoga-active-dropdown-option" data-value="432" style="padding: 6px 10px; font-size: 0.75rem; cursor: pointer; color: #E8E6E3;"><strong>432 Hz</strong> — Calma y armonía natural</div>
-                    <div class="yoga-active-dropdown-option" data-value="528" style="padding: 6px 10px; font-size: 0.75rem; cursor: pointer; color: #E8E6E3;"><strong>528 Hz</strong> — Transformación y milagro</div>
-                    <div class="yoga-active-dropdown-option" data-value="639" style="padding: 6px 10px; font-size: 0.75rem; cursor: pointer; color: #E8E6E3;"><strong>639 Hz</strong> — Conexión y relaciones</div>
-                    <div class="yoga-active-dropdown-option" data-value="741" style="padding: 6px 10px; font-size: 0.75rem; cursor: pointer; color: #E8E6E3;"><strong>741 Hz</strong> — Desintoxicación (Limpieza)</div>
-                    <div class="yoga-active-dropdown-option" data-value="852" style="padding: 6px 10px; font-size: 0.75rem; cursor: pointer; color: #E8E6E3;"><strong>852 Hz</strong> — Despertar de la intuición</div>
-                    <div class="yoga-active-dropdown-option" data-value="963" style="padding: 6px 10px; font-size: 0.75rem; cursor: pointer; color: #E8E6E3;"><strong>963 Hz</strong> — Conexión universal / Unidad</div>
-                  </div>
-                </div>
-
-                <input type="range" id="yoga-active-base-slider" class="tuner-slider" min="5" max="1000" step="0.1" value="${localBaseFreq}">
-                <div style="font-size: 0.65rem; color: #E8E6E3; font-family: var(--font-digital); text-align: right;" id="yoga-active-base-readout">${getFreqLabel(localBaseFreq)}</div>
-              </div>
-
-              <!-- Estado -->
-              <div>
-                <div style="display: flex; justify-content: space-between; font-family: var(--font-digital); font-size: 0.58rem; color: var(--color-text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">
-                  <span>Estado</span>
-                </div>
-                <input type="range" id="yoga-active-diff-slider" class="tuner-slider" min="0" max="100" step="1" value="${freqToValue(localFreq)}">
-                <div style="font-size: 0.65rem; color: #E8E6E3; font-family: var(--font-digital); text-align: right;" id="yoga-active-diff-readout">${localFreq.toFixed(1)} Hz</div>
-              </div>
-
-            </div>
-          </div>
+          <!-- Panel de Sintetizador Incrustado y Colapsable -->
+          ${renderSynthPanel({
+            idPrefix: 'timer',
+            baseFreq: localBaseFreq,
+            diffFreq: localFreq,
+            audioMode: localAudioMode,
+            isAudioActive: localAudioActive,
+            compact: true,
+            dark: true,
+            statusWithWave: false
+          })}
 
           <!-- Botones de control -->
           <div style="display: flex; justify-content: space-around; align-items: center; width: 100%; max-width: 380px; margin: 0 auto 32px auto;">
@@ -1308,7 +1128,7 @@ export async function renderYogaScreen(container, db, onNavigate, appController)
     const clockLabel = timerEl.querySelector('#yoga-clock-text');
     const stepCurrent = timerEl.querySelector('#yoga-step-current');
     const stepRemaining = timerEl.querySelector('#yoga-step-remaining');
-    const tunerProgressBar = timerEl.querySelector('#yoga-tuner-progress-bar');
+
     const controlsContainer = timerEl.querySelector('#yoga-timer-controls');
 
     const btnFlow = timerEl.querySelector('#btn-yoga-flow');
@@ -1323,26 +1143,6 @@ export async function renderYogaScreen(container, db, onNavigate, appController)
 
     const instructionsToggle = timerEl.querySelector('#yoga-instructions-toggle');
     const instructionsContent = timerEl.querySelector('#yoga-instructions-content');
-
-    // Sintonizador en Activo Selectores
-    const activeTunerAccordion = timerEl.querySelector('#yoga-active-tuner');
-    const tunerCollapsedHeader = timerEl.querySelector('#yoga-tuner-collapsed-header');
-    const tunerCollapsedProgress = timerEl.querySelector('#yoga-tuner-collapsed-progress');
-    const tunerDot = timerEl.querySelector('#yoga-tuner-dot');
-    const tunerFreqVal = timerEl.querySelector('#yoga-tuner-freq-val');
-
-    const activeTunerContent = timerEl.querySelector('#yoga-active-tuner-content');
-    const activeAudioSwitch = timerEl.querySelector('#yoga-active-audio-switch');
-    const activeTunerStatus = timerEl.querySelector('#yoga-expanded-tuner-status');
-    const activeBaseSlider = timerEl.querySelector('#yoga-active-base-slider');
-    const activeBaseReadout = timerEl.querySelector('#yoga-active-base-readout');
-    const activeDiffSlider = timerEl.querySelector('#yoga-active-diff-slider');
-    const activeDiffReadout = timerEl.querySelector('#yoga-active-diff-readout');
-    const activeAudioModeRadios = timerEl.querySelectorAll('input[name="yoga-active-audio-mode"]');
-    const activeBaseTrigger = timerEl.querySelector('#yoga-active-base-dropdown-trigger');
-    const activeBaseOptionsContainer = timerEl.querySelector('#yoga-active-base-dropdown-options');
-    const activeBaseOptions = timerEl.querySelectorAll('.yoga-active-dropdown-option');
-    const activeBaseSelectedText = timerEl.querySelector('#yoga-active-base-selected-text');
 
     // Intentar activar Wake Lock
     const requestWakeLock = () => wakeLockController.request();
@@ -1480,7 +1280,6 @@ export async function renderYogaScreen(container, db, onNavigate, appController)
             dot.classList.remove('dot-on');
           }
         });
-        if (tunerProgressBar) tunerProgressBar.style.width = '0%';
         return;
       }
 
@@ -1521,10 +1320,6 @@ export async function renderYogaScreen(container, db, onNavigate, appController)
           }
         }
       });
-
-      if (tunerProgressBar) {
-        tunerProgressBar.style.width = `${pct * 100}%`;
-      }
     };
 
     const startAnimationLoop = () => {
@@ -1572,7 +1367,7 @@ export async function renderYogaScreen(container, db, onNavigate, appController)
         if (timeLeft <= 0) {
           clearInterval(timerInterval);
           stopAnimationLoop();
-          safePlayCompletionBell();
+          playQuartzBowlRing(432, 3.5);
 
           if (currentPhaseIdx < activePhases.length - 1) {
             currentPhaseIdx++;
@@ -1589,9 +1384,7 @@ export async function renderYogaScreen(container, db, onNavigate, appController)
             alert('Práctica de Yin Yoga finalizada. Namasté.');
             
             activeView = 'lobby';
-            if (localAudioActive) {
-              safeAudioStop();
-            }
+            synth.destroy();
             render();
           }
         }
@@ -1641,10 +1434,8 @@ export async function renderYogaScreen(container, db, onNavigate, appController)
 
         // Iniciar audio local si corresponde
         if (localAudioActive) {
-          safeAudioStart(localBaseFreq, localFreq, localAudioMode);
+          synth.start(localBaseFreq, localFreq, localAudioMode);
         }
-        // Actualizar el estado del sintetizador en pantalla
-        syncActiveStatusText();
 
         requestWakeLock();
         resetInactivityTimer();
@@ -1698,9 +1489,7 @@ export async function renderYogaScreen(container, db, onNavigate, appController)
         saveSessionLog();
         alert('Práctica de Yin Yoga finalizada. Namasté.');
         activeView = 'lobby';
-        if (localAudioActive) {
-          safeAudioStop();
-        }
+        synth.destroy();
         render();
       }
     });
@@ -1709,9 +1498,7 @@ export async function renderYogaScreen(container, db, onNavigate, appController)
     btnStop.addEventListener('click', () => {
       if (!isSessionStarted) {
         // Si no ha iniciado la sesión, vuelve directamente al lobby sin preguntar
-        if (localAudioActive) {
-          safeAudioStop();
-        }
+        synth.destroy();
         activeView = 'lobby';
         render();
         return;
@@ -1735,7 +1522,7 @@ export async function renderYogaScreen(container, db, onNavigate, appController)
         clearInterval(timerInterval);
         stopAnimationLoop();
         releaseWakeLock();
-        safeAudioStop();
+        synth.destroy();
         onNavigate('inicio');
       } else {
         if (!wasPaused) {
@@ -1754,150 +1541,29 @@ export async function renderYogaScreen(container, db, onNavigate, appController)
       }
     });
 
-    /* =============================================================
-       LÓGICA SINTETIZADOR ACTIVO (EXPANDIDO Y COLAPSADO)
-       ============================================================= */
-    const syncActiveStatusText = () => {
-      const collapsedSwitch = timerEl.querySelector('#yoga-collapsed-audio-switch');
-      if (collapsedSwitch) collapsedSwitch.checked = localAudioActive;
-      if (activeAudioSwitch) activeAudioSwitch.checked = localAudioActive;
-
-      // Sincronizar texto y opciones activas del dropdown
-      if (activeBaseSelectedText) activeBaseSelectedText.textContent = getFreqLabel(localBaseFreq);
-      if (activeBaseOptions) {
-        activeBaseOptions.forEach(o => {
-          if (parseFloat(o.getAttribute('data-value')) === localBaseFreq) o.classList.add('active');
-          else o.classList.remove('active');
-        });
-      }
-
-      if (localAudioActive) {
-        tunerDot.style.color = 'var(--color-accent-green)';
-        tunerFreqVal.textContent = `${localFreq.toFixed(1)} Hz`;
-        tunerFreqVal.style.color = 'var(--color-accent-green)';
-        activeTunerStatus.textContent = `${localFreq.toFixed(1)} Hz`;
-        activeTunerStatus.style.color = 'var(--color-accent-green)';
-      } else {
-        tunerDot.style.color = 'rgba(255,255,255,0.2)';
-        tunerFreqVal.textContent = 'Off';
-        tunerFreqVal.style.color = 'var(--color-text-muted)';
-        activeTunerStatus.textContent = 'Off';
-        activeTunerStatus.style.color = 'var(--color-text-muted)';
-      }
+    // Vincular panel del sintonizador
+    const getSynthState = () => ({
+      baseFreq: localBaseFreq,
+      diffFreq: localFreq,
+      audioMode: localAudioMode,
+      isAudioActive: localAudioActive
+    });
+    const setSynthState = (update) => {
+      if (update.baseFreq !== undefined) localBaseFreq = update.baseFreq;
+      if (update.diffFreq !== undefined) localFreq = update.diffFreq;
+      if (update.audioMode !== undefined) localAudioMode = update.audioMode;
+      if (update.isAudioActive !== undefined) localAudioActive = update.isAudioActive;
     };
 
-    const updateActiveAudio = () => {
-      if (localAudioActive) {
-        // Arrancar audio si la sesión ya empezó
-        if (isSessionStarted) {
-          safeAudioStart(localBaseFreq, localFreq, localAudioMode);
-        }
-      } else {
-        safeAudioStop();
-      }
-      syncActiveStatusText();
-    };
-
-    // Toggle expander/colapsar panel
-    activeTunerAccordion.addEventListener('click', (e) => {
-      if (e.target.closest('.braun-switch') || e.target.closest('input') || e.target.closest('.tuner-slider')) {
-        return;
-      }
-      
-      const isExpanded = activeTunerContent.style.display === 'flex';
-      if (isExpanded) {
-        activeTunerContent.style.display = 'none';
-        tunerCollapsedHeader.style.display = 'flex';
-        tunerCollapsedProgress.style.display = 'block';
-        activeTunerAccordion.classList.remove('is-expanded');
-      } else {
-        activeTunerContent.style.display = 'flex';
-        tunerCollapsedHeader.style.display = 'none';
-        tunerCollapsedProgress.style.display = 'none';
-        activeTunerAccordion.classList.add('is-expanded');
-      }
-    });
-
-    const collapsedAudioSwitch = timerEl.querySelector('#yoga-collapsed-audio-switch');
-
-    collapsedAudioSwitch.addEventListener('change', (e) => {
-      localAudioActive = e.target.checked;
-      activeAudioSwitch.checked = localAudioActive;
-      updateActiveAudio();
-    });
-
-    activeAudioSwitch.addEventListener('change', (e) => {
-      localAudioActive = e.target.checked;
-      collapsedAudioSwitch.checked = localAudioActive;
-      updateActiveAudio();
-    });
-
-    activeBaseSlider.addEventListener('input', () => {
-      localBaseFreq = parseFloat(activeBaseSlider.value);
-      activeBaseReadout.textContent = `${getFreqLabel(localBaseFreq)}`;
-      activeBaseSelectedText.textContent = getFreqLabel(localBaseFreq);
-      if (localAudioActive && isSessionStarted) {
-        safeAudioUpdate(localBaseFreq, localFreq);
-      }
-      activeBaseOptions.forEach(o => {
-        if (parseFloat(o.getAttribute('data-value')) === localBaseFreq) o.classList.add('active');
-        else o.classList.remove('active');
-      });
-    });
-
-    activeBaseTrigger.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const isVisible = activeBaseOptionsContainer.style.display === 'block';
-      activeBaseOptionsContainer.style.display = isVisible ? 'none' : 'block';
-      activeBaseTrigger.classList.toggle('open', !isVisible);
-    });
-
-    document.addEventListener('click', (e) => {
-      if (activeBaseOptionsContainer && !e.target.closest('#yoga-active-base-dropdown-container')) {
-        activeBaseOptionsContainer.style.display = 'none';
-        activeBaseTrigger.classList.remove('open');
-      }
-    });
-
-    activeBaseOptions.forEach(opt => {
-      opt.addEventListener('click', () => {
-        localBaseFreq = parseFloat(opt.getAttribute('data-value'));
-        activeBaseSlider.value = localBaseFreq;
-        activeBaseSelectedText.textContent = getFreqLabel(localBaseFreq);
-        activeBaseReadout.textContent = `${getFreqLabel(localBaseFreq)}`;
-        if (localAudioActive && isSessionStarted) {
-          safeAudioUpdate(localBaseFreq, localFreq);
-        }
-        activeBaseOptionsContainer.style.display = 'none';
-        activeBaseTrigger.classList.remove('open');
-        
-        activeBaseOptions.forEach(o => {
-          if (parseFloat(o.getAttribute('data-value')) === localBaseFreq) o.classList.add('active');
-          else o.classList.remove('active');
-        });
-      });
-    });
-
-    activeDiffSlider.addEventListener('input', () => {
-      localFreq = valueToFreq(parseInt(activeDiffSlider.value));
-      activeDiffReadout.textContent = `${localFreq.toFixed(1)} Hz`;
-      if (localAudioActive && isSessionStarted) {
-        safeAudioUpdate(localBaseFreq, localFreq);
-      }
-      syncActiveStatusText();
-    });
-
-    activeAudioModeRadios.forEach(radio => {
-      radio.addEventListener('change', (e) => {
-        localAudioMode = e.target.value;
-        if (localAudioActive && isSessionStarted) {
-          safeAudioStart(localBaseFreq, localFreq, localAudioMode);
-        }
-      });
+    bindSynthPanel({
+      root: timerEl,
+      idPrefix: 'timer',
+      getState: getSynthState,
+      setState: setSynthState,
+      synthEngine: synth
     });
 
     syncActivePhase();
-    syncActiveStatusText();
     updateGrid(); // Inicializa la rejilla de puntos vacía
   }
 

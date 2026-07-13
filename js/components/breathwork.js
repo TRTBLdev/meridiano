@@ -9,8 +9,11 @@ import {
   renderWakeLockPreference,
   populateTimerDots
 } from './timerShell.js';
+import { createSynthEngine, playQuartzBowlRing } from '../utils/synth.js';
+import { getFreqLabel, valueToFreq, freqToValue } from '../utils/freqUtils.js';
 
-export async function renderBreathworkScreen(container, db, onNavigate, appController) {
+export async function renderBreathworkScreen(container, db, onNavigate) {
+  const synth = createSynthEngine();
   let activeView = 'lobby';
 
   // Lobby state
@@ -45,15 +48,6 @@ export async function renderBreathworkScreen(container, db, onNavigate, appContr
 
   const wakeLockController = createWakeLockController();
 
-  const syncWithGlobalTuner = () => {
-    if (!appController || typeof appController.getAudioState !== 'function') return;
-    const tunerState = appController.getAudioState();
-    localBaseFreq = tunerState.baseFreq;
-    localFreq = tunerState.diffFreq;
-    localAudioMode = tunerState.audioMode;
-    localAudioActive = tunerState.isAudioActive;
-  };
-
   const getAudioState = () => ({
     baseFreq: localBaseFreq,
     diffFreq: localFreq,
@@ -86,8 +80,6 @@ export async function renderBreathworkScreen(container, db, onNavigate, appContr
   };
 
   function renderLobby() {
-    syncWithGlobalTuner();
-
     const lobbyEl = document.createElement('div');
     lobbyEl.className = 'dashboard-layout fade-in';
     lobbyEl.innerHTML = `
@@ -251,7 +243,10 @@ export async function renderBreathworkScreen(container, db, onNavigate, appContr
 
     renderIntervalSettings();
 
-    lobbyEl.querySelector('#btn-back-home').addEventListener('click', () => onNavigate('inicio'));
+    lobbyEl.querySelector('#btn-back-home').addEventListener('click', () => {
+      synth.destroy();
+      onNavigate('inicio');
+    });
     lobbyEl.querySelector('#btn-breath-start').addEventListener('click', startBreathwork);
   }
 
@@ -418,7 +413,7 @@ export async function renderBreathworkScreen(container, db, onNavigate, appContr
     const synthController = bindSynthPanel({
       root: timerEl,
       idPrefix: 'breath-active',
-      appController,
+      synthEngine: synth,
       statusWithWave: false,
       getState: getAudioState,
       setState: setAudioState,
@@ -518,15 +513,13 @@ export async function renderBreathworkScreen(container, db, onNavigate, appContr
     const cleanupTimer = async () => {
       clearInterval(timerInterval);
       clearInterval(cycleTimer);
-      if (localAudioActive && appController) appController.stopAudio();
+      synth.stop();
       await wakeLockController.release();
     };
 
     const finishBreathwork = async () => {
       await cleanupTimer();
-      if (appController.playQuartzBowl) {
-        appController.playQuartzBowl(432, 4.5);
-      }
+      playQuartzBowlRing(432, 4.5);
 
       const durationMin = Math.max(1, Math.round(totalDuration / 60));
       try {
@@ -621,7 +614,7 @@ export async function renderBreathworkScreen(container, db, onNavigate, appContr
         currentPhase = 'inhale';
         cycleProgress = 0;
         
-        if (appController.playQuartzBowl && timeLeft > 0) appController.playQuartzBowl(648, 2.4);
+        if (timeLeft > 0) playQuartzBowlRing(648, 2.4);
         updateDisplay();
         if (timeLeft <= 0) finishBreathwork();
       });
@@ -639,7 +632,7 @@ export async function renderBreathworkScreen(container, db, onNavigate, appContr
       }
     });
 
-    if (appController.playQuartzBowl) appController.playQuartzBowl(432, 4.0);
+    playQuartzBowlRing(432, 4.0);
     playPhaseChime('inhale');
     wakeLockController.request();
     updateDisplay();
