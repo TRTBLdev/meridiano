@@ -11,6 +11,7 @@ import {
 } from './timerShell.js';
 import { createSynthEngine, playQuartzBowlRing } from '../utils/synth.js';
 import { getFreqLabel, valueToFreq, freqToValue } from '../utils/freqUtils.js';
+import { renderTechnicalTitle } from './ui.js';
 
 export async function renderBreathworkScreen(container, db, onNavigate, orchestratorConfig = null) {
   const synth = createSynthEngine();
@@ -110,7 +111,7 @@ export async function renderBreathworkScreen(container, db, onNavigate, orchestr
 
       <main class="main-viewport breath-lobby-viewport">
         <div class="glass-panel breath-lobby-panel" style="max-width: 600px; margin: 0 auto;">
-          <h2 class="module-lobby-title" style="margin-bottom: 24px;">RESPIRACIÓN</h2>
+          ${renderTechnicalTitle('Respiración', { style: 'margin-bottom: 24px;' })}
 
           <div class="timer-config-group">
             <label>MODO DE PRÁCTICA</label>

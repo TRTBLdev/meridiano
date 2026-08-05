@@ -1,5 +1,6 @@
 import { getAllData, putData, deleteData, addData } from '../db.js';
 import { escapeAttribute, escapeHTML } from '../utils/sanitize.js';
+import { renderTechnicalTitle } from './ui.js';
 
 export async function renderSyllabusScreen(container, db, onNavigate) {
   // Estado local de la base de datos
@@ -12,13 +13,17 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
 
   // Estado local de navegación de pestañas
   let activeTab = 'acupuncture'; // 'acupuncture', 'breathwork', 'yoga', 'heads', 'synth'
-  let activeAcuSubTab = 'points'; // 'points', 'meridians'
-  let activeYogaSubTab = 'postures'; // 'postures', 'blocks'
+  let activeAcuSubTab = 'meridians'; // 'meridians', 'points'
+  let activeYogaSubTab = 'blocks'; // 'blocks', 'postures'
   let activeSynthSubTab = 'brainwaves'; // 'brainwaves', 'solfeggio', 'modes'
 
   // Estados de edición e inserción
   let editingItem = null; // Guardará el objeto del item que se está editando
   let editingStore = ''; // Almacén activo en edición ('acupuncture_points', 'meridians', 'breathwork_patterns', 'yoga_postures', 'yoga_blocks')
+  let isPointFormOpen = false; // Estado del acordeón del formulario para Puntos Extra
+  let isBreathFormOpen = false; // Estado del acordeón del formulario para Respiración
+  let isAsanaFormOpen = false; // Estado del acordeón del formulario para Asanas
+  let isYogaBlockFormOpen = false; // Estado del acordeón del formulario para Bloques de Yoga
 
   // Estado del buscador
   let pointSearchQuery = '';
@@ -74,12 +79,12 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
         <div class="viewport-inner">
           <div class="acu-lobby-container">
             <header class="acu-lobby-header" style="flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 24px;">
-              <h2 class="acu-lobby-title" style="margin:0;">Gestor de Bases de Datos</h2>
+              ${renderTechnicalTitle('Gestor de Bases de Datos')}
               <p style="font-size: 0.75rem; color: var(--color-text-muted); margin: 0;">Administra y edita la información en texto de cada módulo clínico local-first.</p>
             </header>
 
-            <!-- Selector de Base de Datos Principal (Estilo Braun) -->
-            <div style="display: flex; flex-wrap: wrap; background: rgba(46, 43, 40, 0.04); border: 1px solid rgba(46, 43, 40, 0.08); border-radius: 4px; padding: 2px; margin-bottom: 24px; gap: 2px; width: fit-content; max-width: 100%;">
+            <!-- Selector de Base de Datos Principal (Estilo Minimalista Plano) -->
+            <div style="display: flex; flex-wrap: wrap; background: transparent; border-bottom: 1px solid rgba(46, 43, 40, 0.12); border-radius: 0; padding: 0; margin-bottom: 24px; gap: 4px; width: fit-content; max-width: 100%;">
               <button id="tab-acupuncture" class="btn-braun-tab ${activeTab === 'acupuncture' ? 'active' : ''}">Acupuntura</button>
               <button id="tab-breathwork" class="btn-braun-tab ${activeTab === 'breathwork' ? 'active' : ''}">Respiración</button>
               <button id="tab-yoga" class="btn-braun-tab ${activeTab === 'yoga' ? 'active' : ''}">Yin Yoga</button>
@@ -135,79 +140,87 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
      ========================================================================= */
   function renderAcupunctureManager(container) {
     container.innerHTML = `
-      <div style="display: flex; gap: 8px; border-bottom: 1px solid rgba(46,43,40,0.06); padding-bottom: 8px; margin-bottom: 20px;">
-        <button id="btn-sub-pts" class="btn-braun-tab ${activeAcuSubTab === 'points' ? 'active' : ''}" style="padding:4px 12px; font-size:0.75rem;">Puntos</button>
-        <button id="btn-sub-mer" class="btn-braun-tab ${activeAcuSubTab === 'meridians' ? 'active' : ''}" style="padding:4px 12px; font-size:0.75rem;">Meridianos (Canales)</button>
+      <div style="display: flex; gap: 8px; border-bottom: 1px solid rgba(46,43,40,0.12); padding-bottom: 0; margin-bottom: 20px;">
+        <button id="btn-sub-mer" class="btn-braun-tab ${activeAcuSubTab === 'meridians' ? 'active' : ''}" style="padding:6px 12px 8px 12px; font-size:0.75rem;">Meridianos (Canales)</button>
+        <button id="btn-sub-pts" class="btn-braun-tab ${activeAcuSubTab === 'points' ? 'active' : ''}" style="padding:6px 12px 8px 12px; font-size:0.75rem;">Puntos</button>
       </div>
       <div id="acupuncture-sub-content"></div>
     `;
 
-    layout.querySelector('#btn-sub-pts').addEventListener('click', () => { activeAcuSubTab = 'points'; editingItem = null; refresh(); });
     layout.querySelector('#btn-sub-mer').addEventListener('click', () => { activeAcuSubTab = 'meridians'; editingItem = null; refresh(); });
+    layout.querySelector('#btn-sub-pts').addEventListener('click', () => { activeAcuSubTab = 'points'; editingItem = null; refresh(); });
 
     const subContentEl = container.querySelector('#acupuncture-sub-content');
 
     if (activeAcuSubTab === 'points') {
+      if (editingItem && editingStore === 'acupuncture_points') {
+        isPointFormOpen = true;
+      }
+
       // --- SUB-PESTAÑA PUNTOS ---
       subContentEl.innerHTML = `
-        <!-- Formulario de Inserción / Edición -->
-        <div class="glass-panel" style="padding: 20px; margin-bottom: 24px;">
-          <h3 style="font-size:0.9rem; font-weight:600; margin-bottom:14px; text-transform:uppercase; font-family:var(--font-digital); color:var(--color-text-main);">
-            ${editingItem && editingStore === 'acupuncture_points' ? 'Editar Punto Extra' : 'Agregar Nuevo Punto Extra al Catálogo'}
-          </h3>
-          <form id="form-acu-point" style="display:flex; flex-direction:column; gap:12px;">
-            <div style="display:flex; flex-wrap:wrap; gap:16px;">
-              <div style="flex:1; min-width:180px; display:flex; flex-direction:column; gap:4px;">
-                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Nombre del Punto</label>
-                <input type="text" id="acu-p-name" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Yintang (Palacio del Sello)" required>
-              </div>
-              <div style="width:120px; display:flex; flex-direction:column; gap:4px;">
-                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Código MTC / OMS</label>
-                <input type="text" id="acu-p-code" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Ex-HN 3" required>
-              </div>
-              <div style="width:140px; display:flex; flex-direction:column; gap:4px;">
-                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Código Tradicional / Pinyin</label>
-                <input type="text" id="acu-p-trad-code" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Yintang" required>
-              </div>
-              <div style="width:140px; display:flex; flex-direction:column; gap:4px;">
-                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Canal / Meridiano</label>
-                <select id="acu-p-meridian" class="acu-select-flat" style="padding: 6px;" disabled>
-                  <option value="EX" selected>Puntos Extra (EX)</option>
-                </select>
-              </div>
-              <div style="width:140px; display:flex; flex-direction:column; gap:4px;">
-                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Cabezal de Electro Pen</label>
-                <select id="acu-p-head" class="acu-select-flat" style="padding: 6px;">
-                  <option value="Esferoidal">Esferoidal (Ball)</option>
-                  <option value="Domo">Domo (Plano)</option>
-                  <option value="Nodo">Nodo (Sin Cabezal)</option>
-                </select>
-              </div>
-              <div style="width:100px; display:flex; flex-direction:column; gap:4px;">
-                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Duración (s)</label>
-                <input type="number" id="acu-p-dur" class="acu-input-flat" style="padding: 6px;" min="10" value="120" required>
-              </div>
-            </div>
-            
-            <div style="display:flex; flex-direction:column; gap:4px;">
-              <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Ubicación Anatómica Descriptiva (Texto)</label>
-              <textarea id="acu-p-loc" class="acu-input-flat" style="padding: 8px; font-size:0.8rem; min-height:50px; resize:vertical;" placeholder="Describe detalladamente cómo localizar el punto..." required></textarea>
-            </div>
-            
-            <div style="display:flex; flex-direction:column; gap:4px;">
-              <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Beneficios Clínicos / Indicaciones</label>
-              <input type="text" id="acu-p-benefits" class="acu-input-flat" style="padding: 6px; font-size:0.8rem;" placeholder="Ej. Alivia la ansiedad, cefaleas frontales, insomnio y congestión nasal." required>
-            </div>
+        <!-- Acordeón Formulario para Agregar/Editar Punto Extra -->
+        <div style="margin-bottom: 24px;">
+          <button id="btn-toggle-point-form" type="button" style="background:transparent; border:none; border-bottom:1px solid rgba(46,43,40,0.12); width:100%; text-align:left; padding:10px 0; font-family:var(--font-digital); font-size:0.78rem; font-weight:600; cursor:pointer; color:var(--color-text-main); display:flex; justify-content:space-between; align-items:center;">
+            <span>${editingItem && editingStore === 'acupuncture_points' ? '✏ EDITAR PUNTO EXTRA' : '+ AGREGAR NUEVO PUNTO EXTRA'}</span>
+            <span id="point-form-icon" style="font-size:0.65rem; transition:transform 0.2s;">${isPointFormOpen ? '▼' : '▶'}</span>
+          </button>
 
-            <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:8px;">
-              ${editingItem && editingStore === 'acupuncture_points' ? `
-                <button type="button" id="btn-cancel-edit" style="background:none; border:none; color:var(--color-text-muted); font-size:0.75rem; cursor:pointer;">[ CANCELAR ]</button>
-                <button type="submit" style="background:none; border:none; color:var(--color-accent-green); font-size:0.75rem; cursor:pointer; font-weight:600;">[ GUARDAR CAMBIOS ]</button>
-              ` : `
-                <button type="submit" style="background:none; border:none; color:var(--color-text-main); font-size:0.75rem; cursor:pointer; font-weight:600;">[ AGREGAR PUNTO EXTRA ]</button>
-              `}
-            </div>
-          </form>
+          <div id="point-form-accordion-body" style="display:${isPointFormOpen ? 'block' : 'none'}; padding-top: 16px; border-bottom: 1px solid rgba(46,43,40,0.08); padding-bottom: 16px;">
+            <form id="form-acu-point" style="display:flex; flex-direction:column; gap:12px;">
+              <div style="display:flex; flex-wrap:wrap; gap:16px;">
+                <div style="flex:1; min-width:180px; display:flex; flex-direction:column; gap:4px;">
+                  <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Nombre del Punto Extra</label>
+                  <input type="text" id="acu-p-name" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Yintang (Palacio del Sello)" required>
+                </div>
+                <div style="width:120px; display:flex; flex-direction:column; gap:4px;">
+                  <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Código MTC / OMS</label>
+                  <input type="text" id="acu-p-code" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Ex-HN 3" required>
+                </div>
+                <div style="width:140px; display:flex; flex-direction:column; gap:4px;">
+                  <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Código Tradicional / Pinyin</label>
+                  <input type="text" id="acu-p-trad-code" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Yintang" required>
+                </div>
+                <div style="width:140px; display:flex; flex-direction:column; gap:4px;">
+                  <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Canal / Meridiano</label>
+                  <select id="acu-p-meridian" class="acu-select-flat" style="padding: 6px;" disabled>
+                    <option value="EX" selected>Puntos Extra (EX)</option>
+                  </select>
+                </div>
+                <div style="width:140px; display:flex; flex-direction:column; gap:4px;">
+                  <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Cabezal de Electro Pen</label>
+                  <select id="acu-p-head" class="acu-select-flat" style="padding: 6px;">
+                    <option value="Esferoidal">Esferoidal (Ball)</option>
+                    <option value="Domo">Domo (Plano)</option>
+                    <option value="Nodo">Nodo (Sin Cabezal)</option>
+                  </select>
+                </div>
+                <div style="width:100px; display:flex; flex-direction:column; gap:4px;">
+                  <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Duración (s)</label>
+                  <input type="number" id="acu-p-dur" class="acu-input-flat" style="padding: 6px;" min="10" value="120" required>
+                </div>
+              </div>
+              
+              <div style="display:flex; flex-direction:column; gap:4px;">
+                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Ubicación Anatómica Descriptiva (Texto)</label>
+                <textarea id="acu-p-loc" class="acu-input-flat" style="padding: 8px; font-size:0.8rem; min-height:50px; resize:vertical;" placeholder="Describe detalladamente cómo localizar el punto extra..." required></textarea>
+              </div>
+              
+              <div style="display:flex; flex-direction:column; gap:4px;">
+                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Beneficios Clínicos / Indicaciones</label>
+                <input type="text" id="acu-p-benefits" class="acu-input-flat" style="padding: 6px; font-size:0.8rem;" placeholder="Ej. Alivia la ansiedad, cefaleas frontales, insomnio y congestión nasal." required>
+              </div>
+
+              <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:8px;">
+                ${editingItem && editingStore === 'acupuncture_points' ? `
+                  <button type="button" id="btn-cancel-edit" style="background:none; border:none; color:var(--color-text-muted); font-size:0.75rem; cursor:pointer;">[ CANCELAR ]</button>
+                  <button type="submit" style="background:none; border:none; color:var(--color-accent-green); font-size:0.75rem; cursor:pointer; font-weight:600;">[ GUARDAR CAMBIOS ]</button>
+                ` : `
+                  <button type="submit" style="background:none; border:none; color:var(--color-text-main); font-size:0.75rem; cursor:pointer; font-weight:600;">[ AGREGAR PUNTO EXTRA ]</button>
+                `}
+              </div>
+            </form>
+          </div>
         </div>
 
         <!-- Buscador y Filtro por Canal -->
@@ -224,6 +237,18 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
         <div class="acu-points-tab-list" id="points-editor-list"></div>
       `;
 
+      // Evento acordeón formulario punto extra
+      const toggleBtn = layout.querySelector('#btn-toggle-point-form');
+      if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+          isPointFormOpen = !isPointFormOpen;
+          const body = layout.querySelector('#point-form-accordion-body');
+          const icon = layout.querySelector('#point-form-icon');
+          if (body) body.style.display = isPointFormOpen ? 'block' : 'none';
+          if (icon) icon.textContent = isPointFormOpen ? '▼' : '▶';
+        });
+      }
+
       // Cargar valores si estamos editando
       if (editingItem && editingStore === 'acupuncture_points') {
         layout.querySelector('#acu-p-name').value = editingItem.name || '';
@@ -236,6 +261,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
 
         layout.querySelector('#btn-cancel-edit').addEventListener('click', () => {
           editingItem = null;
+          isPointFormOpen = false;
           refresh();
         });
       }
@@ -275,6 +301,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
         try {
           await putData(db, 'acupuncture_points', pointData);
           editingItem = null;
+          isPointFormOpen = false;
           alert('Punto extra guardado en la base de datos.');
           refresh();
         } catch (err) {
@@ -355,8 +382,18 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
             <span style="font-size:0.65rem; color:var(--color-text-muted);">Canal: ${escapeHTML(p.meridian)} (${escapeHTML(p.meridian_id)}) ${p.traditional_code && p.traditional_code !== p.code ? `| Tradicional: ${escapeHTML(p.traditional_code)}` : ''} | Duración: ${escapeHTML(p.duration)}s</span>
             <div style="display:flex; gap:12px;">
               ${p.meridian_id === 'EX' ? `
-                <button class="btn-edit-pt" style="background:none; border:none; color:var(--color-text-main); font-size:0.62rem; cursor:pointer;">[ EDITAR ]</button>
-                <button class="btn-delete-pt" style="background:none; border:none; color:var(--color-accent-red); font-size:0.62rem; cursor:pointer;">[ ELIMINAR ]</button>
+                <button class="btn-action-icon btn-edit-pt" title="Editar" aria-label="Editar">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                  </svg>
+                </button>
+                <button class="btn-action-icon delete-icon btn-delete-pt" title="Eliminar" aria-label="Eliminar">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  </svg>
+                </button>
               ` : ''}
             </div>
           </div>
@@ -379,6 +416,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
           e.stopPropagation();
           editingItem = p;
           editingStore = 'acupuncture_points';
+          isPointFormOpen = true;
           refresh();
           window.scrollTo({ top: 0, behavior: 'smooth' });
         });
@@ -431,62 +469,82 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
      MÓDULO 2: RESPIRACIÓN (BREATHWORK)
      ========================================================================= */
   function renderBreathworkManager(container) {
+    if (editingItem && editingStore === 'breathwork_patterns') {
+      isBreathFormOpen = true;
+    }
+
     container.innerHTML = `
-      <!-- Formulario respiración -->
-      <div class="glass-panel" style="padding: 20px; margin-bottom: 24px;">
-        <h3 style="font-size:0.9rem; font-weight:600; margin-bottom:14px; text-transform:uppercase; font-family:var(--font-digital); color:var(--color-text-main);">
-          ${editingItem && editingStore === 'breathwork_patterns' ? 'Editar Técnica de Respiración' : 'Registrar Nueva Técnica de Respiración'}
-        </h3>
-        <form id="form-breath" style="display:flex; flex-direction:column; gap:12px;">
-          <div style="display:flex; flex-wrap:wrap; gap:16px;">
-            <div style="flex:1.5; min-width:180px; display:flex; flex-direction:column; gap:4px;">
-              <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Nombre de la Técnica</label>
-              <input type="text" id="breath-name" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Respiración de Fuego (Kapalabhati)" required>
-            </div>
-            <div style="width:120px; display:flex; flex-direction:column; gap:4px;">
-              <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">ID Único</label>
-              <input type="text" id="breath-id" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. breath-fire" ${editingItem && editingStore === 'breathwork_patterns' ? 'disabled' : ''} required>
-            </div>
-          </div>
+      <!-- Acordeón Formulario para Registrar/Editar Técnica de Respiración -->
+      <div style="margin-bottom: 24px;">
+        <button id="btn-toggle-breath-form" type="button" style="background:transparent; border:none; border-bottom:1px solid rgba(46,43,40,0.12); width:100%; text-align:left; padding:10px 0; font-family:var(--font-digital); font-size:0.78rem; font-weight:600; cursor:pointer; color:var(--color-text-main); display:flex; justify-content:space-between; align-items:center;">
+          <span>${editingItem && editingStore === 'breathwork_patterns' ? '✏ EDITAR TÉCNICA DE RESPIRACIÓN' : '+ REGISTRAR NUEVA TÉCNICA DE RESPIRACIÓN'}</span>
+          <span id="breath-form-icon" style="font-size:0.65rem; transition:transform 0.2s;">${isBreathFormOpen ? '▼' : '▶'}</span>
+        </button>
 
-          <div style="display:flex; flex-wrap:wrap; gap:16px;">
-            <div style="flex:1; display:flex; flex-direction:column; gap:4px;">
-              <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Inhalación (s)</label>
-              <input type="number" id="breath-inhale" class="acu-input-flat" style="padding: 6px;" min="0" value="4" required>
+        <div id="breath-form-accordion-body" style="display:${isBreathFormOpen ? 'block' : 'none'}; padding-top: 16px; border-bottom: 1px solid rgba(46,43,40,0.08); padding-bottom: 16px;">
+          <form id="form-breath" style="display:flex; flex-direction:column; gap:12px;">
+            <div style="display:flex; flex-wrap:wrap; gap:16px;">
+              <div style="flex:1.5; min-width:180px; display:flex; flex-direction:column; gap:4px;">
+                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Nombre de la Técnica</label>
+                <input type="text" id="breath-name" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Respiración de Fuego (Kapalabhati)" required>
+              </div>
+              <div style="width:120px; display:flex; flex-direction:column; gap:4px;">
+                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">ID Único</label>
+                <input type="text" id="breath-id" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. breath-fire" ${editingItem && editingStore === 'breathwork_patterns' ? 'disabled' : ''} required>
+              </div>
             </div>
-            <div style="flex:1; display:flex; flex-direction:column; gap:4px;">
-              <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Retención Lleno (s)</label>
-              <input type="number" id="breath-holdin" class="acu-input-flat" style="padding: 6px;" min="0" value="4" required>
-            </div>
-            <div style="flex:1; display:flex; flex-direction:column; gap:4px;">
-              <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Exhalación (s)</label>
-              <input type="number" id="breath-exhale" class="acu-input-flat" style="padding: 6px;" min="0" value="4" required>
-            </div>
-            <div style="flex:1; display:flex; flex-direction:column; gap:4px;">
-              <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Retención Vacío (s)</label>
-              <input type="number" id="breath-holdout" class="acu-input-flat" style="padding: 6px;" min="0" value="4" required>
-            </div>
-          </div>
 
-          <div style="display:flex; flex-direction:column; gap:4px;">
-            <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Descripción / Beneficios</label>
-            <textarea id="breath-desc" class="acu-input-flat" style="padding: 8px; font-size:0.8rem; min-height:45px; resize:vertical;" placeholder="Describe cómo practicarlo y qué sistema biológico activa..." required></textarea>
-          </div>
+            <div style="display:flex; flex-wrap:wrap; gap:16px;">
+              <div style="flex:1; display:flex; flex-direction:column; gap:4px;">
+                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Inhalación (s)</label>
+                <input type="number" id="breath-inhale" class="acu-input-flat" style="padding: 6px;" min="0" value="4" required>
+              </div>
+              <div style="flex:1; display:flex; flex-direction:column; gap:4px;">
+                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Retención Lleno (s)</label>
+                <input type="number" id="breath-holdin" class="acu-input-flat" style="padding: 6px;" min="0" value="4" required>
+              </div>
+              <div style="flex:1; display:flex; flex-direction:column; gap:4px;">
+                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Exhalación (s)</label>
+                <input type="number" id="breath-exhale" class="acu-input-flat" style="padding: 6px;" min="0" value="4" required>
+              </div>
+              <div style="flex:1; display:flex; flex-direction:column; gap:4px;">
+                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Retención Vacío (s)</label>
+                <input type="number" id="breath-holdout" class="acu-input-flat" style="padding: 6px;" min="0" value="4" required>
+              </div>
+            </div>
 
-          <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:8px;">
-            ${editingItem && editingStore === 'breathwork_patterns' ? `
-              <button type="button" id="btn-cancel-edit" style="background:none; border:none; color:var(--color-text-muted); font-size:0.75rem; cursor:pointer;">[ CANCELAR ]</button>
-              <button type="submit" style="background:none; border:none; color:var(--color-accent-green); font-size:0.75rem; cursor:pointer; font-weight:600;">[ GUARDAR CAMBIOS ]</button>
-            ` : `
-              <button type="submit" style="background:none; border:none; color:var(--color-text-main); font-size:0.75rem; cursor:pointer; font-weight:600;">[ CREAR TÉCNICA ]</button>
-            `}
-          </div>
-        </form>
+            <div style="display:flex; flex-direction:column; gap:4px;">
+              <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Descripción / Beneficios</label>
+              <textarea id="breath-desc" class="acu-input-flat" style="padding: 8px; font-size:0.8rem; min-height:45px; resize:vertical;" placeholder="Describe cómo practicarlo y qué sistema biológico activa..." required></textarea>
+            </div>
+
+            <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:8px;">
+              ${editingItem && editingStore === 'breathwork_patterns' ? `
+                <button type="button" id="btn-cancel-edit" style="background:none; border:none; color:var(--color-text-muted); font-size:0.75rem; cursor:pointer;">[ CANCELAR ]</button>
+                <button type="submit" style="background:none; border:none; color:var(--color-accent-green); font-size:0.75rem; cursor:pointer; font-weight:600;">[ GUARDAR CAMBIOS ]</button>
+              ` : `
+                <button type="submit" style="background:none; border:none; color:var(--color-text-main); font-size:0.75rem; cursor:pointer; font-weight:600;">[ CREAR TÉCNICA ]</button>
+              `}
+            </div>
+          </form>
+        </div>
       </div>
 
       <!-- Listado de Técnicas -->
       <div class="acu-points-tab-list" id="breathwork-editor-list"></div>
     `;
+
+    // Evento acordeón formulario respiración
+    const toggleBreathBtn = layout.querySelector('#btn-toggle-breath-form');
+    if (toggleBreathBtn) {
+      toggleBreathBtn.addEventListener('click', () => {
+        isBreathFormOpen = !isBreathFormOpen;
+        const body = layout.querySelector('#breath-form-accordion-body');
+        const icon = layout.querySelector('#breath-form-icon');
+        if (body) body.style.display = isBreathFormOpen ? 'block' : 'none';
+        if (icon) icon.textContent = isBreathFormOpen ? '▼' : '▶';
+      });
+    }
 
     if (editingItem && editingStore === 'breathwork_patterns') {
       layout.querySelector('#breath-id').value = editingItem.id || '';
@@ -499,6 +557,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
 
       layout.querySelector('#btn-cancel-edit').addEventListener('click', () => {
         editingItem = null;
+        isBreathFormOpen = false;
         refresh();
       });
     }
@@ -518,6 +577,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
       try {
         await putData(db, 'breathwork_patterns', breathData);
         editingItem = null;
+        isBreathFormOpen = false;
         alert('Técnica de respiración guardada con éxito.');
         refresh();
       } catch (err) {
@@ -549,9 +609,19 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
           </div>
           <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
             <span style="font-family:var(--font-mono); font-size:0.65rem; color:var(--color-text-muted); text-transform:uppercase;">${escapeHTML(b.id)}</span>
-            <div style="display:flex; gap:8px;">
-              <button class="btn-edit-br" style="background:none; border:none; color:var(--color-text-main); font-size:0.62rem; cursor:pointer;">[ EDITAR ]</button>
-              <button class="btn-delete-br" style="background:none; border:none; color:var(--color-accent-red); font-size:0.62rem; cursor:pointer;">[ BORRAR ]</button>
+            <div style="display:flex; gap:4px;">
+              <button class="btn-action-icon btn-edit-br" title="Editar" aria-label="Editar">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+              </button>
+              <button class="btn-action-icon delete-icon btn-delete-br" title="Borrar" aria-label="Borrar">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
             </div>
           </div>
         </div>
@@ -560,6 +630,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
       card.querySelector('.btn-edit-br').addEventListener('click', () => {
         editingItem = b;
         editingStore = 'breathwork_patterns';
+        isBreathFormOpen = true;
         refresh();
         window.scrollTo({ top: 0, behavior: 'smooth' });
       });
@@ -581,65 +652,85 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
      ========================================================================= */
   function renderYogaManager(container) {
     container.innerHTML = `
-      <div style="display: flex; gap: 8px; border-bottom: 1px solid rgba(46,43,40,0.06); padding-bottom: 8px; margin-bottom: 20px;">
-        <button id="btn-sub-asa" class="btn-braun-tab ${activeYogaSubTab === 'postures' ? 'active' : ''}" style="padding:4px 12px; font-size:0.75rem;">Asanas (Posturas)</button>
-        <button id="btn-sub-blo" class="btn-braun-tab ${activeYogaSubTab === 'blocks' ? 'active' : ''}" style="padding:4px 12px; font-size:0.75rem;">Bloques de Secuencia</button>
+      <div style="display: flex; gap: 8px; border-bottom: 1px solid rgba(46,43,40,0.12); padding-bottom: 0; margin-bottom: 20px;">
+        <button id="btn-sub-blo" class="btn-braun-tab ${activeYogaSubTab === 'blocks' ? 'active' : ''}" style="padding:6px 12px 8px 12px; font-size:0.75rem;">Bloques de Secuencia</button>
+        <button id="btn-sub-asa" class="btn-braun-tab ${activeYogaSubTab === 'postures' ? 'active' : ''}" style="padding:6px 12px 8px 12px; font-size:0.75rem;">Asanas (Posturas)</button>
       </div>
       <div id="yoga-sub-content"></div>
     `;
 
-    layout.querySelector('#btn-sub-asa').addEventListener('click', () => { activeYogaSubTab = 'postures'; editingItem = null; refresh(); });
     layout.querySelector('#btn-sub-blo').addEventListener('click', () => { activeYogaSubTab = 'blocks'; editingItem = null; refresh(); });
+    layout.querySelector('#btn-sub-asa').addEventListener('click', () => { activeYogaSubTab = 'postures'; editingItem = null; refresh(); });
 
     const subContentEl = container.querySelector('#yoga-sub-content');
 
     if (activeYogaSubTab === 'postures') {
+      if (editingItem && editingStore === 'yoga_postures') {
+        isAsanaFormOpen = true;
+      }
+
       // --- SUB-PESTAÑA ASANAS ---
       subContentEl.innerHTML = `
-        <!-- Formulario asanas -->
-        <div class="glass-panel" style="padding: 20px; margin-bottom: 24px;">
-          <h3 style="font-size:0.9rem; font-weight:600; margin-bottom:14px; text-transform:uppercase; font-family:var(--font-digital); color:var(--color-text-main);">
-            ${editingItem && editingStore === 'yoga_postures' ? 'Editar Postura (Asana)' : 'Registrar Nueva Asana de Yin Yoga'}
-          </h3>
-          <form id="form-asana" style="display:flex; flex-direction:column; gap:12px;">
-            <div style="display:flex; flex-wrap:wrap; gap:16px;">
-              <div style="flex:1.5; min-width:180px; display:flex; flex-direction:column; gap:4px;">
-                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Nombre de la Asana</label>
-                <input type="text" id="asana-name" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Dragón Alado (Anjaneyasana)" required>
-              </div>
-              <div style="width:120px; display:flex; flex-direction:column; gap:4px;">
-                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">ID Único</label>
-                <input type="text" id="asana-id" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. yin-dragon" ${editingItem && editingStore === 'yoga_postures' ? 'disabled' : ''} required>
-              </div>
-              <div style="width:120px; display:flex; flex-direction:column; gap:4px;">
-                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Estilo</label>
-                <input type="text" id="asana-style" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Yin" value="Yin" required>
-              </div>
-              <div style="width:100px; display:flex; flex-direction:column; gap:4px;">
-                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Duración (s)</label>
-                <input type="number" id="asana-duration" class="acu-input-flat" style="padding: 6px;" min="10" value="180" required>
-              </div>
-            </div>
+        <!-- Acordeón Formulario Asanas -->
+        <div style="margin-bottom: 24px;">
+          <button id="btn-toggle-asana-form" type="button" style="background:transparent; border:none; border-bottom:1px solid rgba(46,43,40,0.12); width:100%; text-align:left; padding:10px 0; font-family:var(--font-digital); font-size:0.78rem; font-weight:600; cursor:pointer; color:var(--color-text-main); display:flex; justify-content:space-between; align-items:center;">
+            <span>${editingItem && editingStore === 'yoga_postures' ? '✏ EDITAR ASANA (POSTURA)' : '+ REGISTRAR NUEVA ASANA DE YIN YOGA'}</span>
+            <span id="asana-form-icon" style="font-size:0.65rem; transition:transform 0.2s;">${isAsanaFormOpen ? '▼' : '▶'}</span>
+          </button>
 
-            <div style="display:flex; flex-direction:column; gap:4px;">
-              <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Indicaciones de Alineación y Beneficios</label>
-              <textarea id="asana-desc" class="acu-input-flat" style="padding: 8px; font-size:0.8rem; min-height:45px; resize:vertical;" placeholder="Describe la tracción del tejido conectivo, meridianos estimulados y precauciones..." required></textarea>
-            </div>
+          <div id="asana-form-accordion-body" style="display:${isAsanaFormOpen ? 'block' : 'none'}; padding-top: 16px; border-bottom: 1px solid rgba(46,43,40,0.08); padding-bottom: 16px;">
+            <form id="form-asana" style="display:flex; flex-direction:column; gap:12px;">
+              <div style="display:flex; flex-wrap:wrap; gap:16px;">
+                <div style="flex:1.5; min-width:180px; display:flex; flex-direction:column; gap:4px;">
+                  <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Nombre de la Asana</label>
+                  <input type="text" id="asana-name" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Dragón Alado (Anjaneyasana)" required>
+                </div>
+                <div style="width:120px; display:flex; flex-direction:column; gap:4px;">
+                  <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">ID Único</label>
+                  <input type="text" id="asana-id" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. yin-dragon" ${editingItem && editingStore === 'yoga_postures' ? 'disabled' : ''} required>
+                </div>
+                <div style="width:120px; display:flex; flex-direction:column; gap:4px;">
+                  <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Estilo</label>
+                  <input type="text" id="asana-style" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Yin" value="Yin" required>
+                </div>
+                <div style="width:100px; display:flex; flex-direction:column; gap:4px;">
+                  <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Duración (s)</label>
+                  <input type="number" id="asana-duration" class="acu-input-flat" style="padding: 6px;" min="10" value="180" required>
+                </div>
+              </div>
 
-            <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:8px;">
-              ${editingItem && editingStore === 'yoga_postures' ? `
-                <button type="button" id="btn-cancel-edit" style="background:none; border:none; color:var(--color-text-muted); font-size:0.75rem; cursor:pointer;">[ CANCELAR ]</button>
-                <button type="submit" style="background:none; border:none; color:var(--color-accent-green); font-size:0.75rem; cursor:pointer; font-weight:600;">[ GUARDAR CAMBIOS ]</button>
-              ` : `
-                <button type="submit" style="background:none; border:none; color:var(--color-text-main); font-size:0.75rem; cursor:pointer; font-weight:600;">[ CREAR ASANA ]</button>
-              `}
-            </div>
-          </form>
+              <div style="display:flex; flex-direction:column; gap:4px;">
+                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Indicaciones de Alineación y Beneficios</label>
+                <textarea id="asana-desc" class="acu-input-flat" style="padding: 8px; font-size:0.8rem; min-height:45px; resize:vertical;" placeholder="Describe la tracción del tejido conectivo, meridianos estimulados y precauciones..." required></textarea>
+              </div>
+
+              <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:8px;">
+                ${editingItem && editingStore === 'yoga_postures' ? `
+                  <button type="button" id="btn-cancel-edit" style="background:none; border:none; color:var(--color-text-muted); font-size:0.75rem; cursor:pointer;">[ CANCELAR ]</button>
+                  <button type="submit" style="background:none; border:none; color:var(--color-accent-green); font-size:0.75rem; cursor:pointer; font-weight:600;">[ GUARDAR CAMBIOS ]</button>
+                ` : `
+                  <button type="submit" style="background:none; border:none; color:var(--color-text-main); font-size:0.75rem; cursor:pointer; font-weight:600;">[ CREAR ASANA ]</button>
+                `}
+              </div>
+            </form>
+          </div>
         </div>
 
         <!-- Listado de Asanas -->
         <div class="acu-points-tab-list" id="postures-editor-list"></div>
       `;
+
+      // Evento acordeón formulario asana
+      const toggleAsanaBtn = layout.querySelector('#btn-toggle-asana-form');
+      if (toggleAsanaBtn) {
+        toggleAsanaBtn.addEventListener('click', () => {
+          isAsanaFormOpen = !isAsanaFormOpen;
+          const body = layout.querySelector('#asana-form-accordion-body');
+          const icon = layout.querySelector('#asana-form-icon');
+          if (body) body.style.display = isAsanaFormOpen ? 'block' : 'none';
+          if (icon) icon.textContent = isAsanaFormOpen ? '▼' : '▶';
+        });
+      }
 
       if (editingItem && editingStore === 'yoga_postures') {
         layout.querySelector('#asana-id').value = editingItem.id || '';
@@ -650,6 +741,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
 
         layout.querySelector('#btn-cancel-edit').addEventListener('click', () => {
           editingItem = null;
+          isAsanaFormOpen = false;
           refresh();
         });
       }
@@ -667,6 +759,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
         try {
           await putData(db, 'yoga_postures', asanaData);
           editingItem = null;
+          isAsanaFormOpen = false;
           alert('Asana guardada correctamente.');
           refresh();
         } catch (err) {
@@ -678,73 +771,97 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
       renderPosturesList(subContentEl.querySelector('#postures-editor-list'));
     } else {
       // --- SUB-PESTAÑA BLOQUES ---
-      // Si estamos editando o creando un bloque, manejamos una lista temporal de posturas en el bloque
+      if (editingItem && editingStore === 'yoga_blocks') {
+        isYogaBlockFormOpen = true;
+      }
+
       let blockPosturesList = [];
       if (editingItem && editingStore === 'yoga_blocks') {
         blockPosturesList = JSON.parse(JSON.stringify(editingItem.postures || []));
       }
 
       subContentEl.innerHTML = `
-        <!-- Formulario bloques -->
-        <div class="glass-panel" style="padding: 20px; margin-bottom: 24px;">
-          <h3 style="font-size:0.9rem; font-weight:600; margin-bottom:14px; text-transform:uppercase; font-family:var(--font-digital); color:var(--color-text-main);">
-            ${editingItem && editingStore === 'yoga_blocks' ? 'Editar Bloque de Secuencia' : 'Crear Nuevo Bloque de Yoga'}
-          </h3>
-          <form id="form-block" style="display:flex; flex-direction:column; gap:12px;">
-            <div style="display:flex; flex-wrap:wrap; gap:16px;">
-              <div style="flex:1.5; min-width:180px; display:flex; flex-direction:column; gap:4px;">
-                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Nombre del Bloque</label>
-                <input type="text" id="block-name" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Apertura de Caderas Yin" required>
-              </div>
-              <div style="width:120px; display:flex; flex-direction:column; gap:4px;">
-                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">ID Único</label>
-                <input type="text" id="block-id" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. block-caderas" ${editingItem && editingStore === 'yoga_blocks' ? 'disabled' : ''} required>
-              </div>
-            </div>
-            
-            <div style="display:flex; flex-direction:column; gap:4px;">
-              <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Descripción / Propósito</label>
-              <input type="text" id="block-desc" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Mini-secuencia enfocada en rotación externa y liberación lumbar." required>
-            </div>
+        <!-- Acordeón Formulario Bloques -->
+        <div style="margin-bottom: 24px;">
+          <button id="btn-toggle-yogablock-form" type="button" style="background:transparent; border:none; border-bottom:1px solid rgba(46,43,40,0.12); width:100%; text-align:left; padding:10px 0; font-family:var(--font-digital); font-size:0.78rem; font-weight:600; cursor:pointer; color:var(--color-text-main); display:flex; justify-content:space-between; align-items:center;">
+            <span>${editingItem && editingStore === 'yoga_blocks' ? '✏ EDITAR BLOQUE DE SECUENCIA' : '+ CREAR NUEVO BLOQUE DE YOGA'}</span>
+            <span id="yogablock-form-icon" style="font-size:0.65rem; transition:transform 0.2s;">${isYogaBlockFormOpen ? '▼' : '▶'}</span>
+          </button>
 
-            <!-- Listado interactivo de posturas dentro de este bloque -->
-            <div style="border:1px solid rgba(46,43,40,0.08); padding:12px; border-radius:6px; margin: 6px 0;">
-              <span style="font-size:0.65rem; color:var(--color-text-muted); text-transform:uppercase; font-weight:600; display:block; margin-bottom:8px;">Posturas del Bloque</span>
+          <div id="yogablock-form-accordion-body" style="display:${isYogaBlockFormOpen ? 'block' : 'none'}; padding-top: 16px; border-bottom: 1px solid rgba(46,43,40,0.08); padding-bottom: 16px;">
+            <form id="form-block" style="display:flex; flex-direction:column; gap:12px;">
+              <div style="display:flex; flex-wrap:wrap; gap:16px;">
+                <div style="flex:1.5; min-width:180px; display:flex; flex-direction:column; gap:4px;">
+                  <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Nombre del Bloque</label>
+                  <input type="text" id="block-name" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Apertura de Caderas Yin" required>
+                </div>
+                <div style="width:120px; display:flex; flex-direction:column; gap:4px;">
+                  <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">ID Único</label>
+                  <input type="text" id="block-id" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. block-caderas" ${editingItem && editingStore === 'yoga_blocks' ? 'disabled' : ''} required>
+                </div>
+              </div>
               
-              <div id="block-postures-builder" style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;">
-                <!-- Posturas agregadas temporalmente -->
+              <div style="display:flex; flex-direction:column; gap:4px;">
+                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Descripción / Propósito</label>
+                <input type="text" id="block-desc" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Mini-secuencia enfocada en rotación externa y liberación lumbar." required>
               </div>
 
-              <!-- Selector para añadir postura -->
-              <div style="display:flex; gap:12px; align-items:flex-end; border-top:1px dotted rgba(46,43,40,0.06); padding-top:10px;">
-                <div style="flex:1; display:flex; flex-direction:column; gap:4px;">
-                  <span style="font-size:0.55rem; color:var(--color-text-muted); text-transform:uppercase;">Seleccionar Asana</span>
-                  <select id="select-asana-to-add" class="acu-select-flat" style="font-size:0.75rem; padding:4px;">
-                    ${yogaPostures.map(p => `<option value="${escapeAttribute(p.id)}">${escapeHTML(p.name)}</option>`).join('')}
-                  </select>
+              <!-- Listado interactivo de posturas dentro de este bloque -->
+              <div style="border:1px solid rgba(46,43,40,0.08); padding:12px; border-radius:0; margin: 6px 0;">
+                <span style="font-size:0.65rem; color:var(--color-text-muted); text-transform:uppercase; font-weight:600; display:block; margin-bottom:8px;">Posturas del Bloque</span>
+                
+                <div id="block-postures-builder" style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;">
+                  <!-- Posturas agregadas temporalmente -->
                 </div>
-                <div style="width:100px; display:flex; flex-direction:column; gap:4px;">
-                  <span style="font-size:0.55rem; color:var(--color-text-muted); text-transform:uppercase;">Retención (s)</span>
-                  <input type="number" id="input-asana-hold" class="acu-input-flat" style="font-size:0.75rem; padding:4px;" min="10" value="120">
-                </div>
-                <button type="button" id="btn-add-asana-to-block" style="background:none; border:none; color:var(--color-text-main); font-size:0.7rem; cursor:pointer; font-weight:600;">[ AGREGAR ASANA ]</button>
-              </div>
-            </div>
 
-            <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:8px;">
-              ${editingItem && editingStore === 'yoga_blocks' ? `
-                <button type="button" id="btn-cancel-edit" style="background:none; border:none; color:var(--color-text-muted); font-size:0.75rem; cursor:pointer;">[ CANCELAR ]</button>
-                <button type="submit" style="background:none; border:none; color:var(--color-accent-green); font-size:0.75rem; cursor:pointer; font-weight:600;">[ GUARDAR CAMBIOS ]</button>
-              ` : `
-                <button type="submit" style="background:none; border:none; color:var(--color-text-main); font-size:0.75rem; cursor:pointer; font-weight:600;">[ CREAR BLOQUE ]</button>
-              `}
-            </div>
-          </form>
+                <!-- Selector para añadir postura -->
+                <div style="display:flex; gap:12px; align-items:flex-end; border-top:1px dotted rgba(46,43,40,0.06); padding-top:10px;">
+                  <div style="flex:1; display:flex; flex-direction:column; gap:4px;">
+                    <span style="font-size:0.55rem; color:var(--color-text-muted); text-transform:uppercase;">Seleccionar Asana</span>
+                    <select id="select-asana-to-add" class="acu-select-flat" style="font-size:0.75rem; padding:4px;">
+                      ${yogaPostures.map(p => `<option value="${escapeAttribute(p.id)}">${escapeHTML(p.name)}</option>`).join('')}
+                    </select>
+                  </div>
+                  <div style="width:100px; display:flex; flex-direction:column; gap:4px;">
+                    <span style="font-size:0.55rem; color:var(--color-text-muted); text-transform:uppercase;">Retención (s)</span>
+                    <input type="number" id="input-asana-hold" class="acu-input-flat" style="font-size:0.75rem; padding:4px;" min="10" value="120">
+                  </div>
+                  <button type="button" id="btn-add-asana-to-block" class="btn-action-icon" title="Agregar Asana al Bloque" aria-label="Agregar Asana al Bloque" style="width:32px; height:32px; color:var(--color-text-main);">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:8px;">
+                ${editingItem && editingStore === 'yoga_blocks' ? `
+                  <button type="button" id="btn-cancel-edit" style="background:none; border:none; color:var(--color-text-muted); font-size:0.75rem; cursor:pointer;">[ CANCELAR ]</button>
+                  <button type="submit" style="background:none; border:none; color:var(--color-accent-green); font-size:0.75rem; cursor:pointer; font-weight:600;">[ GUARDAR CAMBIOS ]</button>
+                ` : `
+                  <button type="submit" style="background:none; border:none; color:var(--color-text-main); font-size:0.75rem; cursor:pointer; font-weight:600;">[ CREAR BLOQUE ]</button>
+                `}
+              </div>
+            </form>
+          </div>
         </div>
 
         <!-- Listado de Bloques -->
         <div class="acu-points-tab-list" id="blocks-editor-list"></div>
       `;
+
+      // Evento acordeón formulario bloques
+      const toggleBlockBtn = layout.querySelector('#btn-toggle-yogablock-form');
+      if (toggleBlockBtn) {
+        toggleBlockBtn.addEventListener('click', () => {
+          isYogaBlockFormOpen = !isYogaBlockFormOpen;
+          const body = layout.querySelector('#yogablock-form-accordion-body');
+          const icon = layout.querySelector('#yogablock-form-icon');
+          if (body) body.style.display = isYogaBlockFormOpen ? 'block' : 'none';
+          if (icon) icon.textContent = isYogaBlockFormOpen ? '▼' : '▶';
+        });
+      }
 
       const blockPosturesBuilderEl = subContentEl.querySelector('#block-postures-builder');
 
@@ -760,7 +877,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
           const name = matchedPost ? matchedPost.name : 'Postura Desconocida';
 
           const itemEl = document.createElement('div');
-          itemEl.style.cssText = 'display:flex; justify-content:space-between; align-items:center; font-size:0.78rem; padding:4px 8px; background:rgba(0,0,0,0.02); border-radius:3px;';
+          itemEl.style.cssText = 'display:flex; justify-content:space-between; align-items:center; font-size:0.78rem; padding:4px 8px; background:transparent; border-bottom:1px solid rgba(46,43,40,0.06); border-radius:0;';
           itemEl.innerHTML = `
             <span>${index + 1}. <strong>${escapeHTML(name)}</strong> (${escapeHTML(bp.holdTime)}s)</span>
             <div style="display:flex; gap:8px;">
@@ -867,9 +984,19 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
           </div>
           <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
             <span style="font-family:var(--font-mono); font-size:0.65rem; color:var(--color-text-muted); text-transform:uppercase;">${escapeHTML(p.id)}</span>
-            <div style="display:flex; gap:8px;">
-              <button class="btn-edit-yp" style="background:none; border:none; color:var(--color-text-main); font-size:0.62rem; cursor:pointer;">[ EDITAR ]</button>
-              <button class="btn-delete-yp" style="background:none; border:none; color:var(--color-accent-red); font-size:0.62rem; cursor:pointer;">[ BORRAR ]</button>
+            <div style="display:flex; gap:4px;">
+              <button class="btn-action-icon btn-edit-yp" title="Editar" aria-label="Editar">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+              </button>
+              <button class="btn-action-icon delete-icon btn-delete-yp" title="Borrar" aria-label="Borrar">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
             </div>
           </div>
         </div>
@@ -916,9 +1043,19 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
           </div>
           <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
             <span style="font-family:var(--font-mono); font-size:0.65rem; color:var(--color-text-muted); text-transform:uppercase;">${escapeHTML(b.id)}</span>
-            <div style="display:flex; gap:8px;">
-              <button class="btn-edit-yb" style="background:none; border:none; color:var(--color-text-main); font-size:0.62rem; cursor:pointer;">[ EDITAR ]</button>
-              <button class="btn-delete-yb" style="background:none; border:none; color:var(--color-accent-red); font-size:0.62rem; cursor:pointer;">[ BORRAR ]</button>
+            <div style="display:flex; gap:4px;">
+              <button class="btn-action-icon btn-edit-yb" title="Editar" aria-label="Editar">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+              </button>
+              <button class="btn-action-icon delete-icon btn-delete-yb" title="Borrar" aria-label="Borrar">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
             </div>
           </div>
         </div>
@@ -991,9 +1128,19 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
           </div>
           <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px; margin-left:16px;">
             <span style="font-family:var(--font-mono); font-size:0.65rem; color:var(--color-text-muted); text-transform:uppercase;">${escapeHTML(session.id)}</span>
-            <div style="display:flex; gap:8px;">
-              <button class="btn-edit-cs" style="background:none; border:none; color:var(--color-text-main); font-size:0.62rem; cursor:pointer; text-transform:uppercase;">[ EDITAR ]</button>
-              <button class="btn-delete-cs" style="background:none; border:none; color:var(--color-accent-red); font-size:0.62rem; cursor:pointer; text-transform:uppercase;">[ BORRAR ]</button>
+            <div style="display:flex; gap:4px;">
+              <button class="btn-action-icon btn-edit-cs" title="Editar" aria-label="Editar">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+              </button>
+              <button class="btn-action-icon delete-icon btn-delete-cs" title="Borrar" aria-label="Borrar">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
             </div>
           </div>
         </div>
@@ -1055,10 +1202,10 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
      ========================================================================= */
   function renderSynthReference(container) {
     container.innerHTML = `
-      <div style="display: flex; gap: 8px; border-bottom: 1px solid rgba(46,43,40,0.06); padding-bottom: 8px; margin-bottom: 20px;">
-        <button id="btn-sub-waves" class="btn-braun-tab ${activeSynthSubTab === 'brainwaves' ? 'active' : ''}" style="padding:4px 12px; font-size:0.75rem;">Ondas Cerebrales</button>
-        <button id="btn-sub-solfeggio" class="btn-braun-tab ${activeSynthSubTab === 'solfeggio' ? 'active' : ''}" style="padding:4px 12px; font-size:0.75rem;">Tonos Base</button>
-        <button id="btn-sub-modes" class="btn-braun-tab ${activeSynthSubTab === 'modes' ? 'active' : ''}" style="padding:4px 12px; font-size:0.75rem;">Modos de Modulación</button>
+      <div style="display: flex; gap: 8px; border-bottom: 1px solid rgba(46,43,40,0.12); padding-bottom: 0; margin-bottom: 20px;">
+        <button id="btn-sub-waves" class="btn-braun-tab ${activeSynthSubTab === 'brainwaves' ? 'active' : ''}" style="padding:6px 12px 8px 12px; font-size:0.75rem;">Ondas Cerebrales</button>
+        <button id="btn-sub-solfeggio" class="btn-braun-tab ${activeSynthSubTab === 'solfeggio' ? 'active' : ''}" style="padding:6px 12px 8px 12px; font-size:0.75rem;">Tonos Base</button>
+        <button id="btn-sub-modes" class="btn-braun-tab ${activeSynthSubTab === 'modes' ? 'active' : ''}" style="padding:6px 12px 8px 12px; font-size:0.75rem;">Modos de Modulación</button>
       </div>
       <div id="synth-sub-content"></div>
     `;

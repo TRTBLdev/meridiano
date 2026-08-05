@@ -215,7 +215,7 @@ body {
    ========================================== */
 @media (min-width: 768px) {
   .dashboard-layout {
-    grid-template-columns: 200px 1fr; /* Columna fija e Columna fluida única */
+    grid-template-columns: var(--sidebar-width) 1fr; /* Columna fija e Columna fluida única */
     grid-template-rows: 1fr;
     height: 100vh;
   }
@@ -269,10 +269,6 @@ body {
 
 /* Desktop ampliado */
 @media (min-width: 1200px) {
-  .dashboard-layout {
-    grid-template-columns: 240px 1fr;
-  }
-  
   .main-viewport {
     padding: 96px 80px;
   }

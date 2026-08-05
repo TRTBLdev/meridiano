@@ -4,6 +4,8 @@ import { renderStrengthScreen } from './strength.js';
 import { renderYogaScreen } from './yoga.js';
 import { renderAcupunctureScreen } from './acupuncture.js';
 import { escapeHTML } from '../utils/sanitize.js';
+import { renderTechnicalTitle } from './ui.js';
+import { renderCompoundAction, renderCompoundSessionBlock, renderCompoundSessionCard } from './sessionsUi.js';
 
 export async function renderSessionsScreen(container, db, onNavigate, initialSessionId = null, initialView = 'lobby') {
   let activeView = initialView; // 'lobby' | 'builder' | 'transition'
@@ -77,18 +79,16 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
       </nav>
 
       <main class="main-viewport" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 20px; overflow-y: auto;">
-        <div class="glass-panel" style="max-width: 650px; width: 100%; padding: 24px; box-sizing: border-box; margin-bottom: 40px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <h2 class="module-lobby-title" style="margin: 0;">SESIONES COMPUESTAS</h2>
-            <button id="btn-create-session" class="btn-braun-tab active" style="font-family: var(--font-digital); text-transform: uppercase; padding: 8px 14px; font-size: 0.75rem; cursor: pointer; border-radius: 0;">
-              + Crear Sesión
-            </button>
+        <div class="glass-panel compound-sessions-panel">
+          <div class="compound-sessions-header">
+            ${renderTechnicalTitle('Sesiones Compuestas')}
+            ${renderCompoundAction('+ Crear Sesión', { id: 'btn-create-session' })}
           </div>
-          <p style="font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 24px; line-height: 1.4;">
+          <p class="compound-sessions-description">
             Rutinas integrales personalizables que encadenan respiración, fuerza, yoga y acupuntura en un solo flujo ininterrumpido.
           </p>
 
-          <div class="syllabus-list" id="sessions-list" style="display: flex; flex-direction: column; gap: 16px;"></div>
+          <div class="compound-sessions-list" id="sessions-list"></div>
         </div>
       </main>
     `;
@@ -111,44 +111,15 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
     const listContainer = layout.querySelector('#sessions-list');
     
     if (sessionsCatalog.length === 0) {
-      listContainer.innerHTML = '<p style="text-align: center; color: var(--color-text-muted); font-size: 0.85rem; padding: 24px;">No hay sesiones disponibles. Haz clic en "+ Crear Sesión" para construir tu primera rutina.</p>';
+      listContainer.innerHTML = '<p class="compound-sessions-empty">No hay sesiones disponibles. Haz clic en "+ Crear Sesión" para construir tu primera rutina.</p>';
       return;
     }
 
     sessionsCatalog.forEach(session => {
       const el = document.createElement('div');
-      el.className = 'syllabus-list-item';
-      el.style.cssText = `
-        padding: 16px;
-        border: 1px solid rgba(46,43,40,0.1);
-        border-radius: 4px;
-        transition: background 0.2s;
-      `;
+      el.className = 'compound-session-card';
       
-      const blocksHtml = session.blocks.map((b, i) => 
-        `<div style="font-size: 0.75rem; color: var(--color-text-muted); margin-top: 4px;">
-           <span style="font-weight: 600; font-size: 0.65rem; color: var(--color-text-main);">[${b.module.toUpperCase()}]</span> ${escapeHTML(b.nameOverride)} (${b.duration}s)
-         </div>`
-      ).join('');
-
-      el.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-          <div>
-            <div style="font-weight: 600; font-size: 1rem;">${escapeHTML(session.name)}</div>
-            <div style="font-size: 0.85rem; color: var(--color-text-muted); margin-top: 2px;">${escapeHTML(session.description || '')}</div>
-          </div>
-          <div style="display: flex; gap: 8px;">
-            <button class="btn-edit-session" style="background: none; border: none; color: var(--color-text-main); font-size: 0.7rem; font-family: var(--font-digital); cursor: pointer; text-transform: uppercase;">[ EDITAR ]</button>
-            <button class="btn-delete-session" style="background: none; border: none; color: var(--color-accent-red); font-size: 0.7rem; font-family: var(--font-digital); cursor: pointer; text-transform: uppercase;">[ BORRAR ]</button>
-          </div>
-        </div>
-        <div style="padding-top: 8px; border-top: 1px dashed rgba(46,43,40,0.1);">
-          ${blocksHtml}
-        </div>
-        <button class="btn-play-session" style="margin-top: 16px; width: 100%; border-radius: 4px; padding: 12px; font-weight: 600; font-size: 0.9rem; border: none; background: var(--color-text-main); color: var(--color-bg-base); cursor: pointer; text-transform: uppercase;">
-          INICIAR SESIÓN
-        </button>
-      `;
+      el.innerHTML = renderCompoundSessionCard(session);
 
       el.querySelector('.btn-edit-session').addEventListener('click', () => {
         editingSession = JSON.parse(JSON.stringify(session));
@@ -199,12 +170,10 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
       </nav>
 
       <main class="main-viewport" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 20px; overflow-y: auto;">
-        <div class="glass-panel" style="max-width: 650px; width: 100%; padding: 24px; box-sizing: border-box; margin-bottom: 40px;">
-          <h2 class="module-lobby-title" style="margin-bottom: 16px; font-family: var(--font-digital); font-size: 1.1rem; text-transform: uppercase;">
-            ${sessionsCatalog.some(s => s.id === editingSession.id) ? '[ EDITAR SESIÓN COMPUESTA ]' : '[ CREAR SESIÓN COMPUESTA ]'}
-          </h2>
+        <div class="glass-panel compound-sessions-panel compound-sessions-builder">
+          ${renderTechnicalTitle(sessionsCatalog.some(s => s.id === editingSession.id) ? 'Editar Sesión Compuesta' : 'Crear Sesión Compuesta', { style: 'margin-bottom: 16px;' })}
 
-          <form id="form-builder" style="display: flex; flex-direction: column; gap: 16px;">
+          <form id="form-builder" class="compound-builder-form">
             <div style="display: flex; flex-direction: column; gap: 4px;">
               <label style="font-size: 0.65rem; color: var(--color-text-muted); text-transform: uppercase; font-family: var(--font-digital);">Nombre de la Sesión</label>
               <input type="text" id="builder-name" class="acu-input-flat" value="${escapeHTML(editingSession.name)}" style="padding: 8px; font-size: 0.9rem;" required>
@@ -215,22 +184,18 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
               <textarea id="builder-desc" class="acu-input-flat" style="padding: 8px; font-size: 0.85rem; min-height: 60px; resize: vertical;" required>${escapeHTML(editingSession.description || '')}</textarea>
             </div>
 
-            <div style="border-top: 1px dashed rgba(46,43,40,0.1); padding-top: 16px; margin-top: 8px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div class="compound-builder-blocks">
+              <div class="compound-builder-blocks__header">
                 <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; font-family: var(--font-digital);">Bloques Secuenciales (${editingSession.blocks.length})</label>
-                <button type="button" id="btn-add-block" class="btn-braun-tab active" style="padding: 4px 10px; font-size: 0.7rem; font-family: var(--font-digital); cursor: pointer;">+ Agregar Bloque</button>
+                ${renderCompoundAction('+ Agregar Bloque', { id: 'btn-add-block' })}
               </div>
 
-              <div id="blocks-container" style="display: flex; flex-direction: column; gap: 12px;"></div>
+              <div id="blocks-container" class="compound-blocks-container"></div>
             </div>
 
-            <div style="display: flex; gap: 12px; margin-top: 24px;">
-              <button type="submit" style="flex: 1; padding: 12px; background: var(--color-text-main); color: var(--color-bg-base); border: none; font-weight: 600; font-size: 0.85rem; border-radius: 4px; cursor: pointer; text-transform: uppercase;">
-                Guardar Sesión Compuesta
-              </button>
-              <button type="button" id="btn-discard" style="padding: 12px 20px; background: transparent; border: 1px solid rgba(46,43,40,0.2); color: var(--color-text-main); font-size: 0.85rem; border-radius: 4px; cursor: pointer;">
-                Cancelar
-              </button>
+            <div class="compound-builder-actions">
+              ${renderCompoundAction('Guardar Sesión Compuesta', { type: 'submit', className: 'compound-primary-action' })}
+              ${renderCompoundAction('Cancelar', { id: 'btn-discard', className: 'compound-secondary-action' })}
             </div>
           </form>
         </div>
@@ -287,64 +252,9 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
 
       editingSession.blocks.forEach((block, index) => {
         const blockEl = document.createElement('div');
-        blockEl.style.cssText = `
-          padding: 12px;
-          border: 1px solid rgba(46,43,40,0.12);
-          background: rgba(0,0,0,0.015);
-          border-radius: 4px;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        `;
+        blockEl.className = 'compound-block';
 
-        const availablePresets = presetsCatalog[block.module] || [];
-        const optionsHtml = availablePresets.map(p => 
-          `<option value="${p.id}" ${p.id === block.presetId ? 'selected' : ''}>${escapeHTML(p.name)}</option>`
-        ).join('');
-
-        blockEl.innerHTML = `
-          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed rgba(46,43,40,0.08); padding-bottom: 4px;">
-            <span style="font-family: var(--font-digital); font-size: 0.7rem; font-weight: 600; text-transform: uppercase;">
-              Bloque ${index + 1}
-            </span>
-            <div style="display: flex; gap: 4px;">
-              <button type="button" class="btn-move-up" style="background:none; border:none; cursor:pointer; font-size:0.7rem;" ${index === 0 ? 'disabled' : ''}>▲</button>
-              <button type="button" class="btn-move-down" style="background:none; border:none; cursor:pointer; font-size:0.7rem;" ${index === editingSession.blocks.length - 1 ? 'disabled' : ''}>▼</button>
-              <button type="button" class="btn-remove-block" style="background:none; border:none; color:var(--color-accent-red); cursor:pointer; font-size:0.7rem; margin-left:8px;">[ ELIMINAR ]</button>
-            </div>
-          </div>
-
-          <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-            <div style="width: 120px; display: flex; flex-direction: column; gap: 2px;">
-              <label style="font-size:0.55rem; color:var(--color-text-muted); text-transform:uppercase;">Módulo</label>
-              <select class="block-module-select acu-select-flat" style="padding: 4px; font-size:0.75rem;">
-                <option value="breathwork" ${block.module === 'breathwork' ? 'selected' : ''}>Breathwork</option>
-                <option value="strength" ${block.module === 'strength' ? 'selected' : ''}>Fuerza</option>
-                <option value="yoga" ${block.module === 'yoga' ? 'selected' : ''}>Yin Yoga</option>
-                <option value="acupuncture" ${block.module === 'acupuncture' ? 'selected' : ''}>Acupuntura</option>
-              </select>
-            </div>
-
-            <div style="flex: 1; min-width: 150px; display: flex; flex-direction: column; gap: 2px;">
-              <label style="font-size:0.55rem; color:var(--color-text-muted); text-transform:uppercase;">Preset Clínico / Rutina</label>
-              <select class="block-preset-select acu-select-flat" style="padding: 4px; font-size:0.75rem;">
-                ${optionsHtml}
-              </select>
-            </div>
-          </div>
-
-          <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-            <div style="flex: 1; min-width: 150px; display: flex; flex-direction: column; gap: 2px;">
-              <label style="font-size:0.55rem; color:var(--color-text-muted); text-transform:uppercase;">Nombre del Bloque</label>
-              <input type="text" class="block-name-input acu-input-flat" value="${escapeHTML(block.nameOverride || '')}" style="padding: 4px; font-size:0.75rem;" required>
-            </div>
-
-            <div style="width: 90px; display: flex; flex-direction: column; gap: 2px;">
-              <label style="font-size:0.55rem; color:var(--color-text-muted); text-transform:uppercase;">Duración (s)</label>
-              <input type="number" class="block-dur-input acu-input-flat" value="${block.duration}" min="10" style="padding: 4px; font-size:0.75rem;" required>
-            </div>
-          </div>
-        `;
+        blockEl.innerHTML = renderCompoundSessionBlock(block, index, editingSession.blocks.length, presetsCatalog);
 
         // Eventos del bloque
         blockEl.querySelector('.btn-move-up').addEventListener('click', () => {
@@ -457,7 +367,7 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
     activeView = 'transition';
     container.innerHTML = `
       <div class="dashboard-layout" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #0A0A0A; color: #E8E6E3;">
-        <h2 style="font-family: var(--font-digital); font-size: 1.5rem; letter-spacing: 0.1em; margin-bottom: 24px; color: var(--color-text-muted);">PREPARANDO SIGUIENTE BLOQUE</h2>
+        ${renderTechnicalTitle('Preparando Siguiente Bloque', { style: 'font-size: 1.5rem; margin-bottom: 24px; color: var(--color-text-muted);' })}
         <div style="font-size: 2rem; font-weight: 300; margin-bottom: 8px;">${block.module.toUpperCase()}</div>
         <div style="font-size: 1.2rem; color: var(--color-text-muted);">${escapeHTML(block.nameOverride)}</div>
         

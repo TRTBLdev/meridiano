@@ -390,7 +390,7 @@
 .sound-tuner-overlay {
   position: fixed;
   top: 120px;
-  left: 220px; /* Al lado de la barra de navegación lateral */
+  left: calc(var(--sidebar-width) + 16px); /* Al lado de la barra de navegación lateral */
   width: 320px;
   z-index: 1100;
   transform: translateX(-15px);
@@ -657,6 +657,311 @@
   padding-bottom: 8px;
 }
 
+.technical-title {
+  margin: 0;
+  color: var(--color-text-main);
+  font-family: var(--font-digital);
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+/* Sesiones compuestas: interfaz plana y técnica */
+.compound-sessions-panel {
+  width: 100%;
+  max-width: 650px;
+  box-sizing: border-box;
+  margin-bottom: 40px;
+  padding: 24px;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.dark-theme .compound-sessions-panel {
+  box-shadow: none !important;
+}
+
+.compound-sessions-header,
+.compound-builder-blocks__header,
+.compound-session-card__header,
+.compound-block__header,
+.compound-builder-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.compound-sessions-description {
+  margin: 8px 0 24px;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.compound-sessions-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.compound-sessions-empty {
+  margin: 0;
+  padding: 24px 0;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.compound-session-card {
+  padding: 20px 0;
+  border-top: 1px solid rgba(46, 43, 40, 0.12);
+  background: transparent;
+}
+
+.compound-session-card:last-child {
+  border-bottom: 1px solid rgba(46, 43, 40, 0.12);
+}
+
+.compound-session-card__header {
+  align-items: flex-start;
+}
+
+.compound-session-card__name {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.compound-session-card__description {
+  max-width: 500px;
+  margin-top: 3px;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.compound-session-card__icons,
+.compound-block__controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.compound-session-card__blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 14px 0;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(46, 43, 40, 0.1);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.compound-session-card__module {
+  margin-right: 3px;
+  color: var(--color-text-main);
+  font-size: 0.65rem;
+  font-weight: 600;
+}
+
+.compound-text-action {
+  padding: 5px 0 !important;
+  border: none !important;
+  border-bottom: 2px solid var(--color-accent-red) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--color-text-main) !important;
+  cursor: pointer;
+  font-family: var(--font-digital);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.compound-text-action:hover,
+.compound-text-action:focus-visible {
+  color: var(--color-accent-red) !important;
+  border-bottom-color: var(--color-text-main) !important;
+  outline: none;
+}
+
+.compound-text-action.btn-play-session {
+  margin-top: 4px;
+}
+
+.compound-primary-action {
+  color: var(--color-text-main) !important;
+}
+
+.compound-secondary-action {
+  border-bottom-color: transparent !important;
+  color: var(--color-text-muted) !important;
+}
+
+.compound-secondary-action:hover,
+.compound-secondary-action:focus-visible {
+  border-bottom-color: var(--color-text-muted) !important;
+  color: var(--color-text-main) !important;
+}
+
+.compound-builder-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.compound-builder-form > div:not(.compound-builder-blocks):not(.compound-builder-actions) {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.compound-builder-form label,
+.compound-builder-blocks__title,
+.compound-field > span {
+  color: var(--color-text-muted);
+  font-family: var(--font-digital);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+}
+
+.compound-builder-form textarea {
+  min-height: 60px;
+  resize: vertical;
+}
+
+.compound-builder-blocks {
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px dashed rgba(46, 43, 40, 0.1);
+}
+
+.compound-builder-blocks__header {
+  margin-bottom: 12px;
+}
+
+.compound-builder-blocks__title {
+  color: var(--color-text-main);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.compound-blocks-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.compound-block {
+  padding: 14px 0;
+  border-top: 1px solid rgba(46, 43, 40, 0.12);
+  background: transparent;
+}
+
+.compound-block:last-child {
+  border-bottom: 1px solid rgba(46, 43, 40, 0.12);
+}
+
+.compound-block__header {
+  padding-bottom: 8px;
+  border-bottom: 1px dashed rgba(46, 43, 40, 0.1);
+}
+
+.compound-block__title {
+  font-family: var(--font-digital);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.compound-icon-action {
+  padding: 2px 4px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 0.7rem;
+}
+
+.compound-icon-action:hover:not(:disabled) {
+  color: var(--color-text-main);
+}
+
+.compound-icon-action:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.compound-block__controls .delete-icon {
+  width: 28px;
+  height: 28px;
+  margin-left: 6px;
+  padding-left: 10px;
+  border-left: 1px solid rgba(46, 43, 40, 0.12) !important;
+}
+
+.compound-block__fields {
+  display: grid;
+  grid-template-columns: 120px minmax(150px, 1fr);
+  gap: 12px 8px;
+  padding-top: 12px;
+}
+
+.compound-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.compound-field--name {
+  grid-column: 1 / -1;
+}
+
+.compound-field--duration {
+  grid-column: 2;
+  width: 90px;
+}
+
+.compound-builder-actions {
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+@media (max-width: 560px) {
+  .compound-sessions-panel {
+    padding: 20px 0;
+  }
+
+  .compound-sessions-header,
+  .compound-builder-blocks__header,
+  .compound-session-card__header {
+    align-items: flex-start;
+  }
+
+  .compound-sessions-header,
+  .compound-builder-blocks__header {
+    flex-direction: column;
+  }
+
+  .compound-block__fields {
+    grid-template-columns: 1fr;
+  }
+
+  .compound-field--duration {
+    grid-column: auto;
+  }
+}
+
 /* Botón Crear Secuencia Estilo Braun Estilizado (sin caja) */
 .btn-braun-create {
   background: none;
@@ -771,15 +1076,17 @@
 }
 
 .acu-point-card {
-  border: 1px solid rgba(46, 43, 40, 0.08);
-  padding: 16px;
-  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-bottom: 1px solid rgba(46, 43, 40, 0.08);
+  padding: 16px 0;
+  background: transparent;
+  border-radius: 0;
   transition: all 0.25s ease;
 }
 
 .acu-point-card:hover {
-  background: rgba(255, 255, 255, 0.6);
-  border-color: rgba(46, 43, 40, 0.15);
+  background: transparent;
+  border-color: rgba(46, 43, 40, 0.2);
 }
 
 .acu-point-header {
@@ -812,7 +1119,9 @@
 .acu-point-headtag {
   font-family: var(--font-digital);
   font-size: 0.65rem;
-  background: rgba(46, 43, 40, 0.05);
+  background: transparent;
+  border: 1px solid rgba(46, 43, 40, 0.12);
+  border-radius: 0;
   color: var(--color-text-main);
   padding: 2px 6px;
   display: inline-block;
@@ -833,9 +1142,10 @@
 }
 
 .acu-manual-item {
-  border: 1px solid rgba(46, 43, 40, 0.05);
+  border: 1px solid rgba(46, 43, 40, 0.08);
   padding: 12px;
-  background: rgba(46, 43, 40, 0.02);
+  background: transparent;
+  border-radius: 0;
 }
 
 .acu-manual-name {
@@ -849,6 +1159,55 @@
   font-size: 0.65rem;
   color: var(--color-text-muted);
   line-height: 1.3;
+}
+
+/* Tablas del Syllabus */
+.acu-heads-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  margin-top: 8px;
+}
+
+.acu-heads-table th, 
+.acu-heads-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(46, 43, 40, 0.08);
+  text-align: left;
+}
+
+.acu-heads-table th {
+  font-family: var(--font-digital);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* Paneles del Syllabus (Sin fondos ni bordes redondeados) */
+.acu-lobby-container .glass-panel {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  border-bottom: 1px solid rgba(46, 43, 40, 0.1) !important;
+  padding: 20px 0 !important;
+}
+
+.acu-lobby-container *,
+.acu-lobby-container .acu-point-card,
+.acu-lobby-container .acu-manual-item,
+.acu-lobby-container .acu-sequence-item,
+.acu-lobby-container .btn-braun-tab,
+.acu-lobby-container div {
+  border-radius: 0 !important;
+}
+
+.acu-lobby-container .acu-point-card,
+.acu-lobby-container .acu-manual-item,
+.acu-lobby-container .acu-sequence-item {
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 /* Creador de Secuencias */
@@ -2131,16 +2490,18 @@ body.dark-theme .acu-fullscreen-bg.grid-36 .acu-dot.dot-on {
   margin-top: 16px;
 }
 .acu-point-card {
-  background: rgba(255, 255, 255, 0.35);
-  border: 1px solid rgba(46, 43, 40, 0.06);
-  border-radius: 12px;
-  padding: 16px 20px;
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid rgba(46, 43, 40, 0.08) !important;
+  border-radius: 0 !important;
+  padding: 16px 0 !important;
+  box-shadow: none !important;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .acu-point-card:hover {
-  background: rgba(255, 255, 255, 0.65);
-  border-color: rgba(46, 43, 40, 0.12);
-  box-shadow: 0 4px 16px rgba(46, 43, 40, 0.02);
+  background: transparent !important;
+  border-color: rgba(46, 43, 40, 0.2) !important;
+  box-shadow: none !important;
 }
 .acu-point-card-header {
   display: flex;
@@ -2157,6 +2518,31 @@ body.dark-theme .acu-fullscreen-bg.grid-36 .acu-dot.dot-on {
 .acu-point-card.expanded .acu-point-card-arrow {
   transform: rotate(90deg);
   color: var(--color-text-main);
+}
+
+/* Botones de Acción Táctiles Braun (Editar / Borrar con íconos) */
+.btn-action-icon {
+  background: transparent !important;
+  border: none !important;
+  color: var(--color-text-muted);
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 0 !important;
+  transition: color 0.2s ease, transform 0.15s ease;
+}
+
+.btn-action-icon:hover {
+  color: var(--color-text-main);
+  transform: scale(1.1);
+}
+
+.btn-action-icon.delete-icon:hover {
+  color: var(--color-accent-red) !important;
 }
 
 /* Asegurar que los botones de texto y eliminar/agregar no tengan borde en la SPA */
@@ -2188,15 +2574,18 @@ body.dark-theme .acu-fullscreen-bg.grid-36 .acu-dot.dot-on {
 
 .btn-braun-tab {
   border: none;
-  background: none;
+  background: transparent;
   font-size: 0.72rem;
-  padding: 6px 16px;
+  padding: 6px 16px 8px 16px;
   cursor: pointer;
   font-family: var(--font-main);
   font-weight: 500;
-  border-radius: 3px;
+  border-radius: 0;
   color: var(--color-text-muted);
   transition: all 0.2s ease;
+  position: relative;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
 }
 
 .btn-braun-tab:hover {
@@ -2204,9 +2593,12 @@ body.dark-theme .acu-fullscreen-bg.grid-36 .acu-dot.dot-on {
 }
 
 .btn-braun-tab.active {
-  background: var(--color-bg-base, #FCFAF6) !important;
+  background: transparent !important;
   color: var(--color-text-main, #2E2B28) !important;
-  box-shadow: 0 1px 3px rgba(46, 43, 40, 0.08), 0 1px 1px rgba(46, 43, 40, 0.04) !important;
+  border-bottom: 2px solid var(--color-accent-red) !important;
+  box-shadow: none !important;
+  margin-bottom: -1px !important;
+  z-index: 2;
 }
 
 /* =============================================================
@@ -4117,4 +4509,3 @@ body.dark-theme .breath-dropdown-options {
   background-color: var(--color-text-muted) !important;
   box-shadow: 0 0 2px rgba(255, 255, 255, 0.25) !important;
 }
-

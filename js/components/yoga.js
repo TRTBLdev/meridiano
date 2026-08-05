@@ -10,6 +10,7 @@ import {
 } from './timerShell.js';
 import { createSynthEngine, playQuartzBowlRing } from '../utils/synth.js';
 import { getFreqLabel, valueToFreq, freqToValue } from '../utils/freqUtils.js';
+import { renderTechnicalTitle } from './ui.js';
 
 // Datos estáticos de respaldo por si falla la base de datos o está vacía
 const FALLBACK_POSTURES = [
@@ -398,7 +399,7 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
         <div class="glass-panel" style="max-width: 480px; width: 100%; padding: 24px; box-sizing: border-box; margin-bottom: 40px;">
           
           <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-            <h2 class="module-lobby-title" style="margin: 0;">YIN YOGA</h2>
+            ${renderTechnicalTitle('Yin Yoga')}
             
             <!-- Botón Crear Secuencia Estilo Braun (Plano) -->
             <button class="btn-braun-create" id="btn-lobby-create">
@@ -503,7 +504,14 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
           <div class="acu-accordion-actions" style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px;">
             <button class="acu-seq-action btn-start" style="font-weight:600;">[ INICIAR ]</button>
             <button class="acu-seq-action btn-edit">[ CONFIGURAR ]</button>
-            ${isCustom ? `<button class="acu-seq-action btn-delete" style="color: var(--color-accent-red);">[ BORRAR ]</button>` : ''}
+            ${isCustom ? `
+              <button class="btn-action-icon delete-icon btn-delete" title="Borrar" aria-label="Borrar">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
+            ` : ''}
           </div>
         </div>
       `;
@@ -598,7 +606,7 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
       <main class="main-viewport" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 20px; overflow-y: auto;">
         <div class="glass-panel" style="max-width: 540px; width: 100%; padding: 24px; box-sizing: border-box; margin-bottom: 40px;">
           
-          <h2 class="dot-digital" style="font-size: 1.15rem; margin-bottom: 24px; text-align: center;">CONSTRUCTOR DE SECUENCIA</h2>
+          ${renderTechnicalTitle('Constructor de Secuencia', { style: 'margin-bottom: 24px; text-align: center;' })}
 
           <!-- Formulario Datos de Secuencia -->
           <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px;">

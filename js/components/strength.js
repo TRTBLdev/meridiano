@@ -1,5 +1,6 @@
 import { addData, getAllData, putData, deleteData } from '../db.js';
 import { escapeHTML } from '../utils/sanitize.js';
+import { renderTechnicalTitle } from './ui.js';
 import { renderDotMatrix } from '../utils/dotmatrix.js';
 import {
   bindWakeLockPreference,
@@ -160,7 +161,7 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
         <div class="glass-panel" style="max-width: 480px; width: 100%; padding: 24px; box-sizing: border-box; margin-bottom: 40px;">
 
           <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-            <h2 class="module-lobby-title" style="margin: 0;">FUERZA</h2>
+            ${renderTechnicalTitle('Fuerza')}
           </header>
 
           <section class="acu-sequences-section">

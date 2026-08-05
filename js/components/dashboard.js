@@ -1,5 +1,6 @@
 import { getAllData, deleteData } from '../db.js';
 import { escapeHTML, toSafeClassToken } from '../utils/sanitize.js';
+import { renderTechnicalTitle } from './ui.js';
 
 const BIBLIOGRAPHY_QUOTES = [
   {
@@ -135,7 +136,7 @@ export async function renderDashboard(container, session, db, onNavigate) {
  
           <!-- 3. Panel de Historial Integrado en el Scroll Continuo -->
           <aside class="hilo-agua-panel">
-            <h2 class="hilo-agua-title">Historial</h2>
+            ${renderTechnicalTitle('Historial', { className: 'hilo-agua-title' })}
             
             <!-- Calendario sin bordes -->
             <div class="calendar-section">
@@ -144,7 +145,7 @@ export async function renderDashboard(container, session, db, onNavigate) {
               </div>
             </div>
  
-            <h2 class="hilo-agua-title">El Hilo de Agua</h2>
+            ${renderTechnicalTitle('El Hilo de Agua', { className: 'hilo-agua-title' })}
             <!-- Timeline Orbital SVG sin puntos -->
             <div class="hilo-agua-svg-area">
               <svg style="position: absolute; left: 0; top: 0; width: 30px; height: 100%; pointer-events: none; overflow: visible;">

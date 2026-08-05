@@ -1,6 +1,7 @@
 import { getAllData, putData, deleteData, addData } from '../db.js';
 import { renderDotMatrix } from '../utils/dotmatrix.js';
 import { escapeAttribute, escapeHTML } from '../utils/sanitize.js';
+import { renderTechnicalTitle } from './ui.js';
 import {
   bindWakeLockPreference,
   createWakeLockController,
@@ -149,7 +150,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
         <div class="glass-panel" style="max-width: 480px; width: 100%; padding: 24px; box-sizing: border-box; margin-bottom: 40px;">
           
           <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-            <h2 class="module-lobby-title" style="margin: 0;">ACUPUNTURA TENS</h2>
+            ${renderTechnicalTitle('Acupuntura TENS')}
             
             <button class="btn-braun-create" id="btn-lobby-create">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -273,8 +274,18 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
             <div class="acu-accordion-actions" style="justify-content: flex-end;">
               <div style="display: flex; gap: 12px;">
                 ${isCustom ? `
-                  <button class="acu-seq-action btn-edit" style="border: none !important;">[ EDITAR ]</button>
-                  <button class="acu-seq-action btn-delete" style="color: var(--color-accent-red); border: none !important;">[ BORRAR ]</button>
+                  <button class="btn-action-icon btn-edit" title="Editar" aria-label="Editar">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                  </button>
+                  <button class="btn-action-icon delete-icon btn-delete" title="Borrar" aria-label="Borrar">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="3 6 5 6 21 6"></polyline>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                  </button>
                 ` : `
                   <button class="acu-seq-action btn-edit" style="border: none !important; display: flex; align-items: center; gap: 4px;">
                     <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block;">
@@ -359,7 +370,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
         <div class="viewport-inner">
           <div class="acu-builder-container">
             <header class="acu-lobby-header">
-              <h2 class="acu-lobby-title">${isEditing ? 'Editar Secuencia' : 'Crear Secuencia'}</h2>
+              ${renderTechnicalTitle(isEditing ? 'Editar Secuencia' : 'Crear Secuencia')}
             </header>
 
             <!-- Nombre de la Secuencia -->

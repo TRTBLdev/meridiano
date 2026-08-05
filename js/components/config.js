@@ -1,5 +1,6 @@
 import { exportDatabase, importDatabase, countItems, seedDatabase } from '../db.js';
 import { escapeHTML } from '../utils/sanitize.js';
+import { renderTechnicalTitle } from './ui.js';
 
 /**
  * Renderiza la interfaz de Configuración y Ajustes (respaldo y restauración de base de datos).
@@ -48,7 +49,7 @@ export async function renderConfigScreen(container, db, onNavigate) {
       <div class="viewport-inner">
         <div class="acu-lobby-container">
           <header class="acu-lobby-header" style="display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 32px;">
-            <h2 class="acu-lobby-title" style="margin: 0; font-family: var(--font-ui); font-weight: 300; letter-spacing: 0.1em; text-transform: uppercase;">Ajustes del Sistema</h2>
+            ${renderTechnicalTitle('Ajustes del Sistema')}
             <p style="font-size: 0.75rem; color: var(--color-text-muted); margin: 0; line-height: 1.4;">Gestione las copias de seguridad de sus datos locales y el estado del almacenamiento en el navegador.</p>
           </header>
 

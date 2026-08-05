@@ -24,6 +24,9 @@
   --glass-blur: blur(28px);
   --glass-inset: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 
+  /* Layout Dimensions */
+  --sidebar-width: 160px;
+
   /* Fuentes */
   --font-ui: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   --font-digital: 'Share Tech Mono', monospace;

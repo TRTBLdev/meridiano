@@ -11,6 +11,7 @@ import {
 } from './timerShell.js';
 import { createSynthEngine, playQuartzBowlRing } from '../utils/synth.js';
 import { getFreqLabel, valueToFreq, freqToValue } from '../utils/freqUtils.js';
+import { renderTechnicalTitle } from './ui.js';
 
 
 export async function renderMeditationScreen(container, db, onNavigate) {
@@ -67,7 +68,7 @@ export async function renderMeditationScreen(container, db, onNavigate) {
 
       <main class="main-viewport meditation-lobby-viewport">
         <div class="glass-panel meditation-lobby-panel">
-          <h2 class="module-lobby-title" style="margin-bottom: 24px;">MEDITACIÓN</h2>
+          ${renderTechnicalTitle('Meditación', { style: 'margin-bottom: 24px;' })}
 
           <div class="timer-config-group">
             <label>TIPO DE INTERVALO</label>
