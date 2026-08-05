@@ -11,7 +11,7 @@ import {
 } from './timerShell.js';
 import { createSynthEngine, playQuartzBowlRing } from '../utils/synth.js';
 import { getFreqLabel, valueToFreq, freqToValue } from '../utils/freqUtils.js';
-import { renderTechnicalTitle } from './ui.js';
+import { renderLobbyAction, renderLobbyShell, renderLobbyTabs } from './lobbyUi.js';
 
 
 export async function renderMeditationScreen(container, db, onNavigate) {
@@ -50,49 +50,32 @@ export async function renderMeditationScreen(container, db, onNavigate) {
   };
 
   function renderLobby() {
-    const lobbyEl = document.createElement('div');
-    lobbyEl.className = 'dashboard-layout fade-in';
-    lobbyEl.innerHTML = `
-      <nav class="nav-bar">
-        <div class="nav-logo dot-digital">M.</div>
-        <ul class="nav-links">
-          <li class="nav-item" id="btn-back-home">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="19" y1="12" x2="5" y2="12"></line>
-              <polyline points="12 19 5 12 12 5"></polyline>
-            </svg>
-            <span>Volver</span>
-          </li>
-        </ul>
-      </nav>
-
-      <main class="main-viewport meditation-lobby-viewport">
-        <div class="glass-panel meditation-lobby-panel">
-          ${renderTechnicalTitle('Meditación', { style: 'margin-bottom: 24px;' })}
-
+    const staging = document.createElement('div');
+    staging.innerHTML = renderLobbyShell({
+      title: 'Meditación',
+      variant: 'config',
+      className: 'meditation-lobby-screen',
+      content: `
           <div class="timer-config-group">
             <label>TIPO DE INTERVALO</label>
-            <div class="segmented-control">
-              <button type="button" class="segment-btn ${intervalType === 'equidistant' ? 'active' : ''}" data-type="equidistant">Fijos</button>
-              <button type="button" class="segment-btn ${intervalType === 'random' ? 'active' : ''}" data-type="random">Aleatorios</button>
-              <button type="button" class="segment-btn ${intervalType === 'sequential' ? 'active' : ''}" data-type="sequential">Secuencias</button>
-            </div>
+            ${renderLobbyTabs({
+              label: 'Tipo de intervalo',
+              activeValue: intervalType,
+              items: [
+                { value: 'equidistant', text: 'Fijos' },
+                { value: 'random', text: 'Aleatorios' },
+                { value: 'sequential', text: 'Secuencias' }
+              ]
+            })}
           </div>
 
           <div id="interval-settings-container" class="meditation-interval-settings"></div>
-
-          ${renderWakeLockPreference()}
-
-          <div style="display: flex; justify-content: flex-end; margin-top: 24px;">
-            <button id="btn-med-start" class="btn-play-header" title="Iniciar Meditación" style="width: 54px; height: 54px; display: flex; align-items: center; justify-content: center; background: var(--color-text-main); color: var(--color-bg-base); border-radius: 50%; border: none;">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="margin-left: 2px;">
-                <polygon points="6 4 19 12 6 20 6 4"></polygon>
-              </svg>
-            </button>
-          </div>
-        </div>
-      </main>
-    `;
+          <div class="lobby-start-row">
+            ${renderLobbyAction({ kind: 'icon', icon: 'play', label: 'Iniciar meditación', id: 'btn-med-start' })}
+          </div>`,
+      footer: renderWakeLockPreference()
+    });
+    const lobbyEl = staging.firstElementChild;
 
     container.appendChild(lobbyEl);
     bindWakeLockPreference(lobbyEl);
@@ -123,7 +106,13 @@ export async function renderMeditationScreen(container, db, onNavigate) {
                 </div>
               `).join('')}
             </div>
-            <button type="button" id="btn-add-block" class="btn-block-action" style="margin-top: 16px; background: transparent; border: 1px solid rgba(46,43,40,0.2); border-radius: 4px; padding: 8px; width: 100%; font-size: 0.8rem; cursor: pointer;" ${blocks.length >= 7 ? 'disabled' : ''}>+ Añadir Bloque (${blocks.length}/7)</button>
+            ${renderLobbyAction({
+              kind: 'text',
+              label: `+ Añadir Bloque (${blocks.length}/7)`,
+              id: 'btn-add-block',
+              className: 'btn-block-action',
+              disabled: blocks.length >= 7
+            })}
           </div>
         `;
 
@@ -223,6 +212,10 @@ export async function renderMeditationScreen(container, db, onNavigate) {
         intervalType = button.dataset.type;
         lobbyEl.querySelectorAll('.segment-btn').forEach(item => item.classList.remove('active'));
         button.classList.add('active');
+        lobbyEl.querySelectorAll('.segment-btn').forEach(item => {
+          const active = item === button;
+          item.setAttribute('aria-pressed', String(active));
+        });
         renderIntervalSettings();
       });
     });

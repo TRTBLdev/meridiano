@@ -47,16 +47,16 @@ export function renderWakeLockPreference(id = 'pref-wakelock-switch') {
   `;
 }
 
-export function populateTimerDots(gridContainer, count = 5184) {
+export function populateTimerDots(gridContainer, count = 5184, dotClass = 'acu-dot') {
   gridContainer.innerHTML = '';
   const fragment = document.createDocumentFragment();
   for (let i = 0; i < count; i++) {
     const dot = document.createElement('div');
-    dot.className = 'acu-dot';
+    dot.className = dotClass;
     fragment.appendChild(dot);
   }
   gridContainer.appendChild(fragment);
-  return gridContainer.querySelectorAll('.acu-dot');
+  return gridContainer.querySelectorAll(`.${dotClass}`);
 }
 
 export function createTimerShell({
@@ -304,4 +304,3 @@ export function bindSynthPanel({
   sync();
   return { sync };
 }
-

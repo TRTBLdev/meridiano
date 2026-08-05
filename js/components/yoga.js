@@ -6,19 +6,21 @@ import {
   createWakeLockController,
   populateTimerDots,
   renderSynthPanel,
-  bindSynthPanel
+  bindSynthPanel,
+  renderWakeLockPreference
 } from './timerShell.js';
 import { createSynthEngine, playQuartzBowlRing } from '../utils/synth.js';
 import { getFreqLabel, valueToFreq, freqToValue } from '../utils/freqUtils.js';
 import { renderTechnicalTitle } from './ui.js';
+import { renderLobbyAction, renderLobbyShell } from './lobbyUi.js';
 
 // Datos estáticos de respaldo por si falla la base de datos o está vacía
 const FALLBACK_POSTURES = [
-  { id: 'yin-butterfly', name: 'Mariposa (Baddha Konasana)', duration: 180 },
-  { id: 'yin-sphinx', name: 'Esfinge (Salamba Bhujangasana)', duration: 120 },
-  { id: 'yin-caterpillar', name: 'Oruga (Paschimottanasana)', duration: 240 },
-  { id: 'yin-seal', name: 'Foca (Variación de Esfinge)', duration: 120 },
-  { id: 'yin-child', name: 'Niño (Balasana)', duration: 180 }
+  { id: 'yin-butterfly', name: 'Mariposa (Baddha Konasana)' },
+  { id: 'yin-sphinx', name: 'Esfinge (Salamba Bhujangasana)' },
+  { id: 'yin-caterpillar', name: 'Oruga (Paschimottanasana)' },
+  { id: 'yin-seal', name: 'Foca (Variación de Esfinge)' },
+  { id: 'yin-child', name: 'Niño (Balasana)' }
 ];
 
 const FALLBACK_BLOCKS = [
@@ -173,7 +175,7 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
               type: 'posture',
               id: post.id,
               name: post.name,
-              holdTime: item.customHoldTime || post.duration || 180,
+              holdTime: Number(item.customHoldTime) || 180,
               isAsymmetric: item.isAsymmetric || false
             });
           }
@@ -243,8 +245,7 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
 
     items.forEach((item, idx) => {
       if (item.type === 'posture') {
-        const post = posturesCatalog.find(p => p.id === item.id);
-        secs += item.customHoldTime || (post ? post.duration : 180);
+        secs += Number(item.customHoldTime) || 180;
       } else if (item.type === 'block') {
         const blk = blocksCatalog.find(b => b.id === item.id);
         if (blk) {
@@ -355,7 +356,7 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
 
     // Encender audio si está sintonizado
     if (localAudioActive) {
-      safeAudioStart(localBaseFreq, localFreq, localAudioMode);
+      synth.start(localBaseFreq, localFreq, localAudioMode);
     }
 
     activeView = 'timer';
@@ -378,59 +379,18 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
      VISTA 1: LOBBY SELECTOR DE SECUENCIAS (ESTILO ACUPUNTURA)
      ============================================================= */
   function renderLobby() {
-    syncWithGlobalTuner();
-    const lobbyEl = document.createElement('div');
-    lobbyEl.className = 'dashboard-layout fade-in yoga-lobby-screen';
-    lobbyEl.innerHTML = `
-      <nav class="nav-bar">
-        <div class="nav-logo dot-digital">M.</div>
-        <ul class="nav-links">
-          <li class="nav-item" id="btn-back-home">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="19" y1="12" x2="5" y2="12"></line>
-              <polyline points="12 19 5 12 12 5"></polyline>
-            </svg>
-            <span>Volver</span>
-          </li>
-        </ul>
-      </nav>
-
-      <main class="main-viewport" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 20px; overflow-y: auto;">
-        <div class="glass-panel" style="max-width: 480px; width: 100%; padding: 24px; box-sizing: border-box; margin-bottom: 40px;">
-          
-          <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-            ${renderTechnicalTitle('Yin Yoga')}
-            
-            <!-- Botón Crear Secuencia Estilo Braun (Plano) -->
-            <button class="btn-braun-create" id="btn-lobby-create">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-              <span>Crear Secuencia</span>
-            </button>
-          </header>
-
-          <!-- Sección de Secuencias Guardadas (Acordeones) -->
-          <section class="acu-sequences-section" style="margin-bottom: 28px;">
-            <span class="acu-section-label" style="display: block; font-family: var(--font-digital); font-size: 0.68rem; color: var(--color-text-muted); text-transform: uppercase; margin-bottom: 12px;">Secuencias y Prácticas</span>
-            <div class="acu-sequence-list" id="lobby-sequences-list">
-              <!-- Se inyecta dinámicamente -->
-            </div>
-          </section>
-
-          <!-- Preferencia Wake Lock -->
-          <div style="margin: 24px 0; display: flex; align-items: center; justify-content: space-between; font-size: 0.68rem; color: var(--color-text-muted); font-family: var(--font-digital); border-top: 1px dashed rgba(46, 43, 40, 0.08); padding-top: 16px; width: 100%;">
-            <span>MANTENER PANTALLA ACTIVA</span>
-            <label class="braun-switch" style="margin: 0;">
-              <input type="checkbox" id="pref-wakelock-switch" ${localStorage.getItem('meridiano_wakelock') !== 'false' ? 'checked' : ''}>
-              <span class="braun-switch-slider"></span>
-            </label>
-          </div>
-
-        </div>
-      </main>
-    `;
+    const staging = document.createElement('div');
+    staging.innerHTML = renderLobbyShell({
+      title: 'Yin Yoga',
+      action: renderLobbyAction({ kind: 'text', label: '+ Crear Secuencia', id: 'btn-lobby-create' }),
+      variant: 'list',
+      className: 'yoga-lobby',
+      content: `
+        <span class="lobby-section-label">Secuencias y prácticas</span>
+        <div class="practice-list" id="lobby-sequences-list"></div>`,
+      footer: renderWakeLockPreference()
+    });
+    const lobbyEl = staging.firstElementChild;
 
     container.appendChild(lobbyEl);
 
@@ -438,47 +398,46 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
     const seqListContainer = lobbyEl.querySelector('#lobby-sequences-list');
     seqListContainer.innerHTML = '';
 
+    if (sequencesCatalog.length === 0) {
+      seqListContainer.innerHTML = '<p class="lobby-empty">No hay secuencias disponibles.</p>';
+    }
+
     sequencesCatalog.forEach(seq => {
       const isCustom = seq.id.startsWith('seq-custom-') || seq.id.startsWith('custom-');
       const totalMin = getSequenceDuration(seq);
 
       const accordionItem = document.createElement('div');
-      accordionItem.className = 'acu-accordion-item';
+      accordionItem.className = 'practice-row yoga-practice-row';
 
       accordionItem.innerHTML = `
-        <div class="acu-accordion-header" style="pointer-events: auto;">
-          <div class="acu-accordion-header-left">
-            <span class="acu-accordion-indicator-arrow">▶</span>
-            <div class="yoga-seq-title-stack">
-              <span class="acu-seq-name" style="font-weight: 500; font-size: 0.95rem;">${escapeHTML(seq.name)}</span>
-              <span class="yoga-seq-kind">${isCustom ? 'PERSONALIZADA' : 'PRESET'}</span>
+        <div class="practice-row__summary" role="button" tabindex="0" aria-expanded="false">
+          <div class="practice-row__lead">
+            <span class="practice-row__indicator">▶</span>
+            <div class="practice-row__title-stack yoga-seq-title-stack">
+              <span class="practice-row__title">${escapeHTML(seq.name)}</span>
+              <span class="practice-row__kind yoga-seq-kind">${isCustom ? 'PERSONALIZADA' : 'PRESET'}</span>
             </div>
           </div>
-          <div style="display: flex; align-items: center; gap: 12px; pointer-events: auto;">
-            <span class="acu-seq-duration-badge">${totalMin} min</span>
-            
-            <button class="btn-play-header" title="Iniciar Secuencia">
-              <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor" style="color: rgba(232, 230, 227, 0.5); margin-left: 1px;">
-                <polygon points="6 4 19 12 6 20 6 4"></polygon>
-              </svg>
-            </button>
+          <div class="practice-row__meta">
+            <span class="practice-row__duration">${totalMin} min</span>
+            ${renderLobbyAction({ kind: 'icon', icon: 'play', label: 'Iniciar secuencia', className: 'btn-play-header' })}
           </div>
         </div>
-        <div class="acu-accordion-content" style="display: none;">
-          <div class="acu-seq-desc" style="margin-bottom: 12px; font-size: 0.78rem; line-height: 1.4; color: var(--color-text-muted);">${escapeHTML(seq.description || 'Práctica suave de Yin Yoga.')}</div>
+        <div class="practice-row__details" style="display: none;">
+          <div class="practice-row__description">${escapeHTML(seq.description || 'Práctica suave de Yin Yoga.')}</div>
           
-          <span class="acu-section-label" style="display: block; margin-bottom: 8px; font-size: 0.65rem; font-family: var(--font-digital); color: var(--color-text-muted);">Asanas de la Sesión</span>
-          <div class="acu-points-timeline">
+          <span class="practice-row__section-label">Asanas de la sesión</span>
+          <div class="practice-timeline">
             ${seq.items.map((item, idx) => {
               if (item.type === 'posture') {
                 const post = posturesCatalog.find(p => p.id === item.id);
-                const hold = item.customHoldTime || (post ? post.duration : 180);
+                const hold = Number(item.customHoldTime) || 180;
                 return `
-                  <div class="acu-timeline-point">
-                    <span class="acu-timeline-point-number">${idx + 1}</span>
-                    <div class="acu-timeline-point-details">
-                      <span class="acu-timeline-point-name" style="font-size:0.8rem; font-weight:600;">${escapeHTML(post ? post.name : 'Postura')} ${item.isAsymmetric ? '[Asimétrica]' : ''}</span>
-                      <span class="acu-timeline-point-times" style="font-size:0.7rem; color:var(--color-text-muted);">${Math.floor(hold / 60)}m ${hold % 60 > 0 ? (hold % 60) + 's' : ''} de retención</span>
+                  <div class="practice-timeline__item">
+                    <span class="practice-timeline__index">${idx + 1}</span>
+                    <div class="practice-timeline__body">
+                      <span class="practice-timeline__title">${escapeHTML(post ? post.name : 'Postura')} ${item.isAsymmetric ? '[Asimétrica]' : ''}</span>
+                      <span class="practice-timeline__meta">${Math.floor(hold / 60)}m ${hold % 60 > 0 ? (hold % 60) + 's' : ''} de retención</span>
                     </div>
                   </div>
                 `;
@@ -489,11 +448,11 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
                   return `${escapeHTML(sp ? sp.name : 'Postura')} (${Math.floor(bp.holdTime / 60)}m)`;
                 }).join(' → ') : '';
                 return `
-                  <div class="acu-timeline-point">
-                    <span class="acu-timeline-point-number">${idx + 1}</span>
-                    <div class="acu-timeline-point-details">
-                      <span class="acu-timeline-point-name" style="font-size:0.8rem; font-weight:600;">Bloque: ${escapeHTML(blk ? blk.name : 'Bloque')}</span>
-                      <span class="acu-timeline-point-times" style="font-size:0.7rem; color:var(--color-text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${subPostures}</span>
+                  <div class="practice-timeline__item">
+                    <span class="practice-timeline__index">${idx + 1}</span>
+                    <div class="practice-timeline__body">
+                      <span class="practice-timeline__title">Bloque: ${escapeHTML(blk ? blk.name : 'Bloque')}</span>
+                      <span class="practice-timeline__meta">${subPostures}</span>
                     </div>
                   </div>
                 `;
@@ -501,40 +460,39 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
             }).join('')}
           </div>
           
-          <div class="acu-accordion-actions" style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px;">
-            <button class="acu-seq-action btn-start" style="font-weight:600;">[ INICIAR ]</button>
-            <button class="acu-seq-action btn-edit">[ CONFIGURAR ]</button>
+          <div class="practice-row__actions">
+            ${renderLobbyAction({ kind: 'icon', icon: 'edit', label: 'Configurar secuencia', className: 'btn-edit' })}
             ${isCustom ? `
-              <button class="btn-action-icon delete-icon btn-delete" title="Borrar" aria-label="Borrar">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="3 6 5 6 21 6"></polyline>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                </svg>
-              </button>
+              ${renderLobbyAction({ kind: 'icon', icon: 'delete', label: 'Borrar secuencia', className: 'btn-delete' })}
             ` : ''}
           </div>
         </div>
       `;
 
       // Accordion toggle
-      const header = accordionItem.querySelector('.acu-accordion-header');
-      const content = accordionItem.querySelector('.acu-accordion-content');
-      const arrow = accordionItem.querySelector('.acu-accordion-indicator-arrow');
-      header.addEventListener('click', (e) => {
-        // Ignorar click si fue en el botón play directo
-        if (e.target.closest('.btn-play-header')) return;
+      const header = accordionItem.querySelector('.practice-row__summary');
+      const content = accordionItem.querySelector('.practice-row__details');
+      const arrow = accordionItem.querySelector('.practice-row__indicator');
+      const toggleDetails = () => {
         const isOpen = content.style.display === 'block';
         content.style.display = isOpen ? 'none' : 'block';
         arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(90deg)';
+        accordionItem.classList.toggle('is-expanded', !isOpen);
+        header.setAttribute('aria-expanded', String(!isOpen));
+      };
+
+      header.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return;
+        toggleDetails();
+      });
+      header.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        toggleDetails();
       });
 
       // Play directo en cabecera
       accordionItem.querySelector('.btn-play-header').addEventListener('click', () => {
-        startSequence(seq);
-      });
-
-      // Acciones del menú expandido
-      accordionItem.querySelector('.btn-start').addEventListener('click', () => {
         startSequence(seq);
       });
 
@@ -629,11 +587,12 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
               <span style="font-family: var(--font-digital); font-size: 0.62rem; color: var(--color-text-muted); text-transform: uppercase;">Añadir elementos a la secuencia</span>
               
               <!-- Añadir Postura -->
-              <div style="display: flex; gap: 8px; align-items: center;">
-                <select id="add-posture-select" style="flex: 1; background: transparent; border: 1px solid rgba(46, 43, 40, 0.12); padding: 6px 10px; color: var(--color-text-main); border-radius: 4px; font-size: 0.78rem;">
+              <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+                <select id="add-posture-select" style="flex: 1; min-width: 180px; background: transparent; border: 1px solid rgba(46, 43, 40, 0.12); padding: 6px 10px; color: var(--color-text-main); border-radius: 4px; font-size: 0.78rem;">
                   <option value="">-- Selecciona Postura --</option>
                   ${posturesCatalog.map(p => `<option value="${p.id}">${escapeHTML(p.name)}</option>`).join('')}
                 </select>
+                <input type="number" id="add-posture-hold" min="10" placeholder="Tiempo (s)" aria-label="Tiempo de permanencia en segundos" style="width: 88px; background: transparent; border: none; border-bottom: 1px solid rgba(46, 43, 40, 0.18); padding: 6px 4px; color: var(--color-text-main); font-size: 0.78rem;">
                 <button id="btn-add-posture-action" class="btn-primary" style="width: auto; padding: 6px 12px; font-size: 0.75rem; margin: 0; background: var(--color-text-main); color: var(--color-bg-base);">+ Añadir</button>
               </div>
 
@@ -696,6 +655,7 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
     // Selectores del Editor
     const itemsListContainer = editorEl.querySelector('#editor-items-list');
     const addPostureSelect = editorEl.querySelector('#add-posture-select');
+    const addPostureHold = editorEl.querySelector('#add-posture-hold');
     const btnAddPosture = editorEl.querySelector('#btn-add-posture-action');
     const addBlockSelect = editorEl.querySelector('#add-block-select');
     const btnAddBlock = editorEl.querySelector('#btn-add-block-action');
@@ -858,8 +818,9 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
     // Agregar Postura (Botón + Selección)
     btnAddPosture.addEventListener('click', () => {
       const pid = addPostureSelect.value;
-      if (!pid) {
-        alert('Selecciona una postura del catálogo primero.');
+      const holdTime = Number(addPostureHold.value);
+      if (!pid || !Number.isFinite(holdTime) || holdTime < 10) {
+        alert('Selecciona una postura y asigna un tiempo de permanencia válido.');
         return;
       }
       const post = posturesCatalog.find(p => p.id === pid);
@@ -868,13 +829,14 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
           type: 'posture',
           id: post.id,
           name: post.name,
-          holdTime: post.duration || 180,
+          holdTime,
           isAsymmetric: false
         });
         renderConstructorList();
         updateTotalDurationDisplay();
       }
       addPostureSelect.value = ''; // Reset select
+      addPostureHold.value = '';
     });
 
     // Agregar Bloque (Botón + Selección)

@@ -249,6 +249,10 @@ export async function seedDatabase() {
     await saveBatch(db, 'strength_circuits', defaultStrengthCircuits);
   }
 
+  // Convertir prescripciones heredadas en valores explícitos dentro de bloques y circuitos.
+  await normalizeYogaPrescriptions(db);
+  await normalizeStrengthPrescriptions(db);
+
   // 9. Sembrar Sesiones Compuestas
   const compoundSessionCount = await countItems(db, 'compound_sessions');
   if (compoundSessionCount === 0) {
@@ -335,6 +339,152 @@ export function deleteData(db, storeName, id) {
 
     request.onsuccess = () => resolve();
     request.onerror = (e) => reject(e.target.error);
+  });
+}
+
+function normalizeYogaPrescriptions(db) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(['yoga_postures', 'yoga_sequences'], 'readwrite');
+    const posturesStore = transaction.objectStore('yoga_postures');
+    const sequencesStore = transaction.objectStore('yoga_sequences');
+    const posturesRequest = posturesStore.getAll();
+    const sequencesRequest = sequencesStore.getAll();
+    let postures = null;
+    let sequences = null;
+
+    const normalize = () => {
+      if (!postures || !sequences) return;
+      const legacyDurationById = new Map(postures.map(posture => [posture.id, Number(posture.duration)]));
+
+      sequences.forEach(sequence => {
+        let changed = false;
+        const items = (sequence.items || []).map(item => {
+          if (item.type !== 'posture' || (Number.isFinite(Number(item.customHoldTime)) && Number(item.customHoldTime) > 0)) return item;
+          const legacyDuration = legacyDurationById.get(item.id);
+          if (!Number.isFinite(legacyDuration) || legacyDuration <= 0) return item;
+          changed = true;
+          return { ...item, customHoldTime: legacyDuration };
+        });
+        if (changed) sequencesStore.put({ ...sequence, items });
+      });
+
+      postures.forEach(posture => {
+        if (!Object.prototype.hasOwnProperty.call(posture, 'duration')) return;
+        const { duration, ...catalogPosture } = posture;
+        posturesStore.put(catalogPosture);
+      });
+    };
+
+    posturesRequest.onsuccess = () => { postures = posturesRequest.result; normalize(); };
+    sequencesRequest.onsuccess = () => { sequences = sequencesRequest.result; normalize(); };
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error || new Error('No se pudieron normalizar las posturas de Yoga.'));
+  });
+}
+
+function normalizeStrengthPrescriptions(db) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(['strength_exercises', 'strength_circuits'], 'readwrite');
+    const exercisesStore = transaction.objectStore('strength_exercises');
+    const circuitsStore = transaction.objectStore('strength_circuits');
+    const exercisesRequest = exercisesStore.getAll();
+    const circuitsRequest = circuitsStore.getAll();
+    let exercises = null;
+    let circuits = null;
+
+    const normalize = () => {
+      if (!exercises || !circuits) return;
+      const exercisesById = new Map(exercises.map(exercise => [exercise.id, exercise]));
+
+      circuits.forEach(circuit => {
+        let changed = false;
+        const entries = (circuit.exercises || []).map(entry => {
+          const exercise = exercisesById.get(entry.exerciseId);
+          if (!exercise) return entry;
+          if (exercise.mode === 'time' && (!Number.isFinite(Number(entry.durationOverride)) || Number(entry.durationOverride) <= 0)) {
+            const legacyDuration = Number(exercise.duration);
+            if (Number.isFinite(legacyDuration) && legacyDuration > 0) {
+              changed = true;
+              return { ...entry, repsOverride: null, durationOverride: legacyDuration };
+            }
+          }
+          if (exercise.mode !== 'time' && (!Number.isFinite(Number(entry.repsOverride)) || Number(entry.repsOverride) <= 0)) {
+            const legacyReps = Number(exercise.reps);
+            if (Number.isFinite(legacyReps) && legacyReps > 0) {
+              changed = true;
+              return { ...entry, repsOverride: legacyReps, durationOverride: null };
+            }
+          }
+          return entry;
+        });
+        if (changed) circuitsStore.put({ ...circuit, exercises: entries });
+      });
+
+      exercises.forEach(exercise => {
+        if (!Object.prototype.hasOwnProperty.call(exercise, 'reps') && !Object.prototype.hasOwnProperty.call(exercise, 'duration')) return;
+        const { reps, duration, ...catalogExercise } = exercise;
+        exercisesStore.put(catalogExercise);
+      });
+    };
+
+    exercisesRequest.onsuccess = () => { exercises = exercisesRequest.result; normalize(); };
+    circuitsRequest.onsuccess = () => { circuits = circuitsRequest.result; normalize(); };
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error || new Error('No se pudieron normalizar los ejercicios de Fuerza.'));
+  });
+}
+
+export function deleteStrengthExerciseAndDetach(db, exerciseId) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(['strength_exercises', 'strength_circuits'], 'readwrite');
+    const exercisesStore = transaction.objectStore('strength_exercises');
+    const circuitsStore = transaction.objectStore('strength_circuits');
+    const affectedCircuits = [];
+    const request = circuitsStore.getAll();
+
+    request.onsuccess = () => {
+      request.result.forEach(circuit => {
+        const nextExercises = (circuit.exercises || []).filter(entry => entry.exerciseId !== exerciseId);
+        if (nextExercises.length !== (circuit.exercises || []).length) {
+          affectedCircuits.push({ id: circuit.id, name: circuit.name, becomesEmpty: nextExercises.length === 0 });
+          circuitsStore.put({ ...circuit, exercises: nextExercises });
+        }
+      });
+      exercisesStore.delete(exerciseId);
+    };
+    request.onerror = () => reject(request.error);
+    transaction.oncomplete = () => resolve(affectedCircuits);
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error || new Error('No se pudo eliminar el ejercicio.'));
+  });
+}
+
+export function deleteStrengthCircuitAndDetach(db, circuitId) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(['strength_circuits', 'compound_sessions'], 'readwrite');
+    const circuitsStore = transaction.objectStore('strength_circuits');
+    const sessionsStore = transaction.objectStore('compound_sessions');
+    const affectedSessions = [];
+    const request = sessionsStore.getAll();
+
+    request.onsuccess = () => {
+      request.result.forEach(session => {
+        const nextBlocks = (session.blocks || []).filter(block =>
+          !(block.module === 'strength' && block.presetId === circuitId)
+        );
+        if (nextBlocks.length !== (session.blocks || []).length) {
+          affectedSessions.push({ id: session.id, name: session.name, becomesEmpty: nextBlocks.length === 0 });
+          sessionsStore.put({ ...session, blocks: nextBlocks });
+        }
+      });
+      circuitsStore.delete(circuitId);
+    };
+    request.onerror = () => reject(request.error);
+    transaction.oncomplete = () => resolve(affectedSessions);
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error || new Error('No se pudo eliminar el circuito.'));
   });
 }
 

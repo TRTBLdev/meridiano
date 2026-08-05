@@ -1,10 +1,5 @@
 import { escapeHTML } from '../utils/sanitize.js';
-
-const editIcon = `
-  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-  </svg>`;
+import { renderLobbyAction } from './lobbyUi.js';
 
 const deleteIcon = `
   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
@@ -12,17 +7,17 @@ const deleteIcon = `
     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
   </svg>`;
 
-export function renderCompoundAction(label, { type = 'button', className = '', id = '' } = {}) {
-  return `<button type="${type}" ${id ? `id="${id}"` : ''} class="compound-text-action ${className}">${label}</button>`;
+export function renderCompoundAction(label, { type = 'button', className = '', id = '', disabled = false } = {}) {
+  return `<button type="${type}" ${id ? `id="${id}"` : ''} class="compound-text-action ${className}" ${disabled ? 'disabled' : ''}>${label}</button>`;
 }
 
-export function renderCompoundSessionCard(session) {
+export function renderCompoundSessionCard(session, { invalidReason = '' } = {}) {
   const blocks = (session.blocks || []).map(block => `
     <div class="compound-session-card__block">
       <span class="compound-session-card__module">[${escapeHTML(block.module.toUpperCase())}]</span>
       <span>${escapeHTML(block.nameOverride)} (${block.duration}s)</span>
     </div>
-  `).join('');
+  `).join('') || '<div class="compound-session-card__empty">Sin bloques</div>';
 
   return `
     <div class="compound-session-card__header">
@@ -31,18 +26,25 @@ export function renderCompoundSessionCard(session) {
         <div class="compound-session-card__description">${escapeHTML(session.description || '')}</div>
       </div>
       <div class="compound-session-card__icons">
-        <button class="btn-action-icon btn-edit-session" title="Editar" aria-label="Editar">${editIcon}</button>
-        <button class="btn-action-icon delete-icon btn-delete-session" title="Borrar" aria-label="Borrar">${deleteIcon}</button>
+        ${renderLobbyAction({ kind: 'icon', icon: 'edit', label: 'Editar sesión', className: 'btn-edit-session' })}
+        ${renderLobbyAction({ kind: 'icon', icon: 'delete', label: 'Borrar sesión', className: 'btn-delete-session' })}
       </div>
     </div>
     <div class="compound-session-card__blocks">${blocks}</div>
-    ${renderCompoundAction('Iniciar Sesión', { className: 'btn-play-session' })}
+    ${invalidReason ? `<div class="compound-session-warning" role="status">${escapeHTML(invalidReason)}</div>` : ''}
+    ${renderLobbyAction({ kind: 'icon', icon: 'play', label: 'Iniciar sesión', className: 'btn-play-session', disabled: Boolean(invalidReason) })}
   `;
 }
 
-export function renderCompoundSessionBlock(block, index, totalBlocks, presetsCatalog) {
+export function renderCompoundSessionBlock(block, index, totalBlocks, presetsCatalog, { invalidReason = '' } = {}) {
   const availablePresets = presetsCatalog[block.module] || [];
-  const options = availablePresets.map(preset =>
+  const hasCurrentPreset = availablePresets.some(preset => preset.id === block.presetId);
+  const invalidCurrentOption = !hasCurrentPreset
+    ? block.presetId
+      ? `<option value="${escapeHTML(block.presetId)}" selected disabled>${escapeHTML(block.nameOverride || block.presetId)} (no disponible)</option>`
+      : '<option value="" selected disabled>Seleccionar preset</option>'
+    : '';
+  const options = invalidCurrentOption + availablePresets.map(preset =>
     `<option value="${escapeHTML(preset.id)}" ${preset.id === block.presetId ? 'selected' : ''}>${escapeHTML(preset.name)}</option>`
   ).join('');
 
@@ -55,6 +57,7 @@ export function renderCompoundSessionBlock(block, index, totalBlocks, presetsCat
         <button type="button" class="btn-action-icon delete-icon btn-remove-block" title="Eliminar bloque" aria-label="Eliminar bloque">${deleteIcon}</button>
       </div>
     </div>
+    ${invalidReason ? `<div class="compound-session-warning compound-session-warning--block" role="status">${escapeHTML(invalidReason)}. Puedes seleccionar otro circuito o eliminar este bloque.</div>` : ''}
     <div class="compound-block__fields">
       <label class="compound-field compound-field--module">
         <span>Módulo</span>

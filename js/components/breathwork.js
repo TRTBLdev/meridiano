@@ -11,7 +11,7 @@ import {
 } from './timerShell.js';
 import { createSynthEngine, playQuartzBowlRing } from '../utils/synth.js';
 import { getFreqLabel, valueToFreq, freqToValue } from '../utils/freqUtils.js';
-import { renderTechnicalTitle } from './ui.js';
+import { renderLobbyAction, renderLobbyShell, renderLobbyTabs } from './lobbyUi.js';
 
 export async function renderBreathworkScreen(container, db, onNavigate, orchestratorConfig = null) {
   const synth = createSynthEngine();
@@ -93,48 +93,31 @@ export async function renderBreathworkScreen(container, db, onNavigate, orchestr
   };
 
   function renderLobby() {
-    const lobbyEl = document.createElement('div');
-    lobbyEl.className = 'dashboard-layout fade-in';
-    lobbyEl.innerHTML = `
-      <nav class="nav-bar">
-        <div class="nav-logo dot-digital">M.</div>
-        <ul class="nav-links">
-          <li class="nav-item" id="btn-back-home">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="19" y1="12" x2="5" y2="12"></line>
-              <polyline points="12 19 5 12 12 5"></polyline>
-            </svg>
-            <span>Volver</span>
-          </li>
-        </ul>
-      </nav>
-
-      <main class="main-viewport breath-lobby-viewport">
-        <div class="glass-panel breath-lobby-panel" style="max-width: 600px; margin: 0 auto;">
-          ${renderTechnicalTitle('Respiración', { style: 'margin-bottom: 24px;' })}
-
+    const staging = document.createElement('div');
+    staging.innerHTML = renderLobbyShell({
+      title: 'Respiración',
+      variant: 'config',
+      className: 'breath-lobby-screen',
+      content: `
           <div class="timer-config-group">
             <label>MODO DE PRÁCTICA</label>
-            <div class="segmented-control">
-              <button type="button" class="segment-btn ${mode === 'single' ? 'active' : ''}" data-type="single">Técnica Única</button>
-              <button type="button" class="segment-btn ${mode === 'sequential' ? 'active' : ''}" data-type="sequential">Secuencia</button>
-            </div>
+            ${renderLobbyTabs({
+              label: 'Modo de práctica',
+              activeValue: mode,
+              items: [
+                { value: 'single', text: 'Técnica Única' },
+                { value: 'sequential', text: 'Secuencia' }
+              ]
+            })}
           </div>
 
           <div id="interval-settings-container" class="meditation-interval-settings"></div>
-
-          ${renderWakeLockPreference()}
-
-          <div style="display: flex; justify-content: flex-end; margin-top: 24px;">
-            <button id="btn-breath-start" class="btn-play-header" title="Iniciar Ejercicio" style="width: 54px; height: 54px; display: flex; align-items: center; justify-content: center; background: var(--color-text-main); color: var(--color-bg-base); border-radius: 50%; border: none;">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="margin-left: 2px;">
-                <polygon points="6 4 19 12 6 20 6 4"></polygon>
-              </svg>
-            </button>
-          </div>
-        </div>
-      </main>
-    `;
+          <div class="lobby-start-row">
+            ${renderLobbyAction({ kind: 'icon', icon: 'play', label: 'Iniciar ejercicio', id: 'btn-breath-start' })}
+          </div>`,
+      footer: renderWakeLockPreference()
+    });
+    const lobbyEl = staging.firstElementChild;
 
     container.appendChild(lobbyEl);
     bindWakeLockPreference(lobbyEl);
@@ -168,7 +151,13 @@ export async function renderBreathworkScreen(container, db, onNavigate, orchestr
                 </div>
               `).join('')}
             </div>
-            <button type="button" id="btn-add-block" class="btn-block-action" style="margin-top: 16px; background: transparent; border: 1px solid rgba(46,43,40,0.2); border-radius: 4px; padding: 8px; width: 100%; font-size: 0.8rem; cursor: pointer;" ${blocks.length >= 10 ? 'disabled' : ''}>+ Añadir Técnica (${blocks.length}/10)</button>
+            ${renderLobbyAction({
+              kind: 'text',
+              label: `+ Añadir Técnica (${blocks.length}/10)`,
+              id: 'btn-add-block',
+              className: 'btn-block-action',
+              disabled: blocks.length >= 10
+            })}
           </div>
         `;
 
@@ -250,6 +239,10 @@ export async function renderBreathworkScreen(container, db, onNavigate, orchestr
         mode = button.dataset.type;
         lobbyEl.querySelectorAll('.segment-btn').forEach(item => item.classList.remove('active'));
         button.classList.add('active');
+        lobbyEl.querySelectorAll('.segment-btn').forEach(item => {
+          const active = item === button;
+          item.setAttribute('aria-pressed', String(active));
+        });
         renderIntervalSettings();
       });
     });

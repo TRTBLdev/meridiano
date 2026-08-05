@@ -5,13 +5,18 @@ import { renderYogaScreen } from './yoga.js';
 import { renderAcupunctureScreen } from './acupuncture.js';
 import { escapeHTML } from '../utils/sanitize.js';
 import { renderTechnicalTitle } from './ui.js';
+import { renderLobbyAction, renderLobbyShell } from './lobbyUi.js';
 import { renderCompoundAction, renderCompoundSessionBlock, renderCompoundSessionCard } from './sessionsUi.js';
+import { estimateStrengthCircuitDuration, getCircuitValidation } from '../utils/strengthUtils.js';
 
 export async function renderSessionsScreen(container, db, onNavigate, initialSessionId = null, initialView = 'lobby') {
   let activeView = initialView; // 'lobby' | 'builder' | 'transition'
   let sessionsCatalog = [];
   let currentSession = null;
   let currentBlockIndex = 0;
+  let currentBlockResults = [];
+  let strengthCircuits = [];
+  let strengthExercises = [];
 
   // Estado del editor (builder)
   let editingSession = null;
@@ -28,11 +33,20 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
       
       const bw = await getAllData(db, 'breathwork_patterns');
       const st = await getAllData(db, 'strength_circuits');
+      const strengthExerciseCatalog = await getAllData(db, 'strength_exercises');
       const yg = await getAllData(db, 'yoga_sequences');
       const ac = await getAllData(db, 'acupuncture_sequences');
 
       presetsCatalog.breathwork = bw.map(p => ({ id: p.id, name: p.name, defaultDuration: (p.inhale + p.holdIn + p.exhale + p.holdOut) * 10 }));
-      presetsCatalog.strength = st.map(c => ({ id: c.id, name: c.name, defaultDuration: (c.workTime + c.restTime) * 6 }));
+      strengthCircuits = st;
+      strengthExercises = strengthExerciseCatalog;
+      presetsCatalog.strength = st
+        .filter(circuit => getCircuitValidation(circuit, strengthExercises).isValid)
+        .map(circuit => ({
+          id: circuit.id,
+          name: circuit.name,
+          defaultDuration: estimateStrengthCircuitDuration(circuit, strengthExercises)
+        }));
       presetsCatalog.yoga = yg.map(s => ({ id: s.id, name: s.name, defaultDuration: 600 }));
       presetsCatalog.acupuncture = ac.map(a => ({ id: a.id, name: a.name, defaultDuration: 420 }));
 
@@ -49,6 +63,19 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
     }
   }
 
+  function getStrengthBlockIssue(block) {
+    if (block.module !== 'strength') return '';
+    const circuit = strengthCircuits.find(item => item.id === block.presetId);
+    if (!circuit) return 'Circuito de fuerza no disponible';
+    return getCircuitValidation(circuit, strengthExercises).reason;
+  }
+
+  function getSessionIssue(session) {
+    if (!Array.isArray(session.blocks) || session.blocks.length === 0) return 'Borrador sin bloques';
+    const invalidStrengthBlock = session.blocks.find(block => getStrengthBlockIssue(block));
+    return invalidStrengthBlock ? getStrengthBlockIssue(invalidStrengthBlock) : '';
+  }
+
   async function refresh() {
     await loadData();
     container.innerHTML = '';
@@ -61,37 +88,16 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
   }
 
   function renderLobby() {
-    const layout = document.createElement('div');
-    layout.className = 'dashboard-layout fade-in';
-
-    layout.innerHTML = `
-      <nav class="nav-bar">
-        <div class="nav-logo dot-digital">M.</div>
-        <ul class="nav-links">
-          <li class="nav-item" id="btn-back-home">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="19" y1="12" x2="5" y2="12"></line>
-              <polyline points="12 19 5 12 12 5"></polyline>
-            </svg>
-            <span>Volver</span>
-          </li>
-        </ul>
-      </nav>
-
-      <main class="main-viewport" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 20px; overflow-y: auto;">
-        <div class="glass-panel compound-sessions-panel">
-          <div class="compound-sessions-header">
-            ${renderTechnicalTitle('Sesiones Compuestas')}
-            ${renderCompoundAction('+ Crear Sesión', { id: 'btn-create-session' })}
-          </div>
-          <p class="compound-sessions-description">
-            Rutinas integrales personalizables que encadenan respiración, fuerza, yoga y acupuntura en un solo flujo ininterrumpido.
-          </p>
-
-          <div class="compound-sessions-list" id="sessions-list"></div>
-        </div>
-      </main>
-    `;
+    const staging = document.createElement('div');
+    staging.innerHTML = renderLobbyShell({
+      title: 'Sesiones Compuestas',
+      description: 'Rutinas integrales personalizables que encadenan respiración, fuerza, yoga y acupuntura en un solo flujo ininterrumpido.',
+      action: renderLobbyAction({ kind: 'text', label: '+ Crear Sesión', id: 'btn-create-session' }),
+      variant: 'list',
+      className: 'compound-sessions-lobby',
+      content: '<div class="compound-sessions-list" id="sessions-list"></div>'
+    });
+    const layout = staging.firstElementChild;
 
     container.appendChild(layout);
     layout.querySelector('#btn-back-home').addEventListener('click', () => onNavigate('inicio'));
@@ -117,9 +123,10 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
 
     sessionsCatalog.forEach(session => {
       const el = document.createElement('div');
-      el.className = 'compound-session-card';
+      const invalidReason = getSessionIssue(session);
+      el.className = `compound-session-card${invalidReason ? ' compound-session-card--invalid' : ''}`;
       
-      el.innerHTML = renderCompoundSessionCard(session);
+      el.innerHTML = renderCompoundSessionCard(session, { invalidReason });
 
       el.querySelector('.btn-edit-session').addEventListener('click', () => {
         editingSession = JSON.parse(JSON.stringify(session));
@@ -134,9 +141,10 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
         }
       });
       
-      el.querySelector('.btn-play-session').addEventListener('click', () => {
-        startSession(session);
-      });
+      const playButton = el.querySelector('.btn-play-session');
+      if (!invalidReason) {
+        playButton.addEventListener('click', () => startSession(session));
+      }
 
       listContainer.appendChild(el);
     });
@@ -229,6 +237,12 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
         return;
       }
 
+      const sessionIssue = getSessionIssue(editingSession);
+      if (sessionIssue) {
+        alert(`No puedes guardar una sesión inválida: ${sessionIssue}. Repara o elimina el bloque afectado.`);
+        return;
+      }
+
       try {
         await putData(db, 'compound_sessions', editingSession);
         alert('Sesión compuesta guardada exitosamente.');
@@ -252,9 +266,16 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
 
       editingSession.blocks.forEach((block, index) => {
         const blockEl = document.createElement('div');
-        blockEl.className = 'compound-block';
+        const invalidReason = getStrengthBlockIssue(block);
+        blockEl.className = `compound-block${invalidReason ? ' compound-block--invalid' : ''}`;
 
-        blockEl.innerHTML = renderCompoundSessionBlock(block, index, editingSession.blocks.length, presetsCatalog);
+        blockEl.innerHTML = renderCompoundSessionBlock(
+          block,
+          index,
+          editingSession.blocks.length,
+          presetsCatalog,
+          { invalidReason }
+        );
 
         // Eventos del bloque
         blockEl.querySelector('.btn-move-up').addEventListener('click', () => {
@@ -292,6 +313,10 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
             block.presetId = newPresets[0].id;
             block.nameOverride = newPresets[0].name;
             block.duration = newPresets[0].defaultDuration;
+          } else {
+            block.presetId = '';
+            block.nameOverride = 'Sin preset disponible';
+            block.duration = 10;
           }
           renderBlocksList();
         });
@@ -323,8 +348,14 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
   }
 
   function startSession(session) {
+    const invalidReason = getSessionIssue(session);
+    if (invalidReason) {
+      alert(`Esta sesión no puede iniciarse: ${invalidReason}. Edítala para reparar el flujo.`);
+      return;
+    }
     currentSession = session;
     currentBlockIndex = 0;
+    currentBlockResults = [];
     runCurrentBlock();
   }
 
@@ -339,7 +370,8 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
       const orchestratorConfig = {
         presetId: block.presetId,
         duration: block.duration,
-        onComplete: () => {
+        onComplete: result => {
+          if (result) currentBlockResults[currentBlockIndex] = result;
           currentBlockIndex++;
           runCurrentBlock();
         }
@@ -408,10 +440,13 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
       let totalDuration = 0;
       currentSession.blocks.forEach(b => totalDuration += b.duration);
       
-      const blocksLog = currentSession.blocks.map(b => ({
+      const blocksLog = currentSession.blocks.map((b, index) => ({
         module: b.module,
         name: b.nameOverride,
-        duration: b.duration
+        duration: b.duration,
+        ...(b.module === 'strength' && currentBlockResults[index]
+          ? { strengthResult: currentBlockResults[index] }
+          : {})
       }));
 
       await addData(db, 'sessions_log', {

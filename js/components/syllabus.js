@@ -1,6 +1,7 @@
 import { getAllData, putData, deleteData, addData } from '../db.js';
 import { escapeAttribute, escapeHTML } from '../utils/sanitize.js';
 import { renderTechnicalTitle } from './ui.js';
+import { renderStrengthManager } from './strengthManager.js';
 
 export async function renderSyllabusScreen(container, db, onNavigate) {
   // Estado local de la base de datos
@@ -12,8 +13,8 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
   let compoundSessions = [];
 
   // Estado local de navegación de pestañas
-  let activeTab = 'acupuncture'; // 'acupuncture', 'breathwork', 'yoga', 'heads', 'synth'
-  let activeAcuSubTab = 'meridians'; // 'meridians', 'points'
+  let activeTab = 'acupuncture'; // 'acupuncture', 'breathwork', 'yoga', 'strength', 'sessions', 'synth'
+  let activeAcuSubTab = 'meridians'; // 'meridians', 'points', 'heads'
   let activeYogaSubTab = 'blocks'; // 'blocks', 'postures'
   let activeSynthSubTab = 'brainwaves'; // 'brainwaves', 'solfeggio', 'modes'
 
@@ -88,8 +89,8 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
               <button id="tab-acupuncture" class="btn-braun-tab ${activeTab === 'acupuncture' ? 'active' : ''}">Acupuntura</button>
               <button id="tab-breathwork" class="btn-braun-tab ${activeTab === 'breathwork' ? 'active' : ''}">Respiración</button>
               <button id="tab-yoga" class="btn-braun-tab ${activeTab === 'yoga' ? 'active' : ''}">Yin Yoga</button>
+              <button id="tab-strength" class="btn-braun-tab ${activeTab === 'strength' ? 'active' : ''}">Fuerza</button>
               <button id="tab-sessions" class="btn-braun-tab ${activeTab === 'sessions' ? 'active' : ''}">Sesiones</button>
-              <button id="tab-heads" class="btn-braun-tab ${activeTab === 'heads' ? 'active' : ''}">Cabezales</button>
               <button id="tab-synth" class="btn-braun-tab ${activeTab === 'synth' ? 'active' : ''}">Sintetizador</button>
             </div>
 
@@ -108,8 +109,8 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
     layout.querySelector('#tab-acupuncture').addEventListener('click', () => { activeTab = 'acupuncture'; editingItem = null; refresh(); });
     layout.querySelector('#tab-breathwork').addEventListener('click', () => { activeTab = 'breathwork'; editingItem = null; refresh(); });
     layout.querySelector('#tab-yoga').addEventListener('click', () => { activeTab = 'yoga'; editingItem = null; refresh(); });
+    layout.querySelector('#tab-strength').addEventListener('click', () => { activeTab = 'strength'; editingItem = null; refresh(); });
     layout.querySelector('#tab-sessions').addEventListener('click', () => { activeTab = 'sessions'; editingItem = null; refresh(); });
-    layout.querySelector('#tab-heads').addEventListener('click', () => { activeTab = 'heads'; editingItem = null; refresh(); });
     layout.querySelector('#tab-synth').addEventListener('click', () => { activeTab = 'synth'; editingItem = null; refresh(); });
 
     renderActiveTabContent();
@@ -126,10 +127,13 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
       renderBreathworkManager(targetEl);
     } else if (activeTab === 'yoga') {
       renderYogaManager(targetEl);
+    } else if (activeTab === 'strength') {
+      renderStrengthManager(targetEl, db).catch(error => {
+        console.error('[Syllabus] Error al renderizar Fuerza:', error);
+        targetEl.innerHTML = '<p class="strength-manager__warning">No se pudo cargar el catálogo de Fuerza.</p>';
+      });
     } else if (activeTab === 'sessions') {
       renderCompoundSessionsManager(targetEl);
-    } else if (activeTab === 'heads') {
-      renderHeadsReference(targetEl);
     } else if (activeTab === 'synth') {
       renderSynthReference(targetEl);
     }
@@ -143,12 +147,14 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
       <div style="display: flex; gap: 8px; border-bottom: 1px solid rgba(46,43,40,0.12); padding-bottom: 0; margin-bottom: 20px;">
         <button id="btn-sub-mer" class="btn-braun-tab ${activeAcuSubTab === 'meridians' ? 'active' : ''}" style="padding:6px 12px 8px 12px; font-size:0.75rem;">Meridianos (Canales)</button>
         <button id="btn-sub-pts" class="btn-braun-tab ${activeAcuSubTab === 'points' ? 'active' : ''}" style="padding:6px 12px 8px 12px; font-size:0.75rem;">Puntos</button>
+        <button id="btn-sub-heads" class="btn-braun-tab ${activeAcuSubTab === 'heads' ? 'active' : ''}" style="padding:6px 12px 8px 12px; font-size:0.75rem;">Cabezales</button>
       </div>
       <div id="acupuncture-sub-content"></div>
     `;
 
     layout.querySelector('#btn-sub-mer').addEventListener('click', () => { activeAcuSubTab = 'meridians'; editingItem = null; refresh(); });
     layout.querySelector('#btn-sub-pts').addEventListener('click', () => { activeAcuSubTab = 'points'; editingItem = null; refresh(); });
+    layout.querySelector('#btn-sub-heads').addEventListener('click', () => { activeAcuSubTab = 'heads'; editingItem = null; refresh(); });
 
     const subContentEl = container.querySelector('#acupuncture-sub-content');
 
@@ -311,6 +317,8 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
       });
 
       renderFilteredPointsList();
+    } else if (activeAcuSubTab === 'heads') {
+      renderHeadsReference(subContentEl);
     } else {
       // --- SUB-PESTAÑA MERIDIANOS (LECTURA ÚNICAMENTE) ---
       subContentEl.innerHTML = `
@@ -693,10 +701,6 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
                   <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Estilo</label>
                   <input type="text" id="asana-style" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Yin" value="Yin" required>
                 </div>
-                <div style="width:100px; display:flex; flex-direction:column; gap:4px;">
-                  <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Duración (s)</label>
-                  <input type="number" id="asana-duration" class="acu-input-flat" style="padding: 6px;" min="10" value="180" required>
-                </div>
               </div>
 
               <div style="display:flex; flex-direction:column; gap:4px;">
@@ -736,7 +740,6 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
         layout.querySelector('#asana-id').value = editingItem.id || '';
         layout.querySelector('#asana-name').value = editingItem.name || '';
         layout.querySelector('#asana-style').value = editingItem.style || 'Yin';
-        layout.querySelector('#asana-duration').value = editingItem.duration || 180;
         layout.querySelector('#asana-desc').value = editingItem.description || '';
 
         layout.querySelector('#btn-cancel-edit').addEventListener('click', () => {
@@ -752,7 +755,6 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
           id: editingItem && editingStore === 'yoga_postures' ? editingItem.id : layout.querySelector('#asana-id').value.trim().toLowerCase(),
           name: layout.querySelector('#asana-name').value.trim(),
           style: layout.querySelector('#asana-style').value.trim(),
-          duration: parseInt(layout.querySelector('#asana-duration').value) || 180,
           description: layout.querySelector('#asana-desc').value.trim()
         };
 
@@ -824,7 +826,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
                   </div>
                   <div style="width:100px; display:flex; flex-direction:column; gap:4px;">
                     <span style="font-size:0.55rem; color:var(--color-text-muted); text-transform:uppercase;">Retención (s)</span>
-                    <input type="number" id="input-asana-hold" class="acu-input-flat" style="font-size:0.75rem; padding:4px;" min="10" value="120">
+                    <input type="number" id="input-asana-hold" class="acu-input-flat" style="font-size:0.75rem; padding:4px;" min="10" placeholder="Asignar">
                   </div>
                   <button type="button" id="btn-add-asana-to-block" class="btn-action-icon" title="Agregar Asana al Bloque" aria-label="Agregar Asana al Bloque" style="width:32px; height:32px; color:var(--color-text-main);">
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -879,13 +881,22 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
           const itemEl = document.createElement('div');
           itemEl.style.cssText = 'display:flex; justify-content:space-between; align-items:center; font-size:0.78rem; padding:4px 8px; background:transparent; border-bottom:1px solid rgba(46,43,40,0.06); border-radius:0;';
           itemEl.innerHTML = `
-            <span>${index + 1}. <strong>${escapeHTML(name)}</strong> (${escapeHTML(bp.holdTime)}s)</span>
+            <span style="flex:1; min-width:0;">${index + 1}. <strong>${escapeHTML(name)}</strong></span>
+            <label style="display:flex; align-items:center; gap:4px; color:var(--color-text-muted); font-size:0.65rem;">
+              <input type="number" class="block-posture-hold" min="10" value="${escapeAttribute(bp.holdTime)}" aria-label="Tiempo de retención de ${escapeAttribute(name)}" style="width:64px; background:transparent; border:none; border-bottom:1px solid rgba(46,43,40,0.15); color:var(--color-text-main); text-align:right;"> s
+            </label>
             <div style="display:flex; gap:8px;">
               <button type="button" class="btn-builder-up" style="background:none; border:none; cursor:pointer; color:var(--color-text-muted);" ${index === 0 ? 'disabled' : ''}>▲</button>
               <button type="button" class="btn-builder-down" style="background:none; border:none; cursor:pointer; color:var(--color-text-muted);" ${index === blockPosturesList.length - 1 ? 'disabled' : ''}>▼</button>
               <button type="button" class="btn-builder-remove" style="background:none; border:none; cursor:pointer; color:var(--color-accent-red); font-weight:600;">✕</button>
             </div>
           `;
+
+          itemEl.querySelector('.block-posture-hold').addEventListener('change', (event) => {
+            const value = Number(event.target.value);
+            if (Number.isFinite(value) && value >= 10) bp.holdTime = value;
+            else event.target.value = bp.holdTime;
+          });
 
           // Ordenación y borrado en el builder temporal
           itemEl.querySelector('.btn-builder-up').addEventListener('click', () => {
@@ -916,12 +927,16 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
       // Conectar botón Agregar Asana al Bloque
       subContentEl.querySelector('#btn-add-asana-to-block').addEventListener('click', () => {
         const asanaId = subContentEl.querySelector('#select-asana-to-add').value;
-        const holdTime = parseInt(subContentEl.querySelector('#input-asana-hold').value) || 120;
+        const holdTimeInput = subContentEl.querySelector('#input-asana-hold');
+        const holdTime = Number(holdTimeInput.value);
 
-        if (asanaId) {
-          blockPosturesList.push({ postureId: asanaId, holdTime });
-          renderBlockBuilderPostures();
+        if (!asanaId || !Number.isFinite(holdTime) || holdTime < 10) {
+          alert('Selecciona una postura y asigna un tiempo de retención válido.');
+          return;
         }
+        blockPosturesList.push({ postureId: asanaId, holdTime });
+        holdTimeInput.value = '';
+        renderBlockBuilderPostures();
       });
 
       renderBlockBuilderPostures();
@@ -978,9 +993,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
           <div style="flex:1;">
             <span style="font-weight:600; font-size:0.88rem; color:var(--color-text-main);">${escapeHTML(p.name)}</span>
             <p style="font-size:0.75rem; color:var(--color-text-muted); margin:4px 0 8px 0; line-height:1.4;">${escapeHTML(p.description)}</p>
-            <div style="font-family:var(--font-mono); font-size:0.7rem; color:var(--color-text-muted);">
-              Estilo: ${escapeHTML(p.style)} | Duración recomendada: ${escapeHTML(p.duration)}s
-            </div>
+            <div style="font-family:var(--font-mono); font-size:0.7rem; color:var(--color-text-muted);">Estilo: ${escapeHTML(p.style)}</div>
           </div>
           <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
             <span style="font-family:var(--font-mono); font-size:0.65rem; color:var(--color-text-muted); text-transform:uppercase;">${escapeHTML(p.id)}</span>

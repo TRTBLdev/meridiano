@@ -2,12 +2,14 @@ import { getAllData, putData, deleteData, addData } from '../db.js';
 import { renderDotMatrix } from '../utils/dotmatrix.js';
 import { escapeAttribute, escapeHTML } from '../utils/sanitize.js';
 import { renderTechnicalTitle } from './ui.js';
+import { renderLobbyAction, renderLobbyShell } from './lobbyUi.js';
 import {
   bindWakeLockPreference,
   createWakeLockController,
   populateTimerDots,
   renderSynthPanel,
-  bindSynthPanel
+  bindSynthPanel,
+  renderWakeLockPreference
 } from './timerShell.js';
 import { createSynthEngine, playQuartzBowlRing } from '../utils/synth.js';
 import { getFreqLabel, valueToFreq, freqToValue } from '../utils/freqUtils.js';
@@ -129,55 +131,18 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
      VISTA 1: LOBBY PRINCIPAL (PRESETS & CATÁLOGO)
      ============================================================= */
   function renderLobby() {
-    const layout = document.createElement('div');
-    layout.className = 'dashboard-layout fade-in';
-
-    layout.innerHTML = `
-      <nav class="nav-bar">
-        <div class="nav-logo dot-digital">M.</div>
-        <ul class="nav-links">
-          <li class="nav-item" id="btn-back-home">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="19" y1="12" x2="5" y2="12"></line>
-              <polyline points="12 19 5 12 12 5"></polyline>
-            </svg>
-            <span>Volver</span>
-          </li>
-        </ul>
-      </nav>
-
-      <main class="main-viewport" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 20px; overflow-y: auto;">
-        <div class="glass-panel" style="max-width: 480px; width: 100%; padding: 24px; box-sizing: border-box; margin-bottom: 40px;">
-          
-          <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-            ${renderTechnicalTitle('Acupuntura TENS')}
-            
-            <button class="btn-braun-create" id="btn-lobby-create">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-              <span>Crear Secuencia</span>
-            </button>
-          </header>
-
-          <!-- 1. Sección de Secuencias (Presets / Accordion) -->
-          <section class="acu-sequences-section">
-            <span class="acu-section-label">Sesiones y Secuencias Activas (Auto-Terapia)</span>
-            <div class="acu-sequence-list" id="lobby-sequences-list"></div>
-          </section>
-
-          <!-- Opción de pantalla encendida / ahorro de batería -->
-          <div style="margin: 32px 0 12px; display: flex; align-items: center; justify-content: space-between; font-size: 0.68rem; color: var(--color-text-muted); font-family: var(--font-digital); border-top: 1px dashed rgba(46, 43, 40, 0.08); padding-top: 20px; width: 100%;">
-            <span>MANTENER PANTALLA ACTIVA</span>
-            <label class="braun-switch" style="margin: 0;">
-              <input type="checkbox" id="pref-wakelock-switch" ${localStorage.getItem('meridiano_wakelock') !== 'false' ? 'checked' : ''}>
-              <span class="braun-switch-slider"></span>
-            </label>
-          </div>
-        </div>
-      </main>
-    `;
+    const staging = document.createElement('div');
+    staging.innerHTML = renderLobbyShell({
+      title: 'Acupuntura TENS',
+      action: renderLobbyAction({ kind: 'text', label: '+ Crear Secuencia', id: 'btn-lobby-create' }),
+      variant: 'list',
+      className: 'acupuncture-lobby',
+      content: `
+        <span class="lobby-section-label">Sesiones y secuencias activas (auto-terapia)</span>
+        <div class="practice-list" id="lobby-sequences-list"></div>`,
+      footer: renderWakeLockPreference()
+    });
+    const layout = staging.firstElementChild;
 
     container.appendChild(layout);
 
@@ -207,7 +172,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
     seqList.innerHTML = '';
 
     if (sequences.length === 0) {
-      seqList.innerHTML = `<p style="font-size: 0.8rem; color: var(--color-text-muted); padding: 16px 0;">No tienes secuencias guardadas. Crea una nueva secuencia arriba.</p>`;
+      seqList.innerHTML = '<p class="lobby-empty">No tienes secuencias guardadas. Crea una nueva secuencia arriba.</p>';
     } else {
       sequences.forEach(seq => {
         // Calcular tiempo total
@@ -221,33 +186,27 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
         const isCustom = seq.id.startsWith('custom-');
 
         const accordionItem = document.createElement('div');
-        accordionItem.className = 'acu-accordion-item';
+        accordionItem.className = 'practice-row acupuncture-practice-row';
 
         accordionItem.innerHTML = `
-          <div class="acu-accordion-header" style="pointer-events: auto;">
-            <div class="acu-accordion-header-left">
-              <span class="acu-accordion-indicator-arrow">▶</span>
-              <span class="acu-seq-name" style="font-weight: 500; font-size: 0.95rem;">${escapeHTML(seq.name)}</span>
+          <div class="practice-row__summary" role="button" tabindex="0" aria-expanded="false">
+            <div class="practice-row__lead">
+              <span class="practice-row__indicator">▶</span>
+              <span class="practice-row__title">${escapeHTML(seq.name)}</span>
             </div>
-            <div style="display: flex; align-items: center; gap: 12px; pointer-events: auto;">
-              <span style="font-family: var(--font-digital); font-size: 0.65rem; color: var(--color-text-muted); letter-spacing:0.05em;">
+            <div class="practice-row__meta">
+              <span class="practice-row__metadata">
                 ${isCustom ? 'PERSONALIZADA' : 'PRESET'}
               </span>
-              <span class="acu-seq-duration-badge">${totalMin} min</span>
-              
-              <!-- Botón Play en la Cabecera (Más estilizado y arriba a la derecha) -->
-              <button class="btn-play-header" title="Iniciar Secuencia">
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" style="color: var(--color-text-main); margin-left: 1px;">
-                  <polygon points="6 4 19 12 6 20 6 4"></polygon>
-                </svg>
-              </button>
+              <span class="practice-row__duration">${totalMin} min</span>
+              ${renderLobbyAction({ kind: 'icon', icon: 'play', label: 'Iniciar secuencia', className: 'btn-play-header' })}
             </div>
           </div>
-          <div class="acu-accordion-content" style="display: none;">
-            <div class="acu-seq-desc" style="margin-bottom: 12px; font-size: 0.78rem; line-height: 1.4; color: var(--color-text-muted);">${escapeHTML(seq.description || 'Secuencia técnica de electroterapia TENS.')}</div>
+          <div class="practice-row__details" style="display: none;">
+            <div class="practice-row__description">${escapeHTML(seq.description || 'Secuencia técnica de electroterapia TENS.')}</div>
             
-            <span class="acu-section-label" style="margin-bottom: 8px; font-size: 0.65rem;">Puntos del Protocolo</span>
-            <div class="acu-points-timeline">
+            <span class="practice-row__section-label">Puntos del protocolo</span>
+            <div class="practice-timeline">
               ${seq.points.map((step, idx) => {
           const pointData = catalogPoints.find(p => p.id === step.pointId);
           if (!pointData) return '';
@@ -260,55 +219,49 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
             : `${sec}s`;
 
           return `
-                  <div class="acu-timeline-point">
-                    <span class="acu-timeline-point-number">${idx + 1}</span>
-                    <div class="acu-timeline-point-details">
-                      <span class="acu-timeline-point-name" style="font-size:0.8rem; font-weight:600;">${escapeHTML(pointData.name)} (${escapeHTML(pointData.code)}${pointData.traditional_code && pointData.traditional_code !== pointData.code ? ` / ${escapeHTML(pointData.traditional_code)}` : ''}) ${step.side ? `[Lado: ${escapeHTML(step.side)}]` : ''}</span>
-                      <span class="acu-timeline-point-times" style="font-size:0.7rem; color:var(--color-text-muted);">${escapeHTML(durationLabel)} estímulo + ${escapeHTML(step.transitionAfter)}s transición (${escapeHTML(pointData.headType)})</span>
+                  <div class="practice-timeline__item">
+                    <span class="practice-timeline__index">${idx + 1}</span>
+                    <div class="practice-timeline__body">
+                      <span class="practice-timeline__title">${escapeHTML(pointData.name)} (${escapeHTML(pointData.code)}${pointData.traditional_code && pointData.traditional_code !== pointData.code ? ` / ${escapeHTML(pointData.traditional_code)}` : ''}) ${step.side ? `[Lado: ${escapeHTML(step.side)}]` : ''}</span>
+                      <span class="practice-timeline__meta">${escapeHTML(durationLabel)} estímulo + ${escapeHTML(step.transitionAfter)}s transición (${escapeHTML(pointData.headType)})</span>
                     </div>
                   </div>
                 `;
         }).join('')}
             </div>
             
-            <div class="acu-accordion-actions" style="justify-content: flex-end;">
+            <div class="practice-row__actions">
               <div style="display: flex; gap: 12px;">
                 ${isCustom ? `
-                  <button class="btn-action-icon btn-edit" title="Editar" aria-label="Editar">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                    </svg>
-                  </button>
-                  <button class="btn-action-icon delete-icon btn-delete" title="Borrar" aria-label="Borrar">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                      <polyline points="3 6 5 6 21 6"></polyline>
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    </svg>
-                  </button>
+                  ${renderLobbyAction({ kind: 'icon', icon: 'edit', label: 'Editar secuencia', className: 'btn-edit' })}
+                  ${renderLobbyAction({ kind: 'icon', icon: 'delete', label: 'Borrar secuencia', className: 'btn-delete' })}
                 ` : `
-                  <button class="acu-seq-action btn-edit" style="border: none !important; display: flex; align-items: center; gap: 4px;">
-                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block;">
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                    </svg>
-                    <span>[ COPIAR Y EDITAR ]</span>
-                  </button>
+                  ${renderLobbyAction({ kind: 'text', label: 'Copiar y editar', className: 'btn-edit' })}
                 `}
               </div>
             </div>
           </div>
         `;
 
-        const headerEl = accordionItem.querySelector('.acu-accordion-header');
-        const contentEl = accordionItem.querySelector('.acu-accordion-content');
+        const headerEl = accordionItem.querySelector('.practice-row__summary');
+        const contentEl = accordionItem.querySelector('.practice-row__details');
         const playBtn = headerEl.querySelector('.btn-play-header');
 
-        headerEl.addEventListener('click', (e) => {
-          // No expandir si hace click en el botón de play
-          if (e.target.closest('.btn-play-header')) return;
+        const toggleDetails = () => {
           const isExpanded = accordionItem.classList.toggle('expanded');
+          accordionItem.classList.toggle('is-expanded', isExpanded);
           contentEl.style.display = isExpanded ? 'block' : 'none';
+          headerEl.setAttribute('aria-expanded', String(isExpanded));
+        };
+
+        headerEl.addEventListener('click', (e) => {
+          if (e.target.closest('button')) return;
+          toggleDetails();
+        });
+        headerEl.addEventListener('keydown', (e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          e.preventDefault();
+          toggleDetails();
         });
 
         playBtn.addEventListener('click', (e) => {
