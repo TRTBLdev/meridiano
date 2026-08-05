@@ -12,7 +12,7 @@ import {
 import { createSynthEngine, playQuartzBowlRing } from '../utils/synth.js';
 import { getFreqLabel, valueToFreq, freqToValue } from '../utils/freqUtils.js';
 
-export async function renderBreathworkScreen(container, db, onNavigate) {
+export async function renderBreathworkScreen(container, db, onNavigate, orchestratorConfig = null) {
   const synth = createSynthEngine();
   let activeView = 'lobby';
 
@@ -71,6 +71,18 @@ export async function renderBreathworkScreen(container, db, onNavigate) {
       { id: 'breath-box', name: 'Respiración Cuadrada (Sama Vritti)', description: 'Balancea el sistema nervioso autónomo y reduce la ansiedad.', inhale: 4, holdIn: 4, exhale: 4, holdOut: 4 },
       { id: 'breath-calm', name: 'Respiración Calmante (4-7-8)', description: 'Poderoso somnífero y calmante mental instantáneo.', inhale: 4, holdIn: 7, exhale: 8, holdOut: 0 }
     ];
+  }
+
+  // --- Integración con Orquestador ---
+  if (orchestratorConfig) {
+    activeView = 'timer';
+    mode = 'single';
+    singlePatternId = orchestratorConfig.presetId;
+    
+    // Convertir segundos a minutos y segundos
+    const dur = orchestratorConfig.duration || 300;
+    singleMins = Math.floor(dur / 60);
+    singleSecs = dur % 60;
   }
 
   const render = () => {
@@ -521,22 +533,22 @@ export async function renderBreathworkScreen(container, db, onNavigate) {
       await cleanupTimer();
       playQuartzBowlRing(432, 4.5);
 
-      const durationMin = Math.max(1, Math.round(totalDuration / 60));
-      try {
-        await addData(db, 'sessions_log', {
+      if (!orchestratorConfig) {
+        addData(db, 'sessions_log', {
           type: 'breathwork',
-          date: new Date().toISOString(),
-          duration: durationMin,
-          notes: `Sesión de respiración completada (${durationMin} min).`,
-          details: pattern.name
-        });
-      } catch (err) {
-        console.error('[Breathwork] Error saving session:', err);
+          duration: elapsedSeconds,
+          timestamp: new Date().toISOString(),
+          details: { mode, completed: !isPaused }
+        }).catch(err => console.error('[Breathwork] Error guardando log:', err));
       }
 
       alert('Sesión de respiración completada.');
-      activeView = 'lobby';
-      render();
+      if (orchestratorConfig) {
+        orchestratorConfig.onComplete();
+      } else {
+        activeView = 'lobby';
+        render();
+      }
     };
 
     // Temporizador principal de segundos
@@ -625,8 +637,12 @@ export async function renderBreathworkScreen(container, db, onNavigate) {
       if (!isPaused) setPaused(true);
       if (confirm('¿Deseas detener y cancelar el ejercicio actual? No se guardará en el historial.')) {
         await cleanupTimer();
-        activeView = 'lobby';
-        render();
+        if (orchestratorConfig) {
+          onNavigate('inicio');
+        } else {
+          activeView = 'lobby';
+          render();
+        }
       } else if (!wasPaused) {
         setPaused(false);
       }

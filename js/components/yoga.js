@@ -56,7 +56,7 @@ const FALLBACK_SEQUENCES = [
  * @param {Function} onNavigate Función para navegar
  * @param {Object} appController Enlace para interactuar con el sintetizador global
  */
-export async function renderYogaScreen(container, db, onNavigate) {
+export async function renderYogaScreen(container, db, onNavigate, orchestratorConfig = null) {
   const synth = createSynthEngine();
   let activeView = 'lobby'; // 'lobby', 'editor' o 'timer'
 
@@ -1004,6 +1004,15 @@ export async function renderYogaScreen(container, db, onNavigate) {
     renderConstructorList();
   }
 
+  // --- Integración con Orquestador ---
+  if (orchestratorConfig) {
+    const seqToLoad = sequencesCatalog.find(s => s.id === orchestratorConfig.presetId) || sequencesCatalog[0];
+    if (seqToLoad) {
+      loadSequence(seqToLoad);
+      activeView = 'timer';
+    }
+  }
+
   /* =============================================================
      VISTA 3: TIMER ACTIVO (PANTALLA COMPLETA INMERSIVA)
      ============================================================= */
@@ -1393,6 +1402,43 @@ export async function renderYogaScreen(container, db, onNavigate) {
       startAnimationLoop();
     };
 
+    const cleanupTimer = async () => {
+      clearInterval(timerInterval);
+      stopAnimationLoop();
+      releaseWakeLock();
+      synth.destroy();
+    };
+
+    // Finalizar sesión (Savasana completado)
+    async function finishSession() {
+      await cleanupTimer();
+      playQuartzBowlRing(432, 4.5);
+      
+      const durationMin = Math.max(1, Math.round(totalSessionSeconds / 60));
+
+      if (!orchestratorConfig) {
+        try {
+          await addData(db, 'sessions_log', {
+            type: 'yoga',
+            date: new Date().toISOString(),
+            duration: durationMin,
+            notes: `Sesión de Yin Yoga completada: ${sequenceName}.`,
+            details: `Yin Yoga: ${escapeHTML(sequenceName)}`
+          });
+        } catch (e) {
+          console.error('[Yoga] Error al guardar el historial:', e);
+        }
+      }
+
+      alert('Sesión de Yoga completada. Namasté.');
+      if (orchestratorConfig) {
+        orchestratorConfig.onComplete();
+      } else {
+        activeView = 'lobby';
+        render();
+      }
+    }
+
     const saveSessionLog = async () => {
       const minutesCount = Math.round(elapsedSeconds / 60) || 1;
       const detailsText = `Yin Yoga: ${escapeHTML(sequenceName)} (${activePhases.filter(p => p.type === 'posture').length} posturas)`;
@@ -1485,12 +1531,7 @@ export async function renderYogaScreen(container, db, onNavigate) {
         syncActivePhase();
         runTimerInterval();
       } else {
-        releaseWakeLock();
-        saveSessionLog();
-        alert('Práctica de Yin Yoga finalizada. Namasté.');
-        activeView = 'lobby';
-        synth.destroy();
-        render();
+        finishSession();
       }
     });
 
@@ -1499,8 +1540,12 @@ export async function renderYogaScreen(container, db, onNavigate) {
       if (!isSessionStarted) {
         // Si no ha iniciado la sesión, vuelve directamente al lobby sin preguntar
         synth.destroy();
-        activeView = 'lobby';
-        render();
+        if (orchestratorConfig) {
+          onNavigate('inicio');
+        } else {
+          activeView = 'lobby';
+          render();
+        }
         return;
       }
 

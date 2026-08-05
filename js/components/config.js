@@ -21,7 +21,10 @@ export async function renderConfigScreen(container, db, onNavigate) {
     { id: 'acupuncture_sequences', label: 'Secuencias de Acupuntura' },
     { id: 'acupuncture_points', label: 'Puntos de Acupuntura' },
     { id: 'meditation_presets', label: 'Presets de Meditación' },
-    { id: 'meridians', label: 'Canales de Meridianos' }
+    { id: 'meridians', label: 'Canales de Meridianos' },
+    { id: 'strength_exercises', label: 'Ejercicios de Fuerza' },
+    { id: 'strength_circuits', label: 'Circuitos de Fuerza' },
+    { id: 'compound_sessions', label: 'Sesiones Compuestas' }
   ];
 
   // Renderizar esqueleto principal

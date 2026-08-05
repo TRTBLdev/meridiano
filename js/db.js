@@ -5,8 +5,10 @@ import { defaultPostures, defaultBlocks, defaultSequences } from './seeds/yoga_s
 import { defaultBreathwork } from './seeds/breathwork_seeds.js';
 import { defaultMeditation } from './seeds/meditation_seeds.js';
 import { defaultAcupunctureSequences } from './seeds/acupuncture_sequences_seed.js';
+import { defaultStrengthExercises, defaultStrengthCircuits } from './seeds/strength_exercises_seed.js';
+import { defaultCompoundSessions } from './seeds/compound_sessions_seed.js';
 
-const DB_VERSION = 9;
+const DB_VERSION = 11;
 
 /**
  * Abre la conexión a IndexedDB y crea las tablas/almacenes necesarios.
@@ -85,6 +87,21 @@ export function openDB() {
       // 8. Módulo Acupuntura (Meridianos Lookup)
       if (!db.objectStoreNames.contains('meridians')) {
         db.createObjectStore('meridians', { keyPath: 'id' });
+      }
+
+      // 9. Módulo Fuerza/Calistenia (Ejercicios)
+      if (!db.objectStoreNames.contains('strength_exercises')) {
+        db.createObjectStore('strength_exercises', { keyPath: 'id' });
+      }
+
+      // 10. Módulo Fuerza/Calistenia (Circuitos)
+      if (!db.objectStoreNames.contains('strength_circuits')) {
+        db.createObjectStore('strength_circuits', { keyPath: 'id' });
+      }
+
+      // 11. Módulo Sesiones Compuestas
+      if (!db.objectStoreNames.contains('compound_sessions')) {
+        db.createObjectStore('compound_sessions', { keyPath: 'id' });
       }
     };
   });
@@ -220,7 +237,25 @@ export async function seedDatabase() {
     }
   }
 
-  // 7. Sembrar Historial de Homeostasis de Prueba (El Hilo de Agua) - Removido por requerimiento (no precargar sesiones)
+  // 7. Sembrar Ejercicios de Fuerza
+  const strengthExCount = await countItems(db, 'strength_exercises');
+  if (strengthExCount === 0) {
+    await saveBatch(db, 'strength_exercises', defaultStrengthExercises);
+  }
+
+  // 8. Sembrar Circuitos de Fuerza
+  const strengthCircuitCount = await countItems(db, 'strength_circuits');
+  if (strengthCircuitCount === 0) {
+    await saveBatch(db, 'strength_circuits', defaultStrengthCircuits);
+  }
+
+  // 9. Sembrar Sesiones Compuestas
+  const compoundSessionCount = await countItems(db, 'compound_sessions');
+  if (compoundSessionCount === 0) {
+    await saveBatch(db, 'compound_sessions', defaultCompoundSessions);
+  }
+
+  // 10. Sembrar Historial de Homeostasis de Prueba (El Hilo de Agua) - Removido por requerimiento (no precargar sesiones)
 }
 
 /* =============================================================
@@ -320,7 +355,10 @@ export async function exportDatabase(db, mode = 'all') {
       'breathwork_patterns',
       'acupuncture_points',
       'acupuncture_sequences',
-      'meridians'
+      'meridians',
+      'strength_exercises',
+      'strength_circuits',
+      'compound_sessions'
     ];
   } else {
     stores = [
@@ -332,7 +370,10 @@ export async function exportDatabase(db, mode = 'all') {
       'breathwork_patterns',
       'acupuncture_points',
       'acupuncture_sequences',
-      'meridians'
+      'meridians',
+      'strength_exercises',
+      'strength_circuits',
+      'compound_sessions'
     ];
   }
 
@@ -379,7 +420,10 @@ export async function importDatabase(db, backup) {
     breathwork_patterns: { imported: 0, overwritten: 0 },
     acupuncture_points: { imported: 0, overwritten: 0 },
     acupuncture_sequences: { imported: 0, overwritten: 0 },
-    meridians: { imported: 0, overwritten: 0 }
+    meridians: { imported: 0, overwritten: 0 },
+    strength_exercises: { imported: 0, overwritten: 0 },
+    strength_circuits: { imported: 0, overwritten: 0 },
+    compound_sessions: { imported: 0, overwritten: 0 }
   };
 
   const stores = Object.keys(backup.data);

@@ -98,6 +98,10 @@ export async function renderDashboard(container, session, db, onNavigate) {
           <section style="width: 100%;">
             <div class="pilars-vertical-list">
               
+              <div class="pilar-list-item sessions" data-module="sessions" style="font-weight: 600; color: var(--color-text-main);">
+                <span>Sesiones Compuestas</span>
+              </div>
+              
               <div class="pilar-list-item yoga" data-module="yoga">
                 <span>Yin Yoga</span>
               </div>
@@ -112,6 +116,10 @@ export async function renderDashboard(container, session, db, onNavigate) {
  
               <div class="pilar-list-item meditation" data-module="meditation">
                 <span>Meditación</span>
+              </div>
+ 
+              <div class="pilar-list-item strength" data-module="strength">
+                <span>Fuerza</span>
               </div>
  
             </div>
@@ -269,6 +277,21 @@ async function loadHistoryAndCalendar(db) {
       if (log.type === 'breathwork') label = 'BREATH';
       if (log.type === 'acupuncture') label = 'ACU';
       if (log.type === 'meditation') label = 'MED';
+      if (log.type === 'strength') label = 'FUERZA';
+      if (log.type === 'compound') label = 'INTEGRAL';
+
+      let blocksHtml = '';
+      if (log.type === 'compound' && log.blocks && log.blocks.length > 0) {
+        blocksHtml = `
+          <div class="compound-blocks-list" style="margin-top: 12px; font-size: 0.85rem; border-left: 2px solid rgba(255,255,255,0.1); padding-left: 12px;">
+            ${log.blocks.map(b => `
+              <div style="margin-bottom: 6px; color: var(--color-text-muted);">
+                <span style="font-weight: 600; color: var(--color-text-main);">[${escapeHTML(b.module.toUpperCase())}]</span> ${escapeHTML(b.name || '')} (${b.duration}s)
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
 
       timelineHTML += `
         <div class="timeline-node-wrapper practice-${toSafeClassToken(log.type)}" data-id="${log.id}">
@@ -282,7 +305,10 @@ async function loadHistoryAndCalendar(db) {
               </svg>
             </button>
           </div>
-          <div class="node-desc">${escapeHTML(log.notes || '')} (${escapeHTML(log.duration)}m)</div>
+          <div class="node-desc">
+            ${escapeHTML(log.notes || '')} (${escapeHTML(log.duration)}m)
+            ${blocksHtml}
+          </div>
         </div>
       `;
     });

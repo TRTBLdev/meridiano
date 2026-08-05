@@ -21,7 +21,7 @@ import { getFreqLabel, valueToFreq, freqToValue } from '../utils/freqUtils.js';
  * @param {Function} onNavigate Navegación global
  * @param {Object} appController Enlace para controlar el sintonizador de sonido global
  */
-export async function renderAcupunctureScreen(container, db, onNavigate) {
+export async function renderAcupunctureScreen(container, db, onNavigate, orchestratorConfig = null) {
   // Estado local del componente
   const synth = createSynthEngine();
   let catalogPoints = [];
@@ -85,6 +85,16 @@ export async function renderAcupunctureScreen(container, db, onNavigate) {
   async function refresh() {
     await loadData();
     container.innerHTML = '';
+
+    // --- Integración con Orquestador ---
+    if (orchestratorConfig && !currentSequence) {
+      const seq = sequences.find(s => s.id === orchestratorConfig.presetId) || sequences[0];
+      if (seq) {
+        currentSequence = seq;
+        activeView = 'timer';
+        activeSeqIndex = 0;
+      }
+    }
 
     if (activeView === 'lobby') {
       renderLobby();
@@ -811,7 +821,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate) {
   /* =============================================================
      VISTA 3: REPRODUCTOR / TIMER SESSIONS (PANTALLA COMPLETA)
      ============================================================= */
-  function startSession(sequence) {
+  function startSession(sequence, orchestratorConfig = null) {
     currentSequence = sequence;
     activeSeqIndex = 0;
     activeState = 'stimulating';
@@ -1103,8 +1113,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate) {
           activeSeqIndex++;
           if (activeSeqIndex >= currentSequence.points.length) {
             // Completado con éxito
-            stopTimerLoop();
-            finishSession();
+            finishSequence();
           } else {
             // Cargar siguiente punto
             const nextStep = currentSequence.points[activeSeqIndex];
@@ -1120,7 +1129,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate) {
       }
     }
 
-    function stopTimerLoop() {
+    const cleanupTimer = async () => {
       if (activeInterval) {
         clearInterval(activeInterval);
         activeInterval = null;
@@ -1129,39 +1138,36 @@ export async function renderAcupunctureScreen(container, db, onNavigate) {
         cancelAnimationFrame(gridAnimFrame);
         gridAnimFrame = null;
       }
-      releaseWakeLock();
-      // Silenciar sintetizador al salir del temporizador
       synth.stop();
-    }
+      await wakeLockController.release();
+    };
 
-    // Guardar sesión y salir
-    async function finishSession() {
-      // Calcular duración total
-      let totalSeconds = 0;
-      currentSequence.points.forEach(p => {
-        totalSeconds += parseInt(p.duration);
-        totalSeconds += parseInt(p.transitionAfter || 0);
-      });
-      const totalMin = Math.ceil(totalSeconds / 60);
+    const finishSequence = async () => {
+      await cleanupTimer();
 
-      // Guardar log en IndexedDB directamente
-      try {
-        await addData(db, 'sessions_log', {
-          type: 'acupuncture',
-          date: new Date().toISOString(),
-          duration: totalMin,
-          notes: `Secuencia: ${currentSequence.name}`,
-          details: 'Digitopuntura Hegu'
-        });
-      } catch (e) {
-        console.error('[DB] Error logging session:', e);
+      if (!orchestratorConfig) {
+        try {
+          await addData(db, 'sessions_log', {
+            type: 'acupuncture',
+            date: new Date().toISOString(),
+            duration: Math.max(1, Math.ceil(activeSessionDuration / 60)),
+            notes: `Secuencia: ${currentSequence.name}`,
+            details: 'Digitopuntura Hegu'
+          });
+        } catch (e) {
+          console.error('[DB] Error logging session:', e);
+        }
       }
 
       alert('¡Secuencia de Electroterapia TENS completada con éxito!');
-      activeView = 'lobby';
-      synth.destroy();
-      refresh();
-    }
+      if (orchestratorConfig) {
+        orchestratorConfig.onComplete();
+      } else {
+        activeView = 'lobby';
+        synth.destroy();
+        refresh();
+      }
+    };
 
     const requestWakeLock = () => wakeLockController.request();
     const releaseWakeLock = () => wakeLockController.release();
@@ -1269,8 +1275,12 @@ export async function renderAcupunctureScreen(container, db, onNavigate) {
     // Salir voluntariamente (Pausar primero, preguntar y volver a inicio sin guardar)
     btnExit.addEventListener('click', () => {
       if (!isSessionStarted) {
-        activeView = 'lobby';
-        refresh();
+        if (orchestratorConfig) {
+          onNavigate('inicio');
+        } else {
+          activeView = 'lobby';
+          refresh();
+        }
         return;
       }
       const wasPaused = isTimerPaused;

@@ -57,5 +57,32 @@ export const defaultAcupunctureSequences = [
       { pointId: 'acu-ht7', duration: 60, transitionAfter: 15, side: 'Izquierda' },
       { pointId: 'acu-ht7', duration: 60, transitionAfter: 0, side: 'Derecha' }
     ]
+  },
+  {
+    id: 'seq-acu-miercoles',
+    name: 'Enfoque Metabólico y Relajación Mental',
+    description: 'Activa digestión (peso), calma la mente (ansiedad) y suelta la musculatura del hombro.',
+    suggestedFreq: 6, // Theta
+    baseFreq: 432,
+    points: [
+      { pointId: 'acu-st36', duration: 90, transitionAfter: 15, side: 'Izquierda' },
+      { pointId: 'acu-st36', duration: 90, transitionAfter: 15, side: 'Derecha' },
+      { pointId: 'acu-yintang', duration: 180, transitionAfter: 15, side: null },
+      { pointId: 'acu-gb21', duration: 240, transitionAfter: 0, side: 'Derecha' }
+    ]
+  },
+  {
+    id: 'seq-acu-domingo',
+    name: 'Desintoxicación y Articulación',
+    description: 'Limpia canales, controla ansiedad oral y trabaja el manguito rotador.',
+    suggestedFreq: 7.83, // Schumann
+    baseFreq: 432,
+    points: [
+      { pointId: 'acu-li4', duration: 90, transitionAfter: 15, side: 'Izquierda' },
+      { pointId: 'acu-li4', duration: 90, transitionAfter: 15, side: 'Derecha' },
+      { pointId: 'acu-pc6', duration: 90, transitionAfter: 15, side: 'Izquierda' },
+      { pointId: 'acu-pc6', duration: 90, transitionAfter: 15, side: 'Derecha' },
+      { pointId: 'acu-li15', duration: 240, transitionAfter: 0, side: 'Derecha' }
+    ]
   }
 ];

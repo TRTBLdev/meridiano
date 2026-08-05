@@ -8,7 +8,8 @@ import { renderBreathworkScreen } from './components/breathwork.js';
 import { renderMeditationScreen } from './components/meditation.js';
 import { renderYogaScreen } from './components/yoga.js';
 import { renderConfigScreen } from './components/config.js';
-
+import { renderStrengthScreen } from './components/strength.js';
+import { renderSessionsScreen } from './components/sessions.js';
 
 // Estado global de la aplicación
 const state = {
@@ -84,7 +85,7 @@ function handleLoginSuccess(session) {
   navigate();
 }
 
-function handleNavigation(target) {
+function handleNavigation(target, param = null) {
   if (target === 'logout') {
     state.session = null;
     localStorage.removeItem('meridiano_session');
@@ -106,7 +107,10 @@ function handleNavigation(target) {
     renderBreathworkScreen(appContainer, state.db, handleNavigation);
   } else if (target === 'yoga') {
     renderYogaScreen(appContainer, state.db, handleNavigation);
-
+  } else if (target === 'strength') {
+    renderStrengthScreen(appContainer, state.db, handleNavigation);
+  } else if (target === 'sessions') {
+    renderSessionsScreen(appContainer, state.db, handleNavigation, param);
   } else if (target === 'syllabus') {
     renderSyllabusScreen(appContainer, state.db, handleNavigation);
   } else if (target === 'config') {

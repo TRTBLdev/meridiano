@@ -8,6 +8,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
   let breathworkPatterns = [];
   let yogaPostures = [];
   let yogaBlocks = [];
+  let compoundSessions = [];
 
   // Estado local de navegación de pestañas
   let activeTab = 'acupuncture'; // 'acupuncture', 'breathwork', 'yoga', 'heads', 'synth'
@@ -34,6 +35,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
       breathworkPatterns = await getAllData(db, 'breathwork_patterns');
       yogaPostures = await getAllData(db, 'yoga_postures');
       yogaBlocks = await getAllData(db, 'yoga_blocks');
+      compoundSessions = await getAllData(db, 'compound_sessions');
 
       // Ordenar meridianos tradicionalmente
       const meridianOrderMap = {
@@ -81,6 +83,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
               <button id="tab-acupuncture" class="btn-braun-tab ${activeTab === 'acupuncture' ? 'active' : ''}">Acupuntura</button>
               <button id="tab-breathwork" class="btn-braun-tab ${activeTab === 'breathwork' ? 'active' : ''}">Respiración</button>
               <button id="tab-yoga" class="btn-braun-tab ${activeTab === 'yoga' ? 'active' : ''}">Yin Yoga</button>
+              <button id="tab-sessions" class="btn-braun-tab ${activeTab === 'sessions' ? 'active' : ''}">Sesiones</button>
               <button id="tab-heads" class="btn-braun-tab ${activeTab === 'heads' ? 'active' : ''}">Cabezales</button>
               <button id="tab-synth" class="btn-braun-tab ${activeTab === 'synth' ? 'active' : ''}">Sintetizador</button>
             </div>
@@ -100,6 +103,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
     layout.querySelector('#tab-acupuncture').addEventListener('click', () => { activeTab = 'acupuncture'; editingItem = null; refresh(); });
     layout.querySelector('#tab-breathwork').addEventListener('click', () => { activeTab = 'breathwork'; editingItem = null; refresh(); });
     layout.querySelector('#tab-yoga').addEventListener('click', () => { activeTab = 'yoga'; editingItem = null; refresh(); });
+    layout.querySelector('#tab-sessions').addEventListener('click', () => { activeTab = 'sessions'; editingItem = null; refresh(); });
     layout.querySelector('#tab-heads').addEventListener('click', () => { activeTab = 'heads'; editingItem = null; refresh(); });
     layout.querySelector('#tab-synth').addEventListener('click', () => { activeTab = 'synth'; editingItem = null; refresh(); });
 
@@ -117,6 +121,8 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
       renderBreathworkManager(targetEl);
     } else if (activeTab === 'yoga') {
       renderYogaManager(targetEl);
+    } else if (activeTab === 'sessions') {
+      renderCompoundSessionsManager(targetEl);
     } else if (activeTab === 'heads') {
       renderHeadsReference(targetEl);
     } else if (activeTab === 'synth') {
@@ -928,6 +934,78 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
       card.querySelector('.btn-delete-yb').addEventListener('click', async () => {
         if (confirm(`¿Seguro que deseas eliminar el bloque "${b.name}"?`)) {
           await deleteData(db, 'yoga_blocks', b.id);
+          refresh();
+        }
+      });
+
+      listEl.appendChild(card);
+    });
+  }
+  
+  /* =========================================================================
+     MÓDULO: SESIONES COMPUESTAS
+     ========================================================================= */
+  function renderCompoundSessionsManager(container) {
+    container.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div style="font-size: 0.75rem; color: var(--color-text-muted); font-family: var(--font-digital); text-transform: uppercase; letter-spacing: 0.05em;">
+          Gestión de Sesiones Compuestas
+        </div>
+        <button id="btn-syllabus-add-session" class="btn-braun-tab active" style="font-family: var(--font-digital); text-transform: uppercase; padding: 6px 12px; font-size: 0.7rem; cursor: pointer;">
+          + Crear Nueva Sesión
+        </button>
+      </div>
+      <div class="acu-points-tab-list" id="compound-sessions-list"></div>
+    `;
+
+    container.querySelector('#btn-syllabus-add-session').addEventListener('click', () => {
+      onNavigate('sessions');
+    });
+
+    const listEl = container.querySelector('#compound-sessions-list');
+    
+    if (compoundSessions.length === 0) {
+      listEl.innerHTML = '<p style="color:var(--color-text-muted); font-size:0.8rem; padding:16px;">No hay sesiones compuestas registradas. Haz clic en "+ Crear Nueva Sesión".</p>';
+      return;
+    }
+
+    compoundSessions.forEach(session => {
+      const blocksHtml = session.blocks.map((b, i) => {
+        return `<div style="font-size:0.75rem; color:var(--color-text-main); margin-bottom:4px;">
+          <span style="color:var(--color-accent-red); font-weight:bold;">${i + 1}.</span> 
+          [${b.module.toUpperCase()}] ${escapeHTML(b.nameOverride || b.presetId)} (${b.duration}s)
+        </div>`;
+      }).join('');
+
+      const card = document.createElement('div');
+      card.className = 'acu-point-card';
+      card.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div style="flex:1;">
+            <span style="font-weight:600; font-size:0.88rem; color:var(--color-text-main);">${escapeHTML(session.name)}</span>
+            <p style="font-size:0.75rem; color:var(--color-text-muted); margin:4px 0 8px 0; line-height:1.4;">${escapeHTML(session.description)}</p>
+            <div style="margin-top:12px; padding:12px; background:rgba(0,0,0,0.02); border-left:2px solid var(--color-accent-red);">
+              <div style="font-size:0.65rem; color:var(--color-text-muted); text-transform:uppercase; margin-bottom:8px; font-weight:bold;">Bloques Secuenciales</div>
+              ${blocksHtml}
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px; margin-left:16px;">
+            <span style="font-family:var(--font-mono); font-size:0.65rem; color:var(--color-text-muted); text-transform:uppercase;">${escapeHTML(session.id)}</span>
+            <div style="display:flex; gap:8px;">
+              <button class="btn-edit-cs" style="background:none; border:none; color:var(--color-text-main); font-size:0.62rem; cursor:pointer; text-transform:uppercase;">[ EDITAR ]</button>
+              <button class="btn-delete-cs" style="background:none; border:none; color:var(--color-accent-red); font-size:0.62rem; cursor:pointer; text-transform:uppercase;">[ BORRAR ]</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      card.querySelector('.btn-edit-cs').addEventListener('click', () => {
+        onNavigate('sessions', session.id);
+      });
+
+      card.querySelector('.btn-delete-cs').addEventListener('click', async () => {
+        if (confirm(`¿Seguro que deseas eliminar la sesión "${session.name}"?`)) {
+          await deleteData(db, 'compound_sessions', session.id);
           refresh();
         }
       });
