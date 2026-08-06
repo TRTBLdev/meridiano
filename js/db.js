@@ -1,4 +1,3 @@
-const DB_NAME = 'meridiano_db';
 import { defaultAcupuncture } from './seeds/acupuncture_points_seed.js';
 import { defaultMeridians } from './seeds/meridians_seed.js';
 import { defaultPostures, defaultBlocks, defaultSequences } from './seeds/yoga_seeds.js';
@@ -8,6 +7,7 @@ import { defaultAcupunctureSequences } from './seeds/acupuncture_sequences_seed.
 import { defaultStrengthExercises, defaultStrengthCircuits } from './seeds/strength_exercises_seed.js';
 import { defaultCompoundSessions } from './seeds/compound_sessions_seed.js';
 
+const DB_NAME = 'meridiano_db';
 const DB_VERSION = 11;
 
 /**
@@ -217,24 +217,6 @@ export async function seedDatabase() {
   const acupunctureSequencesCount = await countItems(db, 'acupuncture_sequences');
   if (acupunctureSequencesCount === 0) {
     await saveBatch(db, 'acupuncture_sequences', defaultAcupunctureSequences);
-  } else {
-    // Para usuarios que ya tienen secuencias, eliminamos explícitamente los presets de masaje
-    try {
-      await deleteData(db, 'acupuncture_sequences', 'seq-cefaleas');
-      await deleteData(db, 'acupuncture_sequences', 'seq-trapecios');
-    } catch (e) {
-      console.warn('[DB] Failed to delete obsolete massage presets:', e);
-    }
-
-    // Sobrescribir/actualizar siempre los presets oficiales con los datos semilla limpios y corregidos
-    try {
-      for (const preset of defaultAcupunctureSequences) {
-        await putData(db, 'acupuncture_sequences', preset);
-      }
-      console.log('[DB] Default acupuncture sequences updated to latest seeds successfully.');
-    } catch (e) {
-      console.warn('[DB] Failed to update default acupuncture sequences:', e);
-    }
   }
 
   // 7. Sembrar Ejercicios de Fuerza
@@ -258,12 +240,10 @@ export async function seedDatabase() {
   if (compoundSessionCount === 0) {
     await saveBatch(db, 'compound_sessions', defaultCompoundSessions);
   }
-
-  // 10. Sembrar Historial de Homeostasis de Prueba (El Hilo de Agua) - Removido por requerimiento (no precargar sesiones)
 }
 
 /* =============================================================
-   MÉTODOS HELPER PARA TRANSACCIONES
+   MÉTODOS HELPER PARA TRANSACCIONES Y RESPALDOS
 ============================================================= */
 
 export function countItems(db, storeName) {
@@ -342,294 +322,177 @@ export function deleteData(db, storeName, id) {
   });
 }
 
-function normalizeYogaPrescriptions(db) {
+export function clearStore(db, storeName) {
   return new Promise((resolve, reject) => {
-    const transaction = db.transaction(['yoga_postures', 'yoga_sequences'], 'readwrite');
-    const posturesStore = transaction.objectStore('yoga_postures');
-    const sequencesStore = transaction.objectStore('yoga_sequences');
-    const posturesRequest = posturesStore.getAll();
-    const sequencesRequest = sequencesStore.getAll();
-    let postures = null;
-    let sequences = null;
+    const tx = db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
+    const request = store.clear();
 
-    const normalize = () => {
-      if (!postures || !sequences) return;
-      const legacyDurationById = new Map(postures.map(posture => [posture.id, Number(posture.duration)]));
-
-      sequences.forEach(sequence => {
-        let changed = false;
-        const items = (sequence.items || []).map(item => {
-          if (item.type !== 'posture' || (Number.isFinite(Number(item.customHoldTime)) && Number(item.customHoldTime) > 0)) return item;
-          const legacyDuration = legacyDurationById.get(item.id);
-          if (!Number.isFinite(legacyDuration) || legacyDuration <= 0) return item;
-          changed = true;
-          return { ...item, customHoldTime: legacyDuration };
-        });
-        if (changed) sequencesStore.put({ ...sequence, items });
-      });
-
-      postures.forEach(posture => {
-        if (!Object.prototype.hasOwnProperty.call(posture, 'duration')) return;
-        const { duration, ...catalogPosture } = posture;
-        posturesStore.put(catalogPosture);
-      });
-    };
-
-    posturesRequest.onsuccess = () => { postures = posturesRequest.result; normalize(); };
-    sequencesRequest.onsuccess = () => { sequences = sequencesRequest.result; normalize(); };
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-    transaction.onabort = () => reject(transaction.error || new Error('No se pudieron normalizar las posturas de Yoga.'));
+    request.onsuccess = () => resolve();
+    request.onerror = (e) => reject(e.target.error);
   });
 }
 
-function normalizeStrengthPrescriptions(db) {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(['strength_exercises', 'strength_circuits'], 'readwrite');
-    const exercisesStore = transaction.objectStore('strength_exercises');
-    const circuitsStore = transaction.objectStore('strength_circuits');
-    const exercisesRequest = exercisesStore.getAll();
-    const circuitsRequest = circuitsStore.getAll();
-    let exercises = null;
-    let circuits = null;
-
-    const normalize = () => {
-      if (!exercises || !circuits) return;
-      const exercisesById = new Map(exercises.map(exercise => [exercise.id, exercise]));
-
-      circuits.forEach(circuit => {
-        let changed = false;
-        const entries = (circuit.exercises || []).map(entry => {
-          const exercise = exercisesById.get(entry.exerciseId);
-          if (!exercise) return entry;
-          if (exercise.mode === 'time' && (!Number.isFinite(Number(entry.durationOverride)) || Number(entry.durationOverride) <= 0)) {
-            const legacyDuration = Number(exercise.duration);
-            if (Number.isFinite(legacyDuration) && legacyDuration > 0) {
-              changed = true;
-              return { ...entry, repsOverride: null, durationOverride: legacyDuration };
-            }
-          }
-          if (exercise.mode !== 'time' && (!Number.isFinite(Number(entry.repsOverride)) || Number(entry.repsOverride) <= 0)) {
-            const legacyReps = Number(exercise.reps);
-            if (Number.isFinite(legacyReps) && legacyReps > 0) {
-              changed = true;
-              return { ...entry, repsOverride: legacyReps, durationOverride: null };
-            }
-          }
-          return entry;
-        });
-        if (changed) circuitsStore.put({ ...circuit, exercises: entries });
-      });
-
-      exercises.forEach(exercise => {
-        if (!Object.prototype.hasOwnProperty.call(exercise, 'reps') && !Object.prototype.hasOwnProperty.call(exercise, 'duration')) return;
-        const { reps, duration, ...catalogExercise } = exercise;
-        exercisesStore.put(catalogExercise);
-      });
-    };
-
-    exercisesRequest.onsuccess = () => { exercises = exercisesRequest.result; normalize(); };
-    circuitsRequest.onsuccess = () => { circuits = circuitsRequest.result; normalize(); };
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-    transaction.onabort = () => reject(transaction.error || new Error('No se pudieron normalizar los ejercicios de Fuerza.'));
-  });
+export async function deleteStrengthExerciseAndDetach(db, exerciseId) {
+  await deleteData(db, 'strength_exercises', exerciseId);
+  const circuits = await getAllData(db, 'strength_circuits');
+  let affectedCircuits = 0;
+  for (const circuit of circuits) {
+    if (Array.isArray(circuit.exercises)) {
+      const originalCount = circuit.exercises.length;
+      circuit.exercises = circuit.exercises.filter(e => e.exerciseId !== exerciseId);
+      if (circuit.exercises.length !== originalCount) {
+        affectedCircuits++;
+        await putData(db, 'strength_circuits', circuit);
+      }
+    }
+  }
+  return { affectedCircuits };
 }
 
-export function deleteStrengthExerciseAndDetach(db, exerciseId) {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(['strength_exercises', 'strength_circuits'], 'readwrite');
-    const exercisesStore = transaction.objectStore('strength_exercises');
-    const circuitsStore = transaction.objectStore('strength_circuits');
-    const affectedCircuits = [];
-    const request = circuitsStore.getAll();
-
-    request.onsuccess = () => {
-      request.result.forEach(circuit => {
-        const nextExercises = (circuit.exercises || []).filter(entry => entry.exerciseId !== exerciseId);
-        if (nextExercises.length !== (circuit.exercises || []).length) {
-          affectedCircuits.push({ id: circuit.id, name: circuit.name, becomesEmpty: nextExercises.length === 0 });
-          circuitsStore.put({ ...circuit, exercises: nextExercises });
-        }
-      });
-      exercisesStore.delete(exerciseId);
-    };
-    request.onerror = () => reject(request.error);
-    transaction.oncomplete = () => resolve(affectedCircuits);
-    transaction.onerror = () => reject(transaction.error);
-    transaction.onabort = () => reject(transaction.error || new Error('No se pudo eliminar el ejercicio.'));
-  });
+export async function deleteStrengthCircuitAndDetach(db, circuitId) {
+  await deleteData(db, 'strength_circuits', circuitId);
+  const compoundSessions = await getAllData(db, 'compound_sessions');
+  let affectedSessions = 0;
+  for (const session of compoundSessions) {
+    if (Array.isArray(session.blocks)) {
+      const originalCount = session.blocks.length;
+      session.blocks = session.blocks.filter(b => !(b.module === 'strength' && b.presetId === circuitId));
+      if (session.blocks.length !== originalCount) {
+        affectedSessions++;
+        await putData(db, 'compound_sessions', session);
+      }
+    }
+  }
+  return { affectedSessions };
 }
 
-export function deleteStrengthCircuitAndDetach(db, circuitId) {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(['strength_circuits', 'compound_sessions'], 'readwrite');
-    const circuitsStore = transaction.objectStore('strength_circuits');
-    const sessionsStore = transaction.objectStore('compound_sessions');
-    const affectedSessions = [];
-    const request = sessionsStore.getAll();
-
-    request.onsuccess = () => {
-      request.result.forEach(session => {
-        const nextBlocks = (session.blocks || []).filter(block =>
-          !(block.module === 'strength' && block.presetId === circuitId)
-        );
-        if (nextBlocks.length !== (session.blocks || []).length) {
-          affectedSessions.push({ id: session.id, name: session.name, becomesEmpty: nextBlocks.length === 0 });
-          sessionsStore.put({ ...session, blocks: nextBlocks });
-        }
-      });
-      circuitsStore.delete(circuitId);
-    };
-    request.onerror = () => reject(request.error);
-    transaction.oncomplete = () => resolve(affectedSessions);
-    transaction.onerror = () => reject(transaction.error);
-    transaction.onabort = () => reject(transaction.error || new Error('No se pudo eliminar el circuito.'));
-  });
-}
-
-/**
- * Exporta toda la base de datos IndexedDB a un objeto JSON consolidado.
- */
 export async function exportDatabase(db, mode = 'all') {
-  let stores = [];
+  const allStoreNames = Array.from(db.objectStoreNames);
+  let targetStores = [];
 
   if (mode === 'history') {
-    stores = ['sessions_log'];
+    targetStores = ['sessions_log'];
   } else if (mode === 'content') {
-    stores = [
-      'yoga_postures',
-      'yoga_blocks',
-      'yoga_sequences',
-      'meditation_presets',
-      'breathwork_patterns',
-      'acupuncture_points',
-      'acupuncture_sequences',
-      'meridians',
-      'strength_exercises',
-      'strength_circuits',
-      'compound_sessions'
-    ];
+    targetStores = allStoreNames.filter(s => s !== 'sessions_log');
   } else {
-    stores = [
-      'sessions_log',
-      'yoga_postures',
-      'yoga_blocks',
-      'yoga_sequences',
-      'meditation_presets',
-      'breathwork_patterns',
-      'acupuncture_points',
-      'acupuncture_sequences',
-      'meridians',
-      'strength_exercises',
-      'strength_circuits',
-      'compound_sessions'
-    ];
+    targetStores = allStoreNames;
   }
 
-  const backup = {
-    version: '1.1',
+  const exportData = {
+    version: DB_VERSION,
     exportDate: new Date().toISOString(),
-    preferences: {
-      theme: localStorage.getItem('meridiano_theme') || 'dark',
-      meridiano_session: localStorage.getItem('meridiano_session')
-    },
-    data: {}
+    mode,
+    stores: {}
   };
 
-  for (const storeName of stores) {
-    try {
-      backup.data[storeName] = await getAllData(db, storeName);
-    } catch (err) {
-      console.warn(`[DB] Error al exportar la tabla ${storeName}:`, err);
-      backup.data[storeName] = [];
-    }
+  for (const storeName of targetStores) {
+    exportData.stores[storeName] = await getAllData(db, storeName);
   }
 
-  return backup;
+  return exportData;
 }
 
-/**
- * Importa los datos del respaldo realizando un merge con los datos locales de IndexedDB.
- */
 export async function importDatabase(db, backup) {
-  if (!backup || backup.version === undefined) {
-    throw new Error('Formato de backup inválido: falta la versión.');
+  if (!backup || typeof backup !== 'object' || !backup.stores) {
+    throw new Error('Formato de archivo JSON inválido. Debe contener una estructura de base de datos válida.');
   }
 
-  if (!backup.data) {
-    throw new Error('Formato de backup inválido: no contiene la sección de datos.');
-  }
+  const results = {};
 
-  const results = {
-    sessions_log: { imported: 0, skipped: 0 },
-    yoga_postures: { imported: 0, overwritten: 0 },
-    yoga_blocks: { imported: 0, overwritten: 0 },
-    yoga_sequences: { imported: 0, overwritten: 0 },
-    meditation_presets: { imported: 0, overwritten: 0 },
-    breathwork_patterns: { imported: 0, overwritten: 0 },
-    acupuncture_points: { imported: 0, overwritten: 0 },
-    acupuncture_sequences: { imported: 0, overwritten: 0 },
-    meridians: { imported: 0, overwritten: 0 },
-    strength_exercises: { imported: 0, overwritten: 0 },
-    strength_circuits: { imported: 0, overwritten: 0 },
-    compound_sessions: { imported: 0, overwritten: 0 }
-  };
-
-  const stores = Object.keys(backup.data);
-
-  for (const storeName of stores) {
-    const items = backup.data[storeName] || [];
-    if (storeName === 'sessions_log') {
-      // Evitar duplicados por date + type
-      const currentSessions = await getAllData(db, 'sessions_log');
-      const sessionKeys = new Set(currentSessions.map(s => `${s.date}_${s.type}`));
-
-      for (const item of items) {
-        const cleanItem = { ...item };
-        delete cleanItem.id;
-
-        const itemKey = `${cleanItem.date}_${cleanItem.type}`;
-        if (sessionKeys.has(itemKey)) {
-          results.sessions_log.skipped++;
-        } else {
-          await addData(db, 'sessions_log', cleanItem);
-          results.sessions_log.imported++;
-          sessionKeys.add(itemKey);
-        }
-      }
-    } else if (results[storeName]) {
-      // Upsert para el resto
-      const currentItems = await getAllData(db, storeName);
-      const currentIds = new Set(currentItems.map(i => i.id));
-
-      for (const item of items) {
-        if (item.id === undefined) continue;
-        await putData(db, storeName, item);
-        if (currentIds.has(item.id)) {
-          results[storeName].overwritten++;
-        } else {
-          results[storeName].imported++;
-        }
-      }
+  for (const [storeName, items] of Object.entries(backup.stores)) {
+    if (!db.objectStoreNames.contains(storeName)) {
+      continue;
     }
-  }
 
-  // Cargar preferencias si existen
-  if (backup.preferences) {
-    if (backup.preferences.theme) {
-      localStorage.setItem('meridiano_theme', backup.preferences.theme);
-      if (backup.preferences.theme === 'dark') {
-        document.body.classList.add('dark-theme');
+    let imported = 0;
+    let overwritten = 0;
+    let skipped = 0;
+
+    const existingItems = await getAllData(db, storeName);
+    const existingMap = new Map();
+    
+    const keyPath = storeName === 'sessions_log' ? 'id' : 'id';
+    existingItems.forEach(item => {
+      if (item && item[keyPath] !== undefined) {
+        existingMap.set(String(item[keyPath]), item);
+      }
+    });
+
+    for (const item of items) {
+      if (!item) continue;
+      const itemId = item[keyPath] !== undefined ? String(item[keyPath]) : null;
+      
+      if (itemId !== null && existingMap.has(itemId)) {
+        const existing = existingMap.get(itemId);
+        if (JSON.stringify(existing) === JSON.stringify(item)) {
+          skipped++;
+        } else {
+          await putData(db, storeName, item);
+          overwritten++;
+        }
       } else {
-        document.body.classList.remove('dark-theme');
+        await putData(db, storeName, item);
+        imported++;
       }
     }
-    if (backup.preferences.meridiano_session) {
-      localStorage.setItem('meridiano_session', backup.preferences.meridiano_session);
-    }
+
+    results[storeName] = { imported, overwritten, skipped };
   }
 
   return results;
 }
 
+async function normalizeYogaPrescriptions(db) {
+  const blocks = await getAllData(db, 'yoga_blocks');
+  for (const block of blocks) {
+    let modified = false;
+    const normalizedPostures = (block.postures || []).map(p => {
+      if (typeof p.holdTime === 'undefined') {
+        modified = true;
+        return { postureId: p.postureId, holdTime: 180, side: p.side || null };
+      }
+      return p;
+    });
+    if (modified) {
+      block.postures = normalizedPostures;
+      await putData(db, 'yoga_blocks', block);
+    }
+  }
+}
+
+async function normalizeStrengthPrescriptions(db) {
+  const circuits = await getAllData(db, 'strength_circuits');
+  const exercises = await getAllData(db, 'strength_exercises');
+  const exerciseMap = new Map(exercises.map(ex => [ex.id, ex]));
+
+  for (const circuit of circuits) {
+    let modified = false;
+    const normalizedExercises = (circuit.exercises || []).map(entry => {
+      const ex = exerciseMap.get(entry.exerciseId);
+      const isTimeMode = ex && ex.mode === 'time';
+      const isRepsUndefined = typeof entry.targetReps === 'undefined';
+      const isSecondsUndefined = typeof entry.targetSeconds === 'undefined';
+
+      if (isRepsUndefined && isSecondsUndefined) {
+        modified = true;
+        return {
+          ...entry,
+          targetReps: isTimeMode ? 0 : 10,
+          targetSeconds: isTimeMode ? 30 : 0
+        };
+      }
+
+      return {
+        ...entry,
+        targetReps: typeof entry.targetReps === 'number' ? entry.targetReps : (isTimeMode ? 0 : 10),
+        targetSeconds: typeof entry.targetSeconds === 'number' ? entry.targetSeconds : (isTimeMode ? 30 : 0)
+      };
+    });
+
+    if (modified) {
+      circuit.exercises = normalizedExercises;
+      await putData(db, 'strength_circuits', circuit);
+    }
+  }
+}

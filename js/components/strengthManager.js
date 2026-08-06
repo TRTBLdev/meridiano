@@ -93,13 +93,13 @@ export async function renderStrengthManager(container, db) {
         <div class="strength-manager__accordion-body" style="display:${exerciseFormOpen ? 'block' : 'none'}">
           <form id="strength-exercise-form" class="strength-manager__form">
             <div class="strength-manager__grid strength-manager__grid--exercise">
-              <label class="strength-manager__field strength-manager__field--wide"><span>Nombre</span><input id="strength-ex-name" class="acu-input-flat" required></label>
-              <label class="strength-manager__field"><span>Foco corporal</span><input id="strength-ex-focus" class="acu-input-flat" required></label>
+              <label class="strength-manager__field strength-manager__field--wide"><span>Nombre</span><input id="strength-ex-name" class="acu-input-flat" placeholder="Ej. Sentadilla con Peso Corporal" required></label>
+              <label class="strength-manager__field"><span>ID / Código Único</span><input id="strength-ex-id" class="acu-input-flat" placeholder="Ej. str-squat" ${editingExercise ? 'disabled' : ''} required></label>
               <label class="strength-manager__field"><span>Modo</span><select id="strength-ex-mode" class="acu-select-flat"><option value="reps">Repeticiones</option><option value="time">Tiempo</option></select></label>
-              <label class="strength-manager__field strength-manager__field--full"><span>Preparación</span><textarea id="strength-ex-preparation" class="acu-input-flat" required></textarea></label>
-              <label class="strength-manager__field strength-manager__field--full"><span>Ejecución</span><textarea id="strength-ex-execution" class="acu-input-flat" required></textarea></label>
+              <label class="strength-manager__field strength-manager__field--full"><span>Enfoque (Cadenas Musculares y Grupos Objetivo)</span><textarea id="strength-ex-focus" class="acu-input-flat" placeholder="Ej. Cuádriceps, glúteos y estabilidad del core..." required></textarea></label>
+              <label class="strength-manager__field strength-manager__field--full"><span>Preparación (Postura y Alineación Inicial)</span><textarea id="strength-ex-preparation" class="acu-input-flat" placeholder="Ej. Pies al ancho de hombros, mirada al frente..." required></textarea></label>
+              <label class="strength-manager__field strength-manager__field--full"><span>Ejecución (Movimiento y Respiración)</span><textarea id="strength-ex-execution" class="acu-input-flat" placeholder="Ej. Descender manteniendo el tronco erguido..." required></textarea></label>
               <label class="strength-manager__field strength-manager__field--full"><span>Equipo — separado por comas</span><input id="strength-ex-equipment" class="acu-input-flat" placeholder="Mat de yoga, Pelota grande"></label>
-              <label class="strength-manager__field strength-manager__field--full"><span>Etiquetas — separadas por comas</span><input id="strength-ex-tags" class="acu-input-flat" placeholder="core, estabilidad, piernas"></label>
             </div>
             <div class="strength-manager__form-actions">
               ${editingExercise ? '<button type="button" class="strength-manager__text-action secondary" id="strength-cancel-exercise">Cancelar</button>' : ''}
@@ -118,13 +118,13 @@ export async function renderStrengthManager(container, db) {
 
     const modeSelect = target.querySelector('#strength-ex-mode');
     if (editingExercise) {
+      target.querySelector('#strength-ex-id').value = editingExercise.id || '';
       target.querySelector('#strength-ex-name').value = editingExercise.name || '';
       target.querySelector('#strength-ex-focus').value = editingExercise.focus || '';
       modeSelect.value = editingExercise.mode || 'reps';
       target.querySelector('#strength-ex-preparation').value = editingExercise.preparation || '';
       target.querySelector('#strength-ex-execution').value = editingExercise.execution || '';
       target.querySelector('#strength-ex-equipment').value = (editingExercise.equipment || []).join(', ');
-      target.querySelector('#strength-ex-tags').value = (editingExercise.tags || []).join(', ');
       target.querySelector('#strength-cancel-exercise').addEventListener('click', () => {
         editingExercise = null;
         exerciseFormOpen = false;
@@ -134,15 +134,15 @@ export async function renderStrengthManager(container, db) {
     target.querySelector('#strength-exercise-form').addEventListener('submit', async event => {
       event.preventDefault();
       const mode = modeSelect.value;
+      const exId = editingExercise?.id || target.querySelector('#strength-ex-id').value.trim().toLowerCase();
       const data = {
-        id: editingExercise?.id || `strength-exercise-${Date.now()}`,
+        id: exId,
         name: target.querySelector('#strength-ex-name').value.trim(),
         focus: target.querySelector('#strength-ex-focus').value.trim(),
         mode,
         preparation: target.querySelector('#strength-ex-preparation').value.trim(),
         execution: target.querySelector('#strength-ex-execution').value.trim(),
-        equipment: parseList(target.querySelector('#strength-ex-equipment').value),
-        tags: parseList(target.querySelector('#strength-ex-tags').value)
+        equipment: parseList(target.querySelector('#strength-ex-equipment').value)
       };
       await putData(db, 'strength_exercises', data);
       editingExercise = null;
@@ -158,17 +158,36 @@ export async function renderStrengthManager(container, db) {
     exercises.forEach(exercise => {
       const dependencies = circuits.filter(circuit => (circuit.exercises || []).some(entry => entry.exerciseId === exercise.id));
       const item = document.createElement('article');
-      item.className = 'strength-manager__item';
+      item.className = 'strength-manager__item acu-point-card';
+      item.style.cssText = 'display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;';
+      
+      let detailsHtml = '';
+      if (exercise.focus || exercise.preparation || exercise.execution) {
+        detailsHtml = `
+          <div style="font-size:0.78rem; color:var(--color-text-muted); margin:6px 0 10px 0; line-height:1.45; display:flex; flex-direction:column; gap:6px;">
+            ${exercise.focus ? `<div><span style="color:var(--color-text-main); font-weight:500;">- Enfoque:</span> ${escapeHTML(exercise.focus)}</div>` : ''}
+            ${exercise.preparation ? `<div><span style="color:var(--color-text-main); font-weight:500;">- Preparación:</span> ${escapeHTML(exercise.preparation)}</div>` : ''}
+            ${exercise.execution ? `<div><span style="color:var(--color-text-main); font-weight:500;">- Ejecución:</span> ${escapeHTML(exercise.execution)}</div>` : ''}
+          </div>
+        `;
+      }
+
       item.innerHTML = `
-        <div class="strength-manager__item-main">
-          <strong>${escapeHTML(exercise.name)}</strong>
-          <span>${escapeHTML(exercise.focus || '')}</span>
-          <small>${exercise.mode === 'time' ? 'Prescripción por tiempo' : 'Prescripción por repeticiones'} · ${(exercise.equipment || []).map(escapeHTML).join(', ') || 'Sin equipo'}</small>
-          ${dependencies.length ? `<small>Usado en ${dependencies.length} circuito${dependencies.length === 1 ? '' : 's'}</small>` : ''}
+        <div style="flex:1; padding-right:16px;">
+          <div style="font-weight:600; font-size:0.95rem; color:var(--color-text-main); line-height:1.2;">${escapeHTML(exercise.name)}</div>
+          ${detailsHtml}
+          <div style="font-family:var(--font-mono); font-size:0.72rem; color:var(--color-text-muted); margin-top:4px;">
+            Modo: <span style="color:var(--color-text-main); font-weight:500;">${exercise.mode === 'time' ? 'Prescripción por tiempo' : 'Prescripción por repeticiones'}</span>
+            ${(exercise.equipment || []).length ? ` &nbsp;|&nbsp; Equipo: <span style="color:var(--color-text-main);">${(exercise.equipment || []).map(escapeHTML).join(', ')}</span>` : ''}
+          </div>
+          ${dependencies.length ? `<div style="font-size:0.68rem; color:var(--color-text-muted); margin-top:4px;">Usado en ${dependencies.length} circuito${dependencies.length === 1 ? '' : 's'}</div>` : ''}
         </div>
-        <div class="strength-manager__item-actions">
-          <button class="btn-action-icon strength-edit-exercise" title="Editar" aria-label="Editar">${editIcon}</button>
-          <button class="btn-action-icon delete-icon strength-delete-exercise" title="Eliminar" aria-label="Eliminar">${deleteIcon}</button>
+        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
+          <span style="font-family:var(--font-mono); font-size:0.65rem; color:var(--color-text-muted); text-transform:uppercase; letter-spacing:0.05em;">${escapeHTML(exercise.id)}</span>
+          <div style="display:flex; gap:4px;">
+            <button class="btn-action-icon strength-edit-exercise" title="Editar" aria-label="Editar">${editIcon}</button>
+            <button class="btn-action-icon delete-icon strength-delete-exercise" title="Eliminar" aria-label="Eliminar">${deleteIcon}</button>
+          </div>
         </div>`;
       item.querySelector('.strength-edit-exercise').addEventListener('click', () => {
         editingExercise = structuredClone(exercise);

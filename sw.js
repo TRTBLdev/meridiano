@@ -1,4 +1,4 @@
-const CACHE_NAME = 'meridiano-cache-v22';
+const CACHE_NAME = 'meridiano-cache-v31';
 const ASSETS = [
   './',
   './index.html',
@@ -9,6 +9,7 @@ const ASSETS = [
   './css/components.css',
   './css/lobbies.css',
   './css/strengthTimer.css',
+  './css/timerTechnique.css',
   './js/app.js',
   './js/db.js',
   './js/seeds/acupuncture_points_seed.js',
@@ -31,9 +32,14 @@ const ASSETS = [
   './js/components/strength.js',
   './js/components/strengthDotField.js',
   './js/components/strengthTimerUi.js',
+  './js/components/techniqueDetails.js',
   './js/components/timerShell.js',
   './js/utils/dotmatrix.js',
+  './js/utils/acupunctureUtils.js',
+  './js/utils/breathworkUtils.js',
   './js/utils/strengthUtils.js',
+  './js/utils/sessionResults.js',
+  './js/utils/yogaUtils.js',
   './icons/icon.svg'
 ];
 

@@ -11,6 +11,11 @@ import {
 } from './timerShell.js';
 import { createSynthEngine, playQuartzBowlRing } from '../utils/synth.js';
 import { getFreqLabel, valueToFreq, freqToValue } from '../utils/freqUtils.js';
+import {
+  createSequentialBreathworkTiming,
+  createSingleBreathworkTiming
+} from '../utils/breathworkUtils.js';
+import { createModuleResult } from '../utils/sessionResults.js';
 import { renderLobbyAction, renderLobbyShell, renderLobbyTabs } from './lobbyUi.js';
 
 export async function renderBreathworkScreen(container, db, onNavigate, orchestratorConfig = null) {
@@ -30,6 +35,7 @@ export async function renderBreathworkScreen(container, db, onNavigate, orchestr
   
   let timerInterval = null;
   let elapsedSeconds = 0;
+  let activeElapsedSeconds = 0;
   let timeLeft = 0;
   let totalDuration = 0;
   let isPaused = false;
@@ -48,6 +54,16 @@ export async function renderBreathworkScreen(container, db, onNavigate, orchestr
   let localAudioActive = false;
 
   const wakeLockController = createWakeLockController();
+
+  function applyTiming(timing) {
+    totalDuration = timing.totalDuration;
+    timeLeft = timing.timeLeft;
+    blockBoundaries = timing.blockBoundaries;
+    elapsedSeconds = 0;
+    activeElapsedSeconds = 0;
+    isPaused = false;
+    activeBlockIndex = 0;
+  }
 
   const getAudioState = () => ({
     baseFreq: localBaseFreq,
@@ -80,10 +96,10 @@ export async function renderBreathworkScreen(container, db, onNavigate, orchestr
     mode = 'single';
     singlePatternId = orchestratorConfig.presetId;
     
-    // Convertir segundos a minutos y segundos
-    const dur = orchestratorConfig.duration || 300;
-    singleMins = Math.floor(dur / 60);
-    singleSecs = dur % 60;
+    const timing = createSingleBreathworkTiming(orchestratorConfig.duration, 300);
+    singleMins = timing.minutes;
+    singleSecs = timing.seconds;
+    applyTiming(timing);
   }
 
   const render = () => {
@@ -257,27 +273,16 @@ export async function renderBreathworkScreen(container, db, onNavigate, orchestr
   }
 
   function startBreathwork() {
-    blockBoundaries = [];
-    if (mode === 'sequential') {
-      totalDuration = blocks.reduce((sum, block) => sum + block.mins * 60 + block.secs, 0);
-      let boundary = 0;
-      blocks.forEach(block => {
-        boundary += block.mins * 60 + block.secs;
-        blockBoundaries.push(boundary);
-      });
-    } else {
-      totalDuration = singleMins * 60 + singleSecs;
-    }
+    const timing = mode === 'sequential'
+      ? createSequentialBreathworkTiming(blocks)
+      : createSingleBreathworkTiming(singleMins * 60 + singleSecs);
+    applyTiming(timing);
 
     if (totalDuration <= 0) {
       alert('Por favor, indica una duración mayor a 0 segundos.');
       return;
     }
 
-    timeLeft = totalDuration;
-    elapsedSeconds = 0;
-    isPaused = false;
-    activeBlockIndex = 0;
     activeView = 'timer';
     render();
   }
@@ -526,20 +531,25 @@ export async function renderBreathworkScreen(container, db, onNavigate, orchestr
     const finishBreathwork = async () => {
       await cleanupTimer();
       playQuartzBowlRing(432, 4.5);
+      const result = createModuleResult('breathwork', activeElapsedSeconds, {
+        mode,
+        patternId: mode === 'single' ? singlePatternId : null
+      });
 
       if (!orchestratorConfig) {
         addData(db, 'sessions_log', {
           type: 'breathwork',
-          duration: elapsedSeconds,
-          timestamp: new Date().toISOString(),
+          date: new Date().toISOString(),
+          duration: Math.max(1, Math.round(activeElapsedSeconds / 60)),
+          activeDurationSeconds: activeElapsedSeconds,
           details: { mode, completed: !isPaused }
         }).catch(err => console.error('[Breathwork] Error guardando log:', err));
       }
 
-      alert('Sesión de respiración completada.');
       if (orchestratorConfig) {
-        orchestratorConfig.onComplete();
+        orchestratorConfig.onComplete(result);
       } else {
+        alert('Sesión de respiración completada.');
         activeView = 'lobby';
         render();
       }
@@ -550,6 +560,7 @@ export async function renderBreathworkScreen(container, db, onNavigate, orchestr
       if (isPaused) return;
       timeLeft--;
       elapsedSeconds++;
+      activeElapsedSeconds++;
       
       if (timeLeft <= 0) {
         finishBreathwork();

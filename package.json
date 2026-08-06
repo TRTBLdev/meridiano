@@ -5,7 +5,7 @@
   "main": "index.html",
   "scripts": {
     "dev": "http-server -p 8080 -c-1",
-    "test": "node --test tests/strengthUtils.test.mjs tests/strengthTimerUi.test.mjs tests/strengthDotField.test.mjs"
+    "test": "node --test tests/strengthUtils.test.mjs tests/strengthTimerUi.test.mjs tests/strengthDotField.test.mjs tests/breathworkUtils.test.mjs tests/acupunctureUtils.test.mjs tests/yogaUtils.test.mjs tests/techniqueDetails.test.mjs tests/sessionResults.test.mjs tests/compoundSessionSeeds.test.mjs"
   },
   "keywords": [
     "pwa",

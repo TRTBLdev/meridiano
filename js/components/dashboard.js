@@ -1,5 +1,6 @@
 import { getAllData, deleteData } from '../db.js';
 import { escapeHTML, toSafeClassToken } from '../utils/sanitize.js';
+import { formatDurationSeconds } from '../utils/sessionResults.js';
 import { renderTechnicalTitle } from './ui.js';
 
 const BIBLIOGRAPHY_QUOTES = [
@@ -287,18 +288,25 @@ async function loadHistoryAndCalendar(db) {
           <div class="compound-blocks-list" style="margin-top: 12px; font-size: 0.85rem; border-left: 2px solid rgba(255,255,255,0.1); padding-left: 12px;">
             ${log.blocks.map(b => `
               <div style="margin-bottom: 6px; color: var(--color-text-muted);">
-                <span style="font-weight: 600; color: var(--color-text-main);">[${escapeHTML(b.module.toUpperCase())}]</span> ${escapeHTML(b.name || '')} (${b.duration}s)
+                <span style="font-weight: 600; color: var(--color-text-main);">[${escapeHTML(b.module.toUpperCase())}]</span>
+                ${escapeHTML(b.name || '')}
+                · REAL ${formatDurationSeconds(b.actualDurationSeconds)}
+                · PLAN ${formatDurationSeconds(b.plannedDurationSeconds)}
               </div>
             `).join('')}
           </div>
         `;
       }
+      const durationSummary = log.activeDurationSeconds != null
+        ? `ACTIVO ${formatDurationSeconds(log.activeDurationSeconds)} · TOTAL ${formatDurationSeconds(log.elapsedDurationSeconds ?? log.activeDurationSeconds)}`
+        : `${escapeHTML(log.duration)}m`;
+      const detailText = typeof log.details === 'string' ? log.details : 'Práctica';
 
       timelineHTML += `
         <div class="timeline-node-wrapper practice-${toSafeClassToken(log.type)}" data-id="${log.id}">
           <div class="node-date">${escapeHTML(dateString)}</div>
           <div class="node-content" style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-            <span>${escapeHTML(label)} / ${escapeHTML(log.details || 'Práctica')}</span>
+            <span>${escapeHTML(label)} / ${escapeHTML(detailText)}</span>
             <button class="btn-delete-log" data-id="${log.id}" title="Eliminar registro" style="background: none; border: none; cursor: pointer; color: var(--color-text-muted); opacity: 0.4; padding: 4px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s ease;">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -307,7 +315,7 @@ async function loadHistoryAndCalendar(db) {
             </button>
           </div>
           <div class="node-desc">
-            ${escapeHTML(log.notes || '')} (${escapeHTML(log.duration)}m)
+            ${escapeHTML(log.notes || '')} (${durationSummary})
             ${blocksHtml}
           </div>
         </div>

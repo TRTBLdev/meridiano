@@ -120,6 +120,7 @@ export function buildStrengthPhaseList(circuit, exercises) {
 export function createStrengthResult(circuit) {
   return {
     version: 1,
+    module: 'strength',
     circuitId: circuit.id,
     circuitName: circuit.name,
     roundsPlanned: Number(circuit.rounds),

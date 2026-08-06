@@ -3795,13 +3795,6 @@ body.dark-theme select option {
   text-transform: uppercase;
 }
 
-#yoga-instructions-toggle,
-#yoga-instructions-content {
-  border: 0 !important;
-  background: transparent !important;
-  padding: 0 !important;
-}
-
 .acu-timer-fullscreen .acu-timer-info-frame {
   background: transparent !important;
   border: none !important;

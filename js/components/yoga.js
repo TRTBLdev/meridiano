@@ -10,9 +10,12 @@ import {
   renderWakeLockPreference
 } from './timerShell.js';
 import { createSynthEngine, playQuartzBowlRing } from '../utils/synth.js';
+import { startResolvedYogaSequence } from '../utils/yogaUtils.js';
+import { createModuleResult } from '../utils/sessionResults.js';
 import { getFreqLabel, valueToFreq, freqToValue } from '../utils/freqUtils.js';
 import { renderTechnicalTitle } from './ui.js';
 import { renderLobbyAction, renderLobbyShell } from './lobbyUi.js';
+import { renderTechniqueDetails } from './techniqueDetails.js';
 
 // Datos estáticos de respaldo por si falla la base de datos o está vacía
 const FALLBACK_POSTURES = [
@@ -299,23 +302,29 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
 
     currentSequenceItems.forEach((item, idx) => {
       if (item.type === 'posture') {
-        const desc = posturesCatalog.find(p => p.id === item.id)?.description || '';
+        const posture = posturesCatalog.find(p => p.id === item.id);
         activePhases.push({
           type: 'posture',
           name: item.name,
           duration: item.holdTime,
           isAsymmetric: item.isAsymmetric,
-          description: desc
+          focus: posture?.focus || '',
+          preparation: posture?.preparation || '',
+          execution: posture?.execution || '',
+          description: posture?.description || ''
         });
       } else if (item.type === 'block') {
         item.postures.forEach(bp => {
-          const desc = posturesCatalog.find(p => p.id === bp.id)?.description || '';
+          const posture = posturesCatalog.find(p => p.id === bp.id);
           activePhases.push({
             type: 'posture',
             name: `${bp.name} (${item.name})`,
             duration: bp.holdTime,
             isAsymmetric: false,
-            description: desc
+            focus: posture?.focus || '',
+            preparation: posture?.preparation || '',
+            execution: posture?.execution || '',
+            description: posture?.description || ''
           });
         });
       }
@@ -462,9 +471,7 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
           
           <div class="practice-row__actions">
             ${renderLobbyAction({ kind: 'icon', icon: 'edit', label: 'Configurar secuencia', className: 'btn-edit' })}
-            ${isCustom ? `
-              ${renderLobbyAction({ kind: 'icon', icon: 'delete', label: 'Borrar secuencia', className: 'btn-delete' })}
-            ` : ''}
+            ${renderLobbyAction({ kind: 'icon', icon: 'delete', label: 'Borrar secuencia', className: 'btn-delete' })}
           </div>
         </div>
       `;
@@ -502,19 +509,17 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
         render();
       });
 
-      if (isCustom) {
-        accordionItem.querySelector('.btn-delete').addEventListener('click', async () => {
-          if (confirm(`¿Estás seguro de que deseas eliminar la secuencia "${seq.name}"?`)) {
-            try {
-              await deleteSequenceFromStore(seq.id);
-              await loadData();
-              render();
-            } catch (err) {
-              alert('Error al borrar secuencia.');
-            }
+      accordionItem.querySelector('.btn-delete').addEventListener('click', async () => {
+        if (confirm(`¿Estás seguro de que deseas eliminar la secuencia "${seq.name}"?`)) {
+          try {
+            await deleteSequenceFromStore(seq.id);
+            await loadData();
+            render();
+          } catch (err) {
+            alert('Error al borrar secuencia.');
           }
-        });
-      }
+        }
+      });
 
       seqListContainer.appendChild(accordionItem);
     });
@@ -974,15 +979,6 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
     renderConstructorList();
   }
 
-  // --- Integración con Orquestador ---
-  if (orchestratorConfig) {
-    const seqToLoad = sequencesCatalog.find(s => s.id === orchestratorConfig.presetId) || sequencesCatalog[0];
-    if (seqToLoad) {
-      loadSequence(seqToLoad);
-      activeView = 'timer';
-    }
-  }
-
   /* =============================================================
      VISTA 3: TIMER ACTIVO (PANTALLA COMPLETA INMERSIVA)
      ============================================================= */
@@ -991,6 +987,7 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
     let gridAnimFrame = null;
     let phaseStartTime = 0;
     let phaseElapsedBeforePause = 0;
+    const initialPhase = activePhases[currentPhaseIdx] || {};
 
     const timerEl = document.createElement('div');
     timerEl.className = 'acu-timer-fullscreen fade-in';
@@ -1015,17 +1012,22 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
       <div class="acu-fullscreen-bg grid-36" id="yoga-dots-grid" style="opacity: 0.75;"></div>
 
       <!-- Lectura del Timer -->
-      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; width: 100%; z-index: 10; position: relative; pointer-events: none; box-sizing: border-box; padding: 20px;">
+      <div class="yoga-timer__stage">
         
         <!-- Nombre de asana/rebote -->
         <h2 id="yoga-active-pose-name" style="font-size: 2.2rem; font-weight: 200; margin: 0 0 4px 0; color: #E8E6E3; text-transform: uppercase; letter-spacing: 0.2em; text-align: center; line-height: 1.2;">CARGANDO...</h2>
         <span id="yoga-pose-subname" style="font-family: var(--font-ui); font-weight: 300; font-size: 0.85rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; text-align: center; min-height: 1.2rem; display: block;"></span>
 
-        <!-- Desplegable de instrucciones -->
-        <div id="yoga-instructions-toggle" style="font-family: var(--font-digital); font-size: 0.62rem; color: var(--color-text-muted); cursor: pointer; text-transform: uppercase; margin-bottom: 12px; border: 1px dashed rgba(255,255,255,0.08); padding: 4px 8px; border-radius: 4px; display: none; align-items: center; gap: 4px; pointer-events: auto; user-select: none;">
-          <span>▶ Instrucciones</span>
-        </div>
-        <div id="yoga-instructions-content" style="display: none; font-size: 0.75rem; color: var(--color-text-muted); text-align: center; max-width: 320px; line-height: 1.4; margin-bottom: 16px; font-style: italic; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); padding: 10px; border-radius: 4px;"></div>
+        ${renderTechniqueDetails({
+          id: 'yoga-technique',
+          className: 'yoga-timer__technique',
+          preserveEmpty: true,
+          sections: [
+            { key: 'focus', title: 'Enfoque', content: initialPhase.focus || initialPhase.description || '', wide: true },
+            { key: 'preparation', title: 'Preparación', content: initialPhase.preparation || '' },
+            { key: 'execution', title: 'Ejecución', content: initialPhase.execution || '' }
+          ]
+        })}
 
         <!-- Gran Reloj Minimalista -->
         <div id="yoga-clock-text" class="acu-timer-dot-display yoga-timer-dot-display" style="margin-bottom: 32px; pointer-events: auto; cursor: default; user-select: none;"></div>
@@ -1120,8 +1122,7 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
 
     const btnStop = timerEl.querySelector('#btn-yoga-stop');
 
-    const instructionsToggle = timerEl.querySelector('#yoga-instructions-toggle');
-    const instructionsContent = timerEl.querySelector('#yoga-instructions-content');
+    const techniqueDetails = timerEl.querySelector('#yoga-technique');
 
     // Intentar activar Wake Lock
     const requestWakeLock = () => wakeLockController.request();
@@ -1153,17 +1154,8 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
       }
     };
 
-    // Toggle de Instrucciones
-    instructionsToggle.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const isVisible = instructionsContent.style.display === 'block';
-      if (isVisible) {
-        instructionsContent.style.display = 'none';
-        instructionsToggle.querySelector('span').textContent = '▶ Instrucciones';
-      } else {
-        instructionsContent.style.display = 'block';
-        instructionsToggle.querySelector('span').textContent = '▼ Instrucciones';
-      }
+    techniqueDetails?.addEventListener('toggle', () => {
+      timerEl.classList.toggle('yoga-technique-open', techniqueDetails.open);
     });
 
     timerEl.addEventListener('mousemove', showControls);
@@ -1190,19 +1182,26 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
         poseSubname.textContent = '';
       }
 
-            // Mostrar u ocultar el toggle de instrucciones
-      if (phase.description) {
-        instructionsToggle.style.display = 'inline-flex';
-        instructionsContent.textContent = phase.description;
-        instructionsToggle.querySelector('span').textContent = '▼ Instrucciones';
-      } else {
-        instructionsToggle.style.display = 'inline-flex';
-        instructionsContent.textContent = 'No hay instrucciones disponibles';
-        instructionsToggle.querySelector('span').textContent = '▶ Instrucciones';
-      }
+      if (techniqueDetails) {
+        techniqueDetails.open = false;
+        timerEl.classList.remove('yoga-technique-open');
+        const techniqueContent = {
+          focus: phase.focus || phase.description || '',
+          preparation: phase.preparation || '',
+          execution: phase.execution || ''
+        };
+        let visibleSections = 0;
 
-      instructionsContent.style.display = 'none';
-      instructionsToggle.querySelector('span').textContent = 'â–¶ Instrucciones';
+        Object.entries(techniqueContent).forEach(([key, content]) => {
+          const section = techniqueDetails.querySelector(`[data-technique-section="${key}"]`);
+          const paragraph = techniqueDetails.querySelector(`[data-technique-content="${key}"]`);
+          if (!section || !paragraph) return;
+          paragraph.textContent = content;
+          section.hidden = !content;
+          if (content) visibleSections++;
+        });
+        techniqueDetails.hidden = visibleSections === 0;
+      }
 
       // Actualizar FASE X y RESTANTES
       stepCurrent.textContent = currentPhaseIdx + 1;
@@ -1358,13 +1357,7 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
             syncActivePhase();
             runTimerInterval();
           } else {
-            releaseWakeLock();
-            saveSessionLog();
-            alert('Práctica de Yin Yoga finalizada. Namasté.');
-            
-            activeView = 'lobby';
-            synth.destroy();
-            render();
+            finishSession();
           }
         }
       }, 1000);
@@ -1383,8 +1376,11 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
     async function finishSession() {
       await cleanupTimer();
       playQuartzBowlRing(432, 4.5);
-      
-      const durationMin = Math.max(1, Math.round(totalSessionSeconds / 60));
+      const result = createModuleResult('yoga', elapsedSeconds, {
+        sequenceId,
+        sequenceName
+      });
+      const durationMin = Math.max(1, Math.round(elapsedSeconds / 60));
 
       if (!orchestratorConfig) {
         try {
@@ -1392,6 +1388,7 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
             type: 'yoga',
             date: new Date().toISOString(),
             duration: durationMin,
+            activeDurationSeconds: elapsedSeconds,
             notes: `Sesión de Yin Yoga completada: ${sequenceName}.`,
             details: `Yin Yoga: ${escapeHTML(sequenceName)}`
           });
@@ -1400,30 +1397,14 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
         }
       }
 
-      alert('Sesión de Yoga completada. Namasté.');
       if (orchestratorConfig) {
-        orchestratorConfig.onComplete();
+        orchestratorConfig.onComplete(result);
       } else {
+        alert('Sesión de Yoga completada. Namasté.');
         activeView = 'lobby';
         render();
       }
     }
-
-    const saveSessionLog = async () => {
-      const minutesCount = Math.round(elapsedSeconds / 60) || 1;
-      const detailsText = `Yin Yoga: ${escapeHTML(sequenceName)} (${activePhases.filter(p => p.type === 'posture').length} posturas)`;
-      try {
-        await addData(db, 'sessions_log', {
-          type: 'yoga',
-          date: new Date().toISOString(),
-          duration: minutesCount,
-          notes: 'Práctica completada con éxito en Yin Yoga.',
-          details: detailsText
-        });
-      } catch (e) {
-        console.error('[Yoga] Error al guardar log:', e);
-      }
-    };
 
     // BOTÓN INICIAR / PAUSAR / REANUDAR (IZQUIERDA - CONTROL DE FLUJO)
     btnFlow.addEventListener('click', () => {
@@ -1584,5 +1565,12 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
 
   // Carga inicial y primer montaje del componente
   await loadData();
+  if (orchestratorConfig && startResolvedYogaSequence(
+    sequencesCatalog,
+    orchestratorConfig.presetId,
+    startSequence
+  )) {
+    return;
+  }
   render();
 }

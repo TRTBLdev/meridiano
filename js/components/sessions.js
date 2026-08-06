@@ -8,6 +8,7 @@ import { renderTechnicalTitle } from './ui.js';
 import { renderLobbyAction, renderLobbyShell } from './lobbyUi.js';
 import { renderCompoundAction, renderCompoundSessionBlock, renderCompoundSessionCard } from './sessionsUi.js';
 import { estimateStrengthCircuitDuration, getCircuitValidation } from '../utils/strengthUtils.js';
+import { createCompoundSessionResult } from '../utils/sessionResults.js';
 
 export async function renderSessionsScreen(container, db, onNavigate, initialSessionId = null, initialView = 'lobby') {
   let activeView = initialView; // 'lobby' | 'builder' | 'transition'
@@ -15,6 +16,7 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
   let currentSession = null;
   let currentBlockIndex = 0;
   let currentBlockResults = [];
+  let sessionStartedAt = 0;
   let strengthCircuits = [];
   let strengthExercises = [];
 
@@ -356,6 +358,7 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
     currentSession = session;
     currentBlockIndex = 0;
     currentBlockResults = [];
+    sessionStartedAt = Date.now();
     runCurrentBlock();
   }
 
@@ -434,33 +437,33 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
   }
 
   async function finishCompoundSession() {
-    alert('¡Sesión Integral Completada con éxito!');
-    
     try {
-      let totalDuration = 0;
-      currentSession.blocks.forEach(b => totalDuration += b.duration);
-      
-      const blocksLog = currentSession.blocks.map((b, index) => ({
-        module: b.module,
-        name: b.nameOverride,
-        duration: b.duration,
-        ...(b.module === 'strength' && currentBlockResults[index]
-          ? { strengthResult: currentBlockResults[index] }
-          : {})
-      }));
+      const completedAt = Date.now();
+      const sessionResult = createCompoundSessionResult(
+        currentSession.blocks,
+        currentBlockResults,
+        sessionStartedAt,
+        completedAt
+      );
 
       await addData(db, 'sessions_log', {
         type: 'compound',
-        date: new Date().toISOString(),
-        duration: Math.max(1, Math.round(totalDuration / 60)),
+        version: 2,
+        date: new Date(completedAt).toISOString(),
+        startedAt: new Date(sessionStartedAt).toISOString(),
+        completedAt: new Date(completedAt).toISOString(),
+        duration: Math.max(1, Math.round(sessionResult.activeDurationSeconds / 60)),
+        activeDurationSeconds: sessionResult.activeDurationSeconds,
+        elapsedDurationSeconds: sessionResult.elapsedDurationSeconds,
         notes: `Sesión Compuesta Completada: ${currentSession.name}`,
         details: `Compuesta: ${escapeHTML(currentSession.name)}`,
-        blocks: blocksLog
+        blocks: sessionResult.blocks
       });
     } catch (err) {
       console.error('[Sessions] Error saving compound session log:', err);
     }
 
+    alert('¡Sesión Integral Completada con éxito!');
     onNavigate('inicio');
   }
 

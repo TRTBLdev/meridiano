@@ -422,6 +422,7 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
             type: 'strength',
             date: new Date().toISOString(),
             duration: Math.max(1, Math.round(elapsedSeconds / 60)),
+            activeDurationSeconds: elapsedSeconds,
             notes: `Circuito completado: ${currentCircuit.name} (${currentCircuit.rounds} rondas).`,
             details: `Fuerza: ${escapeHTML(currentCircuit.name)}`,
             strengthResult: finalResult

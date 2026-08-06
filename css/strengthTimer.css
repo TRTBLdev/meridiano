@@ -358,63 +358,6 @@ body.dark-theme .strength-timer {
   text-align: center;
 }
 
-.strength-timer__instructions {
-  margin-top: 1.1rem;
-  border-top: 1px dashed var(--strength-line-soft);
-  border-bottom: 1px dashed var(--strength-line-soft);
-}
-
-.strength-timer__instructions summary {
-  padding: 0.8rem 0;
-  color: var(--strength-muted);
-  font-family: var(--font-digital);
-  font-size: 0.64rem;
-  letter-spacing: 0.1em;
-  list-style: none;
-  cursor: pointer;
-}
-
-.strength-timer__instructions summary::-webkit-details-marker {
-  display: none;
-}
-
-.strength-timer__instructions summary::before {
-  display: inline-block;
-  width: 1rem;
-  color: var(--color-accent-red);
-  content: '›';
-  transition: transform 180ms ease;
-}
-
-.strength-timer__instructions[open] summary::before {
-  transform: rotate(90deg);
-}
-
-.strength-timer__instructions > div {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1.5rem;
-  padding: 0.2rem 0 1rem 1rem;
-}
-
-.strength-timer__instructions h2 {
-  margin: 0 0 0.35rem;
-  color: var(--strength-muted);
-  font-family: var(--font-digital);
-  font-size: 0.62rem;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.strength-timer__instructions p {
-  max-width: 65ch;
-  margin: 0;
-  font-size: 0.76rem;
-  line-height: 1.55;
-  text-wrap: pretty;
-}
-
 .strength-timer__phase-actions,
 .strength-timer__skip-confirm > div {
   display: flex;
@@ -619,11 +562,6 @@ body.dark-theme .strength-timer {
     border-top: 1px solid var(--strength-line);
     border-left: 0;
     align-items: center;
-  }
-
-  .strength-timer__instructions > div {
-    grid-template-columns: 1fr;
-    gap: 0.9rem;
   }
 
   .strength-timer__phase-actions {

@@ -1,4 +1,5 @@
 import { escapeAttribute, escapeHTML } from '../utils/sanitize.js';
+import { renderTechniqueDetails } from './techniqueDetails.js';
 
 const ICONS = {
   play: '<polygon points="6 4 19 12 6 20 6 4"></polygon>',
@@ -100,14 +101,21 @@ export function renderStrengthPhase({ phase, totalExercises, totalRounds, starte
 }
 
 function renderInstructions(exercise) {
-  return `
-    <details class="strength-timer__instructions">
-      <summary>VER TÉCNICA</summary>
-      <div>
-        <section><h2>Preparación</h2><p>${escapeHTML(exercise.preparation || 'Sin indicaciones de preparación.')}</p></section>
-        <section><h2>Ejecución</h2><p>${escapeHTML(exercise.execution || 'Sin indicaciones de ejecución.')}</p></section>
-      </div>
-    </details>`;
+  return renderTechniqueDetails({
+    className: 'strength-timer__instructions',
+    sections: [
+      {
+        key: 'preparation',
+        title: 'Preparación',
+        content: exercise.preparation || 'Sin indicaciones de preparación.'
+      },
+      {
+        key: 'execution',
+        title: 'Ejecución',
+        content: exercise.execution || 'Sin indicaciones de ejecución.'
+      }
+    ]
+  });
 }
 
 export function renderStrengthSkipConfirmation(exerciseName) {

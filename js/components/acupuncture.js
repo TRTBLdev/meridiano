@@ -13,6 +13,8 @@ import {
 } from './timerShell.js';
 import { createSynthEngine, playQuartzBowlRing } from '../utils/synth.js';
 import { getFreqLabel, valueToFreq, freqToValue } from '../utils/freqUtils.js';
+import { createAcupunctureTiming } from '../utils/acupunctureUtils.js';
+import { createModuleResult } from '../utils/sessionResults.js';
 
 
 /**
@@ -49,6 +51,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
   let activeStepDuration = 0; // duración total del estado actual (para el porcentaje de la matriz)
   let isTimerPaused = false;
   let activeSessionDuration = 0;
+  let elapsedSeconds = 0;
   const wakeLockController = createWakeLockController();
 
   // Frecuencia y modo local del temporizador (sincronizado con appController)
@@ -59,6 +62,29 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
 
   let activeMeridianTab = 'LI'; // Código OMS para Intestino Grueso (Hegu)
   let meridiansList = [];
+
+  function initializeSequence(sequence) {
+    currentSequence = sequence;
+    activeSeqIndex = 0;
+    activeState = 'stimulating';
+    isTimerPaused = false;
+
+    const timing = createAcupunctureTiming(sequence);
+    activeSessionDuration = timing.activeSessionDuration;
+    activeTimeLeft = timing.activeTimeLeft;
+    activeStepDuration = timing.activeStepDuration;
+    elapsedSeconds = 0;
+
+    localBaseFreq = sequence.baseFreq || 432;
+    localFreq = sequence.suggestedFreq || 6.0;
+    localAudioMode = 'binaural';
+    localAudioActive = false;
+    phaseStartTime = Date.now();
+    phaseElapsedBeforePause = 0;
+    lastActiveDotsCount = -1;
+    lastStateType = '';
+    lastActiveColor = '';
+  }
 
 
 
@@ -93,9 +119,8 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
     if (orchestratorConfig && !currentSequence) {
       const seq = sequences.find(s => s.id === orchestratorConfig.presetId) || sequences[0];
       if (seq) {
-        currentSequence = seq;
+        initializeSequence(seq);
         activeView = 'timer';
-        activeSeqIndex = 0;
       }
     }
 
@@ -232,12 +257,8 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
             
             <div class="practice-row__actions">
               <div style="display: flex; gap: 12px;">
-                ${isCustom ? `
-                  ${renderLobbyAction({ kind: 'icon', icon: 'edit', label: 'Editar secuencia', className: 'btn-edit' })}
-                  ${renderLobbyAction({ kind: 'icon', icon: 'delete', label: 'Borrar secuencia', className: 'btn-delete' })}
-                ` : `
-                  ${renderLobbyAction({ kind: 'text', label: 'Copiar y editar', className: 'btn-edit' })}
-                `}
+                ${renderLobbyAction({ kind: 'icon', icon: 'edit', label: 'Editar secuencia', className: 'btn-edit' })}
+                ${renderLobbyAction({ kind: 'icon', icon: 'delete', label: 'Borrar secuencia', className: 'btn-delete' })}
               </div>
             </div>
           </div>
@@ -246,7 +267,6 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
         const headerEl = accordionItem.querySelector('.practice-row__summary');
         const contentEl = accordionItem.querySelector('.practice-row__details');
         const playBtn = headerEl.querySelector('.btn-play-header');
-
         const toggleDetails = () => {
           const isExpanded = accordionItem.classList.toggle('expanded');
           accordionItem.classList.toggle('is-expanded', isExpanded);
@@ -265,37 +285,27 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
         });
 
         playBtn.addEventListener('click', (e) => {
-          e.stopPropagation(); // Evitar expandir acordeón
+          e.stopPropagation();
           startSession(seq);
         });
 
         contentEl.querySelector('.btn-edit').addEventListener('click', () => {
           isEditing = true;
           currentSequence = JSON.parse(JSON.stringify(seq));
-
-          // Si es un preset predefinido, lo duplicamos como personalizado para que el usuario pueda guardarlo sin pisar el original
-          if (!isCustom) {
-            currentSequence.id = 'custom-' + Date.now();
-            currentSequence.name = currentSequence.name + ' (Copia)';
-          }
-
           activeView = 'builder';
           refresh();
         });
 
-        if (isCustom) {
-          contentEl.querySelector('.btn-delete').addEventListener('click', async () => {
-            if (confirm(`¿Seguro que deseas eliminar la secuencia "${seq.name}"?`)) {
-              await deleteData(db, 'acupuncture_sequences', seq.id);
-              refresh();
-            }
-          });
-        }
+        contentEl.querySelector('.btn-delete').addEventListener('click', async () => {
+          if (confirm(`¿Seguro que deseas eliminar la secuencia "${seq.name}"?`)) {
+            await deleteData(db, 'acupuncture_sequences', seq.id);
+            refresh();
+          }
+        });
 
         seqList.appendChild(accordionItem);
       });
     }
-
   }
 
   /* =============================================================
@@ -326,15 +336,14 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
               ${renderTechnicalTitle(isEditing ? 'Editar Secuencia' : 'Crear Secuencia')}
             </header>
 
-            <!-- Nombre de la Secuencia -->
             <div class="acu-builder-input-group">
               <label>Nombre del Protocolo</label>
-              <input type="text" id="seq-name" class="acu-input-flat" placeholder="Ej. Alivio Tensión Mandíbula" value="${escapeAttribute(currentSequence.name || '')}" required>
+              <input type="text" id="seq-name" class="acu-input-flat" placeholder="Ej. Alivio Tensión Mandíbula" value="${escapeAttribute(currentSequence?.name || '')}" required>
             </div>
 
             <div class="acu-builder-input-group">
               <label>Descripción / Objetivo</label>
-              <input type="text" id="seq-desc" class="acu-input-flat" style="font-size: 0.9rem;" placeholder="Ej. Alivia la presión mandibular y del entrecejo causada por bruxismo.">
+              <input type="text" id="seq-desc" class="acu-input-flat" style="font-size: 0.9rem;" placeholder="Ej. Alivia la presión mandibular y del entrecejo causada por bruxismo." value="${escapeAttribute(currentSequence?.description || '')}">
             </div>
 
             <!-- Listado de Pasos Actuales -->
@@ -785,32 +794,8 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
   /* =============================================================
      VISTA 3: REPRODUCTOR / TIMER SESSIONS (PANTALLA COMPLETA)
      ============================================================= */
-  function startSession(sequence, orchestratorConfig = null) {
-    currentSequence = sequence;
-    activeSeqIndex = 0;
-    activeState = 'stimulating';
-    isTimerPaused = false;
-    activeSessionDuration = currentSequence.points.reduce((sum, p) => {
-      return sum + (parseInt(p.duration) || 0) + (parseInt(p.transitionAfter) || 0);
-    }, 0);
-
-    // Obtener parámetros iniciales del sintonizador o sugeridos
-    localBaseFreq = currentSequence.baseFreq || 432;
-    localFreq = currentSequence.suggestedFreq || 6.0;
-    localAudioMode = 'binaural';
-    localAudioActive = false; // empezamos silenciado por cortesía, pero sugerido al lado
-
-    // Cargar la duración del primer paso
-    const firstStep = currentSequence.points[0];
-    activeTimeLeft = firstStep.duration;
-    activeStepDuration = firstStep.duration;
-
-    phaseStartTime = Date.now();
-    phaseElapsedBeforePause = 0;
-    lastActiveDotsCount = -1;
-    lastStateType = '';
-    lastActiveColor = '';
-
+  function startSession(sequence) {
+    initializeSequence(sequence);
     activeView = 'timer';
     refresh();
   }
@@ -1055,6 +1040,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
       if (isTimerPaused) return;
 
       activeTimeLeft--;
+      elapsedSeconds++;
       updateCountdownDisplay();
 
       if (activeTimeLeft <= 0) {
@@ -1108,13 +1094,18 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
 
     const finishSequence = async () => {
       await cleanupTimer();
+      const result = createModuleResult('acupuncture', elapsedSeconds, {
+        sequenceId: currentSequence.id,
+        sequenceName: currentSequence.name
+      });
 
       if (!orchestratorConfig) {
         try {
           await addData(db, 'sessions_log', {
             type: 'acupuncture',
             date: new Date().toISOString(),
-            duration: Math.max(1, Math.ceil(activeSessionDuration / 60)),
+            duration: Math.max(1, Math.round(elapsedSeconds / 60)),
+            activeDurationSeconds: elapsedSeconds,
             notes: `Secuencia: ${currentSequence.name}`,
             details: 'Digitopuntura Hegu'
           });
@@ -1123,10 +1114,10 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
         }
       }
 
-      alert('¡Secuencia de Electroterapia TENS completada con éxito!');
       if (orchestratorConfig) {
-        orchestratorConfig.onComplete();
+        orchestratorConfig.onComplete(result);
       } else {
+        alert('¡Secuencia de Electroterapia TENS completada con éxito!');
         activeView = 'lobby';
         synth.destroy();
         refresh();

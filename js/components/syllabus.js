@@ -691,11 +691,11 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
               <div style="display:flex; flex-wrap:wrap; gap:16px;">
                 <div style="flex:1.5; min-width:180px; display:flex; flex-direction:column; gap:4px;">
                   <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Nombre de la Asana</label>
-                  <input type="text" id="asana-name" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Dragón Alado (Anjaneyasana)" required>
+                  <input type="text" id="asana-name" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Oruga (Paschimottanasana)" required>
                 </div>
-                <div style="width:120px; display:flex; flex-direction:column; gap:4px;">
-                  <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">ID Único</label>
-                  <input type="text" id="asana-id" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. yin-dragon" ${editingItem && editingStore === 'yoga_postures' ? 'disabled' : ''} required>
+                <div style="width:140px; display:flex; flex-direction:column; gap:4px;">
+                  <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">ID / Código Único</label>
+                  <input type="text" id="asana-id" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. yin-caterpillar" ${editingItem && editingStore === 'yoga_postures' ? 'disabled' : ''} required>
                 </div>
                 <div style="width:120px; display:flex; flex-direction:column; gap:4px;">
                   <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Estilo</label>
@@ -704,8 +704,23 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
               </div>
 
               <div style="display:flex; flex-direction:column; gap:4px;">
-                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Indicaciones de Alineación y Beneficios</label>
-                <textarea id="asana-desc" class="acu-input-flat" style="padding: 8px; font-size:0.8rem; min-height:45px; resize:vertical;" placeholder="Describe la tracción del tejido conectivo, meridianos estimulados y precauciones..." required></textarea>
+                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Enfoque (Meridianos, Tejido Conectivo y Beneficios)</label>
+                <textarea id="asana-focus" class="acu-input-flat" style="padding: 8px; font-size:0.8rem; min-height:45px; resize:vertical;" placeholder="Ej. Estiramiento profundo de la cadena posterior, estimulación del meridiano de la Vejiga..." required></textarea>
+              </div>
+
+              <div style="display:flex; flex-direction:column; gap:4px;">
+                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Preparación (Posición Inicial y Apoyos)</label>
+                <textarea id="asana-prep" class="acu-input-flat" style="padding: 8px; font-size:0.8rem; min-height:45px; resize:vertical;" placeholder="Ej. Sentada en el mat con las piernas estiradas hacia adelante. Colocar la pelota sobre las piernas..." required></textarea>
+              </div>
+
+              <div style="display:flex; flex-direction:column; gap:4px;">
+                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Ejecución (Respiración, Gravedad y Permanencia)</label>
+                <textarea id="asana-exec" class="acu-input-flat" style="padding: 8px; font-size:0.8rem; min-height:55px; resize:vertical;" placeholder="Ej. Inhalar profundo y al exhalar dejarse caer sobre la pelota sin jalar ni forzar..." required></textarea>
+              </div>
+
+              <div style="display:flex; flex-direction:column; gap:4px;">
+                <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Equipo / Utilería (Opcional)</label>
+                <input type="text" id="asana-equipment" class="acu-input-flat" style="padding: 6px;" placeholder="Ej. Pelota grande de yoga, Bloques">
               </div>
 
               <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:8px;">
@@ -740,7 +755,10 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
         layout.querySelector('#asana-id').value = editingItem.id || '';
         layout.querySelector('#asana-name').value = editingItem.name || '';
         layout.querySelector('#asana-style').value = editingItem.style || 'Yin';
-        layout.querySelector('#asana-desc').value = editingItem.description || '';
+        layout.querySelector('#asana-focus').value = editingItem.focus || editingItem.description || '';
+        layout.querySelector('#asana-prep').value = editingItem.preparation || '';
+        layout.querySelector('#asana-exec').value = editingItem.execution || '';
+        layout.querySelector('#asana-equipment').value = editingItem.equipment || '';
 
         layout.querySelector('#btn-cancel-edit').addEventListener('click', () => {
           editingItem = null;
@@ -751,11 +769,21 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
 
       layout.querySelector('#form-asana').addEventListener('submit', async (e) => {
         e.preventDefault();
+        const focus = layout.querySelector('#asana-focus').value.trim();
+        const prep = layout.querySelector('#asana-prep').value.trim();
+        const exec = layout.querySelector('#asana-exec').value.trim();
+        const equip = layout.querySelector('#asana-equipment').value.trim();
+        const descText = `- Enfoque: ${focus}\n- Preparación: ${prep}\n- Ejecución: ${exec}`;
+
         const asanaData = {
           id: editingItem && editingStore === 'yoga_postures' ? editingItem.id : layout.querySelector('#asana-id').value.trim().toLowerCase(),
           name: layout.querySelector('#asana-name').value.trim(),
           style: layout.querySelector('#asana-style').value.trim(),
-          description: layout.querySelector('#asana-desc').value.trim()
+          focus: focus,
+          preparation: prep,
+          execution: exec,
+          equipment: equip,
+          description: descText
         };
 
         try {
@@ -988,15 +1016,32 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
     yogaPostures.forEach(p => {
       const card = document.createElement('div');
       card.className = 'acu-point-card';
+
+      let bodyContentHtml = '';
+      if (p.focus || p.preparation || p.execution) {
+        bodyContentHtml = `
+          <div style="font-size:0.78rem; color:var(--color-text-muted); margin:6px 0 10px 0; line-height:1.45; display:flex; flex-direction:column; gap:6px;">
+            ${p.focus ? `<div><span style="color:var(--color-text-main); font-weight:500;">- Enfoque:</span> ${escapeHTML(p.focus)}</div>` : ''}
+            ${p.preparation ? `<div><span style="color:var(--color-text-main); font-weight:500;">- Preparación:</span> ${escapeHTML(p.preparation)}</div>` : ''}
+            ${p.execution ? `<div><span style="color:var(--color-text-main); font-weight:500;">- Ejecución:</span> ${escapeHTML(p.execution)}</div>` : ''}
+          </div>
+        `;
+      } else {
+        bodyContentHtml = `<p style="font-size:0.78rem; color:var(--color-text-muted); margin:4px 0 8px 0; line-height:1.4;">${escapeHTML(p.description || '')}</p>`;
+      }
+
       card.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-          <div style="flex:1;">
-            <span style="font-weight:600; font-size:0.88rem; color:var(--color-text-main);">${escapeHTML(p.name)}</span>
-            <p style="font-size:0.75rem; color:var(--color-text-muted); margin:4px 0 8px 0; line-height:1.4;">${escapeHTML(p.description)}</p>
-            <div style="font-family:var(--font-mono); font-size:0.7rem; color:var(--color-text-muted);">Estilo: ${escapeHTML(p.style)}</div>
+          <div style="flex:1; padding-right:16px;">
+            <div style="font-weight:600; font-size:0.95rem; color:var(--color-text-main); line-height:1.2;">${escapeHTML(p.name)}</div>
+            ${bodyContentHtml}
+            <div style="font-family:var(--font-mono); font-size:0.72rem; color:var(--color-text-muted); margin-top:4px;">
+              Estilo: <span style="color:var(--color-text-main); font-weight:500;">${escapeHTML(p.style || 'Yin')}</span>
+              ${p.equipment ? ` &nbsp;|&nbsp; Equipo: <span style="color:var(--color-text-main);">${escapeHTML(p.equipment)}</span>` : ''}
+            </div>
           </div>
           <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
-            <span style="font-family:var(--font-mono); font-size:0.65rem; color:var(--color-text-muted); text-transform:uppercase;">${escapeHTML(p.id)}</span>
+            <span style="font-family:var(--font-mono); font-size:0.65rem; color:var(--color-text-muted); text-transform:uppercase; letter-spacing:0.05em;">${escapeHTML(p.id)}</span>
             <div style="display:flex; gap:4px;">
               <button class="btn-action-icon btn-edit-yp" title="Editar" aria-label="Editar">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
