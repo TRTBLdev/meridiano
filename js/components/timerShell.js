@@ -8,43 +8,116 @@ import {
 
 export function createWakeLockController() {
   let wakeLock = null;
+  let videoFallback = null;
+  let isActive = false;
+
+  const requestNativeWakeLock = async () => {
+    if (typeof navigator === 'undefined' || !('wakeLock' in navigator)) return false;
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => {
+        wakeLock = null;
+      });
+      return true;
+    } catch (err) {
+      wakeLock = null;
+      return false;
+    }
+  };
+
+  const handleVisibilityChange = async () => {
+    if (isActive && typeof document !== 'undefined' && document.visibilityState === 'visible') {
+      if (!wakeLock) {
+        const ok = await requestNativeWakeLock();
+        if (!ok && !videoFallback) {
+          startVideoFallback();
+        }
+      }
+    }
+  };
+
+  const startVideoFallback = () => {
+    if (typeof document === 'undefined' || videoFallback) return;
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1;
+      canvas.height = 1;
+      if (canvas.captureStream) {
+        const stream = canvas.captureStream(1);
+        const video = document.createElement('video');
+        video.muted = true;
+        video.playsInline = true;
+        video.setAttribute('playsinline', '');
+        video.setAttribute('webkit-playsinline', '');
+        video.style.position = 'fixed';
+        video.style.left = '-9999px';
+        video.style.top = '-9999px';
+        video.style.width = '1px';
+        video.style.height = '1px';
+        video.style.opacity = '0';
+        video.style.pointerEvents = 'none';
+        document.body.appendChild(video);
+        video.srcObject = stream;
+        video.play().catch(() => {});
+        videoFallback = video;
+      }
+    } catch (err) {
+      // Ignorar si no se permite captureStream
+    }
+  };
+
+  const stopVideoFallback = () => {
+    if (videoFallback) {
+      try {
+        videoFallback.pause();
+        if (videoFallback.srcObject && videoFallback.srcObject.getTracks) {
+          videoFallback.srcObject.getTracks().forEach(track => track.stop());
+          videoFallback.srcObject = null;
+        }
+        videoFallback.remove();
+      } catch (e) {}
+      videoFallback = null;
+    }
+  };
 
   return {
     async request() {
-      const isEnabled = localStorage.getItem('meridiano_wakelock') !== 'false';
-      if (!isEnabled || !('wakeLock' in navigator)) return;
-      try {
-        wakeLock = await navigator.wakeLock.request('screen');
-      } catch (err) {}
+      isActive = true;
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+      }
+
+      const nativeOk = await requestNativeWakeLock();
+      if (!nativeOk) {
+        startVideoFallback();
+      }
     },
     async release() {
-      if (!wakeLock) return;
-      try {
-        await wakeLock.release();
-      } catch (err) {}
-      wakeLock = null;
+      isActive = false;
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
+
+      if (wakeLock) {
+        try {
+          await wakeLock.release();
+        } catch (err) {}
+        wakeLock = null;
+      }
+
+      stopVideoFallback();
     }
   };
 }
 
 export function bindWakeLockPreference(root) {
-  const switchEl = root.querySelector('#pref-wakelock-switch');
-  if (!switchEl) return;
-  switchEl.addEventListener('change', (event) => {
-    localStorage.setItem('meridiano_wakelock', event.target.checked ? 'true' : 'false');
-  });
+  // Función vacía para compatibilidad: el wake lock ahora es 100% automático
 }
 
-export function renderWakeLockPreference(id = 'pref-wakelock-switch') {
-  return `
-    <div class="timer-wakelock-setting">
-      <span>MANTENER PANTALLA ACTIVA</span>
-      <label class="braun-switch">
-        <input type="checkbox" id="${id}" ${localStorage.getItem('meridiano_wakelock') !== 'false' ? 'checked' : ''}>
-        <span class="braun-switch-slider"></span>
-      </label>
-    </div>
-  `;
+export function renderWakeLockPreference() {
+  // Retorna string vacío: se elimina el switch visual para una estética limpia y sin cortisol
+  return '';
 }
 
 export function populateTimerDots(gridContainer, count = 5184, dotClass = 'acu-dot') {

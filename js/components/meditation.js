@@ -3,12 +3,10 @@ import { renderDotMatrix } from '../utils/dotmatrix.js';
 import { escapeAttribute, escapeHTML } from '../utils/sanitize.js';
 import {
   bindSynthPanel,
-  bindWakeLockPreference,
   createTimerShell,
   createWakeLockController,
   populateTimerDots,
-  renderSynthPanel,
-  renderWakeLockPreference
+  renderSynthPanel
 } from './timerShell.js';
 import { createSynthEngine, playQuartzBowlRing } from '../utils/synth.js';
 import { getFreqLabel, valueToFreq, freqToValue } from '../utils/freqUtils.js';
@@ -100,13 +98,11 @@ export async function renderMeditationScreen(container, db, onNavigate) {
           <div id="interval-settings-container" class="meditation-interval-settings"></div>
           <div class="lobby-start-row">
             ${renderLobbyAction({ kind: 'icon', icon: 'play', label: 'Iniciar meditación', id: 'btn-med-start' })}
-          </div>`,
-      footer: renderWakeLockPreference()
+          </div>`
     });
     const lobbyEl = staging.firstElementChild;
 
     container.appendChild(lobbyEl);
-    bindWakeLockPreference(lobbyEl);
 
     const intervalContainer = lobbyEl.querySelector('#interval-settings-container');
 

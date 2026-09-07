@@ -2,11 +2,9 @@ import { addData, getAllData } from '../db.js';
 import { renderDotMatrix } from '../utils/dotmatrix.js';
 import {
   bindSynthPanel,
-  bindWakeLockPreference,
   createTimerShell,
   createWakeLockController,
   renderSynthPanel,
-  renderWakeLockPreference,
   populateTimerDots
 } from './timerShell.js';
 import { createSynthEngine, playQuartzBowlRing } from '../utils/synth.js';
@@ -130,13 +128,11 @@ export async function renderBreathworkScreen(container, db, onNavigate, orchestr
           <div id="interval-settings-container" class="meditation-interval-settings"></div>
           <div class="lobby-start-row">
             ${renderLobbyAction({ kind: 'icon', icon: 'play', label: 'Iniciar ejercicio', id: 'btn-breath-start' })}
-          </div>`,
-      footer: renderWakeLockPreference()
+          </div>`
     });
     const lobbyEl = staging.firstElementChild;
 
     container.appendChild(lobbyEl);
-    bindWakeLockPreference(lobbyEl);
 
     const intervalContainer = lobbyEl.querySelector('#interval-settings-container');
 

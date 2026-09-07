@@ -15,9 +15,7 @@ import {
 } from '../utils/strengthUtils.js';
 import { renderLobbyAction, renderLobbyShell, renderPracticeRow } from './lobbyUi.js';
 import {
-  bindWakeLockPreference,
-  createWakeLockController,
-  renderWakeLockPreference
+  createWakeLockController
 } from './timerShell.js';
 import { createStrengthDotField } from './strengthDotField.js';
 import {
@@ -88,13 +86,11 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
       className: 'strength-lobby',
       content: `
         <span class="lobby-section-label">Circuitos disponibles</span>
-        <div class="practice-list" id="lobby-circuits-list"></div>`,
-      footer: renderWakeLockPreference()
+        <div class="practice-list" id="lobby-circuits-list"></div>`
     });
     const layout = staging.firstElementChild;
 
     container.appendChild(layout);
-    bindWakeLockPreference(layout);
     layout.querySelector('#btn-back-home').addEventListener('click', () => onNavigate('inicio'));
 
     const circuitsList = layout.querySelector('#lobby-circuits-list');

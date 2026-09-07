@@ -2,12 +2,10 @@ import { addData } from '../db.js';
 import { renderDotMatrix } from '../utils/dotmatrix.js';
 import { escapeHTML } from '../utils/sanitize.js';
 import {
-  bindWakeLockPreference,
   createWakeLockController,
   populateTimerDots,
   renderSynthPanel,
-  bindSynthPanel,
-  renderWakeLockPreference
+  bindSynthPanel
 } from './timerShell.js';
 import { createSynthEngine, playQuartzBowlRing } from '../utils/synth.js';
 import { startResolvedYogaSequence } from '../utils/yogaUtils.js';
@@ -396,8 +394,7 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
       className: 'yoga-lobby',
       content: `
         <span class="lobby-section-label">Secuencias y prácticas</span>
-        <div class="practice-list" id="lobby-sequences-list"></div>`,
-      footer: renderWakeLockPreference()
+        <div class="practice-list" id="lobby-sequences-list"></div>`
     });
     const lobbyEl = staging.firstElementChild;
 
@@ -540,8 +537,6 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
       synth.destroy();
       onNavigate('inicio');
     });
-
-    bindWakeLockPreference(lobbyEl);
   }
 
   /* =============================================================
@@ -1056,36 +1051,36 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
           })}
 
           <!-- Botones de control -->
-          <div style="display: flex; justify-content: space-around; align-items: center; width: 100%; max-width: 380px; margin: 0 auto 32px auto;">
+          <div class="timer-icon-controls">
             <!-- Izquierda: Iniciar / Pausar / Reanudar (Flow Control) -->
-            <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            <div class="timer-icon-control-group">
               <button class="btn-acu-icon btn-acu-active" id="btn-yoga-flow" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; pointer-events: auto; cursor: pointer;">
                 <svg id="svg-flow-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                   <polygon points="6 4 19 12 6 20 6 4"></polygon>
                 </svg>
               </button>
-              <span id="lbl-yoga-flow" style="font-family: var(--font-digital); font-size: 0.65rem; color: var(--color-text-muted); letter-spacing: 0.1em; text-transform: uppercase;">Iniciar</span>
+              <span id="lbl-yoga-flow">Iniciar</span>
             </div>
 
             <!-- Centro: Saltar (Navigation) -->
-            <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            <div class="timer-icon-control-group">
               <button class="btn-acu-icon" id="btn-yoga-skip" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; pointer-events: auto; cursor: pointer; opacity: 0.4; pointer-events: none;">
                 <svg id="svg-skip-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                   <polygon points="4 3 13 12 4 21 4 3" fill="currentColor"></polygon>
                   <line x1="17" y1="4" x2="17" y2="20"></line>
                 </svg>
               </button>
-              <span id="lbl-yoga-skip" style="font-family: var(--font-digital); font-size: 0.65rem; color: var(--color-text-muted); letter-spacing: 0.1em; text-transform: uppercase;">Saltar</span>
+              <span id="lbl-yoga-skip">Saltar</span>
             </div>
 
             <!-- Detener -->
-            <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            <div class="timer-icon-control-group">
               <button class="btn-acu-icon btn-acu-danger" id="btn-yoga-stop" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; pointer-events: auto; cursor: pointer;">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                   <rect x="5" y="5" width="14" height="14" rx="1"></rect>
                 </svg>
               </button>
-              <span style="font-family: var(--font-digital); font-size: 0.65rem; color: var(--color-text-muted); letter-spacing: 0.1em; text-transform: uppercase;">Detener</span>
+              <span>Detener</span>
             </div>
           </div>
 
@@ -1519,7 +1514,12 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
         stopAnimationLoop();
         releaseWakeLock();
         synth.destroy();
-        onNavigate('inicio');
+        if (orchestratorConfig) {
+          onNavigate('inicio');
+        } else {
+          activeView = 'lobby';
+          render();
+        }
       } else {
         if (!wasPaused) {
           isPaused = false;

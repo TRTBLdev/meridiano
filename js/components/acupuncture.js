@@ -4,12 +4,10 @@ import { escapeAttribute, escapeHTML } from '../utils/sanitize.js';
 import { renderTechnicalTitle } from './ui.js';
 import { renderLobbyAction, renderLobbyShell } from './lobbyUi.js';
 import {
-  bindWakeLockPreference,
   createWakeLockController,
   populateTimerDots,
   renderSynthPanel,
-  bindSynthPanel,
-  renderWakeLockPreference
+  bindSynthPanel
 } from './timerShell.js';
 import { createSynthEngine, playQuartzBowlRing } from '../utils/synth.js';
 import { getFreqLabel, valueToFreq, freqToValue } from '../utils/freqUtils.js';
@@ -133,8 +131,6 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
     }
   }
 
-
-
   // Helper para color de meridianos
   function getMeridianColor(meridian) {
     if (!meridian) return '#138D75'; // default muted cyan
@@ -150,8 +146,6 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
     return '#34495E';
   }
 
-
-
   /* =============================================================
      VISTA 1: LOBBY PRINCIPAL (PRESETS & CATÁLOGO)
      ============================================================= */
@@ -164,15 +158,10 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
       className: 'acupuncture-lobby',
       content: `
         <span class="lobby-section-label">Sesiones y secuencias activas (auto-terapia)</span>
-        <div class="practice-list" id="lobby-sequences-list"></div>`,
-      footer: renderWakeLockPreference()
+        <div class="practice-list" id="lobby-sequences-list"></div>`
     });
     const layout = staging.firstElementChild;
-
     container.appendChild(layout);
-
-    // Guardar preferencia de Wake Lock
-    bindWakeLockPreference(layout);
 
     // Eventos de Navegación
     layout.querySelector('#btn-back-home').addEventListener('click', () => {
@@ -191,7 +180,6 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
       activeView = 'builder';
       refresh();
     });
-
     // --- RENDERIZAR SECUENCIAS (ACORDEÓN) ---
     const seqList = layout.querySelector('#lobby-sequences-list');
     seqList.innerHTML = '';
@@ -763,7 +751,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
     layout.querySelector('#btn-builder-save').addEventListener('click', async () => {
       const name = layout.querySelector('#seq-name').value.trim();
       const desc = layout.querySelector('#seq-desc').value.trim();
-
+      
       if (!name) {
         alert('Por favor, indica un nombre para la secuencia.');
         return;
@@ -859,25 +847,34 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
           })}
           
           <!-- Controles de Timer (Iniciar/Pausar, Saltar, Detener con Iconos SVG) -->
-          <div class="acu-panel-controls" style="gap: 24px;">
-            <button class="btn-acu-icon btn-acu-active" id="btn-timer-play" title="Iniciar sesion" style="width:38px; height:38px;">
-              <svg id="svg-play-icon" viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
-                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-              </svg>
-            </button>
+          <div class="timer-icon-controls">
+            <div class="timer-icon-control-group">
+              <button class="btn-acu-icon btn-acu-active" id="btn-timer-play" title="Iniciar sesion" style="width:48px; height:48px; display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer;">
+                <svg id="svg-play-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+              </button>
+              <span id="lbl-timer-flow">Iniciar</span>
+            </div>
 
-            <button class="btn-acu-icon" id="btn-timer-skip" title="Saltar paso" style="width:38px; height:38px; opacity:0.35; pointer-events:none;">
-              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="4 3 13 12 4 21 4 3" fill="currentColor"></polygon>
-                <line x1="17" y1="4" x2="17" y2="20"></line>
-              </svg>
-            </button>
+            <div class="timer-icon-control-group">
+              <button class="btn-acu-icon" id="btn-timer-skip" title="Saltar paso" style="width:48px; height:48px; display:flex; align-items:center; justify-content:center; opacity:0.35; pointer-events:none; cursor:pointer;">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="4 3 13 12 4 21 4 3" fill="currentColor"></polygon>
+                  <line x1="17" y1="4" x2="17" y2="20"></line>
+                </svg>
+              </button>
+              <span>Saltar</span>
+            </div>
 
-            <button class="btn-acu-icon btn-acu-danger" id="btn-timer-exit" title="Detener sesion" style="width:38px; height:38px;">
-              <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
-                <rect x="5" y="5" width="14" height="14" rx="1"></rect>
-              </svg>
-            </button>
+            <div class="timer-icon-control-group">
+              <button class="btn-acu-icon btn-acu-danger" id="btn-timer-exit" title="Detener sesion" style="width:48px; height:48px; display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer;">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                  <rect x="5" y="5" width="14" height="14" rx="1"></rect>
+                </svg>
+              </button>
+              <span>Detener</span>
+            </div>
           </div>
         </div>
       </div>
@@ -901,6 +898,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
     const btnPlay = timerScreen.querySelector('#btn-timer-play');
     const btnSkip = timerScreen.querySelector('#btn-timer-skip');
     const btnExit = timerScreen.querySelector('#btn-timer-exit');
+    const lblFlow = timerScreen.querySelector('#lbl-timer-flow');
 
     // Sincronizar el display del paso actual
     function syncTimerDisplay() {
@@ -1153,9 +1151,10 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
       phaseElapsedBeforePause = 0;
       btnSkip.style.opacity = '1';
       btnSkip.style.pointerEvents = 'auto';
+      if (lblFlow) lblFlow.textContent = 'Pausar';
       btnPlay.title = 'Pausar sesion';
       btnPlay.innerHTML = `
-        <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
           <rect x="6" y="4" width="3" height="16" rx="1"></rect>
           <rect x="15" y="4" width="3" height="16" rx="1"></rect>
         </svg>
@@ -1200,8 +1199,9 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
         // Pausar y congelar el tiempo acumulado de la etapa activa
         phaseElapsedBeforePause += Date.now() - phaseStartTime;
         btnPlay.classList.remove('btn-acu-active');
+        if (lblFlow) lblFlow.textContent = 'Reanudar';
         btnPlay.innerHTML = `
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
             <polygon points="5 3 19 12 5 21 5 3"></polygon>
           </svg>
         `;
@@ -1210,8 +1210,9 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
         // Reanudar e iniciar un nuevo intervalo relativo de tiempo
         phaseStartTime = Date.now();
         btnPlay.classList.add('btn-acu-active');
+        if (lblFlow) lblFlow.textContent = 'Pausar';
         btnPlay.innerHTML = `
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
             <rect x="6" y="4" width="3" height="16" rx="1"></rect>
             <rect x="15" y="4" width="3" height="16" rx="1"></rect>
           </svg>
@@ -1228,7 +1229,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
     });
 
     // Salir voluntariamente (Pausar primero, preguntar y volver a inicio sin guardar)
-    btnExit.addEventListener('click', () => {
+    btnExit.addEventListener('click', async () => {
       if (!isSessionStarted) {
         if (orchestratorConfig) {
           onNavigate('inicio');
@@ -1244,9 +1245,14 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
       }
 
       if (confirm('¿Deseas detener y cancelar la sesión actual? (NO se guardará en el historial)')) {
-        stopTimerLoop();
+        await cleanupTimer();
         synth.destroy();
-        onNavigate('inicio');
+        if (orchestratorConfig) {
+          onNavigate('inicio');
+        } else {
+          activeView = 'lobby';
+          refresh();
+        }
       } else {
         if (!wasPaused) {
           btnPlay.click();
