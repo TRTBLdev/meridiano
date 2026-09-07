@@ -2,6 +2,11 @@ import { getAllData, putData, deleteData, addData } from '../db.js';
 import { escapeAttribute, escapeHTML } from '../utils/sanitize.js';
 import { renderTechnicalTitle } from './ui.js';
 import { renderStrengthManager } from './strengthManager.js';
+import {
+  calculateSequenceDuration,
+  validateMeditationSequence,
+  sanitizeMeditationSequence
+} from '../utils/meditationUtils.js';
 
 export async function renderSyllabusScreen(container, db, onNavigate) {
   // Estado local de la base de datos
@@ -11,20 +16,22 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
   let yogaPostures = [];
   let yogaBlocks = [];
   let compoundSessions = [];
+  let meditationPresets = [];
 
   // Estado local de navegación de pestañas
-  let activeTab = 'acupuncture'; // 'acupuncture', 'breathwork', 'yoga', 'strength', 'sessions', 'synth'
+  let activeTab = 'acupuncture'; // 'acupuncture', 'breathwork', 'yoga', 'strength', 'meditation', 'sessions', 'synth'
   let activeAcuSubTab = 'meridians'; // 'meridians', 'points', 'heads'
   let activeYogaSubTab = 'blocks'; // 'blocks', 'postures'
   let activeSynthSubTab = 'brainwaves'; // 'brainwaves', 'solfeggio', 'modes'
 
   // Estados de edición e inserción
   let editingItem = null; // Guardará el objeto del item que se está editando
-  let editingStore = ''; // Almacén activo en edición ('acupuncture_points', 'meridians', 'breathwork_patterns', 'yoga_postures', 'yoga_blocks')
+  let editingStore = ''; // Almacén activo en edición ('acupuncture_points', 'meridians', 'breathwork_patterns', 'yoga_postures', 'yoga_blocks', 'meditation_presets')
   let isPointFormOpen = false; // Estado del acordeón del formulario para Puntos Extra
   let isBreathFormOpen = false; // Estado del acordeón del formulario para Respiración
   let isAsanaFormOpen = false; // Estado del acordeón del formulario para Asanas
   let isYogaBlockFormOpen = false; // Estado del acordeón del formulario para Bloques de Yoga
+  let isMeditationFormOpen = false; // Estado del acordeón para Meditación
 
   // Estado del buscador
   let pointSearchQuery = '';
@@ -42,6 +49,9 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
       yogaPostures = await getAllData(db, 'yoga_postures');
       yogaBlocks = await getAllData(db, 'yoga_blocks');
       compoundSessions = await getAllData(db, 'compound_sessions');
+      const allMed = await getAllData(db, 'meditation_presets');
+      meditationPresets = (allMed || []).filter(item => Array.isArray(item.blocks) && item.blocks.length > 0);
+      meditationPresets.sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
 
       // Ordenar meridianos tradicionalmente
       const meridianOrderMap = {
@@ -90,6 +100,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
               <button id="tab-breathwork" class="btn-braun-tab ${activeTab === 'breathwork' ? 'active' : ''}">Respiración</button>
               <button id="tab-yoga" class="btn-braun-tab ${activeTab === 'yoga' ? 'active' : ''}">Yin Yoga</button>
               <button id="tab-strength" class="btn-braun-tab ${activeTab === 'strength' ? 'active' : ''}">Fuerza</button>
+              <button id="tab-meditation" class="btn-braun-tab ${activeTab === 'meditation' ? 'active' : ''}">Meditación</button>
               <button id="tab-sessions" class="btn-braun-tab ${activeTab === 'sessions' ? 'active' : ''}">Sesiones</button>
               <button id="tab-synth" class="btn-braun-tab ${activeTab === 'synth' ? 'active' : ''}">Sintetizador</button>
             </div>
@@ -110,6 +121,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
     layout.querySelector('#tab-breathwork').addEventListener('click', () => { activeTab = 'breathwork'; editingItem = null; refresh(); });
     layout.querySelector('#tab-yoga').addEventListener('click', () => { activeTab = 'yoga'; editingItem = null; refresh(); });
     layout.querySelector('#tab-strength').addEventListener('click', () => { activeTab = 'strength'; editingItem = null; refresh(); });
+    layout.querySelector('#tab-meditation').addEventListener('click', () => { activeTab = 'meditation'; editingItem = null; refresh(); });
     layout.querySelector('#tab-sessions').addEventListener('click', () => { activeTab = 'sessions'; editingItem = null; refresh(); });
     layout.querySelector('#tab-synth').addEventListener('click', () => { activeTab = 'synth'; editingItem = null; refresh(); });
 
@@ -132,6 +144,8 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
         console.error('[Syllabus] Error al renderizar Fuerza:', error);
         targetEl.innerHTML = '<p class="strength-manager__warning">No se pudo cargar el catálogo de Fuerza.</p>';
       });
+    } else if (activeTab === 'meditation') {
+      renderMeditationManager(targetEl);
     } else if (activeTab === 'sessions') {
       renderCompoundSessionsManager(targetEl);
     } else if (activeTab === 'synth') {
@@ -1211,6 +1225,248 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
       card.querySelector('.btn-delete-cs').addEventListener('click', async () => {
         if (confirm(`¿Seguro que deseas eliminar la sesión "${session.name}"?`)) {
           await deleteData(db, 'compound_sessions', session.id);
+          refresh();
+        }
+      });
+
+      listEl.appendChild(card);
+    });
+  }
+
+
+  /* =========================================================================
+     MÓDULO: MEDITACIÓN (SECUENCIAS DE BLOQUES)
+     ========================================================================= */
+  function renderMeditationManager(container) {
+    const wrapper = document.createElement('div');
+    const isEditing = editingItem && editingStore === 'meditation_presets';
+    let tempBlocks = isEditing
+      ? structuredClone(editingItem.blocks || [])
+      : [
+          { name: 'Fase Inicial', mins: 5, secs: 0 },
+          { name: 'Fase Profunda', mins: 5, secs: 0 }
+        ];
+
+    wrapper.innerHTML = `
+      <div class="strength-manager__accordion" style="margin-bottom: 24px;">
+        <button type="button" class="strength-manager__accordion-trigger" id="btn-toggle-med-form" aria-expanded="${isMeditationFormOpen}">
+          <span>${isEditing ? '✎ EDITAR SECUENCIA DE MEDITACIÓN' : '+ REGISTRAR SECUENCIA DE MEDITACIÓN'}</span>
+          <span>${isMeditationFormOpen ? '▼' : '▶'}</span>
+        </button>
+        <div class="strength-manager__accordion-body" style="display:${isMeditationFormOpen ? 'block' : 'none'}">
+          <form id="meditation-syllabus-form" class="strength-manager__form">
+            <div class="strength-manager__grid">
+              <label class="strength-manager__field strength-manager__field--wide">
+                <span>Nombre de la Secuencia</span>
+                <input id="syllabus-med-name" class="acu-input-flat" placeholder="Ej. Vipassana en 3 Fases" required value="${isEditing ? escapeAttribute(editingItem.name) : ''}">
+              </label>
+              <label class="strength-manager__field strength-manager__field--full">
+                <span>Descripción / Enfoque (Opcional)</span>
+                <textarea id="syllabus-med-desc" class="acu-input-flat" placeholder="Ej. Transición gradual de calma respiratoria a presencia abierta...">${isEditing ? escapeHTML(editingItem.description || '') : ''}</textarea>
+              </label>
+            </div>
+
+            <section class="strength-circuit-builder" style="margin-top: 16px;">
+              <div class="strength-circuit-builder__header">
+                <strong>Bloques de la Secuencia</strong>
+                <span id="syllabus-med-total-time" style="font-family: var(--font-digital); color: var(--color-text-muted); font-size: 0.75rem;"></span>
+              </div>
+              <div id="syllabus-med-blocks-container" class="meditation-block-list"></div>
+              <div style="margin-top: 12px;">
+                <button type="button" class="strength-manager__text-action" id="btn-syllabus-med-add-block">+ Añadir Bloque (${tempBlocks.length}/7)</button>
+              </div>
+            </section>
+
+            <div class="strength-manager__form-actions" style="margin-top: 20px;">
+              ${isEditing ? '<button type="button" class="strength-manager__text-action secondary" id="btn-syllabus-med-cancel">Cancelar</button>' : ''}
+              <button type="submit" class="strength-manager__text-action">${isEditing ? 'Guardar Cambios' : 'Crear Secuencia'}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+      <div id="syllabus-meditation-list"></div>
+    `;
+
+    container.appendChild(wrapper);
+
+    // Toggle acordeón
+    wrapper.querySelector('#btn-toggle-med-form').addEventListener('click', () => {
+      isMeditationFormOpen = !isMeditationFormOpen;
+      renderMeditationManager(container);
+    });
+
+    const blocksContainer = wrapper.querySelector('#syllabus-med-blocks-container');
+    const totalTimeLabel = wrapper.querySelector('#syllabus-med-total-time');
+    const addBlockBtn = wrapper.querySelector('#btn-syllabus-med-add-block');
+
+    const updateBlocksUI = () => {
+      const totalSecs = calculateSequenceDuration(tempBlocks);
+      totalTimeLabel.textContent = `TOTAL: ${Math.floor(totalSecs / 60)}m ${totalSecs % 60}s`;
+      addBlockBtn.textContent = `+ Añadir Bloque (${tempBlocks.length}/7)`;
+      addBlockBtn.disabled = tempBlocks.length >= 7;
+
+      blocksContainer.innerHTML = '';
+      tempBlocks.forEach((block, idx) => {
+        const row = document.createElement('div');
+        row.className = 'meditation-block-row';
+        row.style.cssText = 'display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 0; border-bottom: 1px dashed rgba(46,43,40,0.1);';
+        row.innerHTML = `
+          <span style="font-family: var(--font-digital); font-size: 0.75rem; color: var(--color-text-muted); width: 20px;">${idx + 1}.</span>
+          <input type="text" class="block-name-input acu-input-flat" value="${escapeAttribute(block.name || 'Bloque ' + (idx + 1))}" style="flex: 1; min-width: 120px; font-size: 0.8rem; padding: 4px; background: transparent; border: none; border-bottom: 1px solid rgba(46,43,40,0.2);">
+          <div style="display: flex; gap: 4px; align-items: center;">
+            <input type="number" class="block-mins-input acu-step-num-input" min="0" max="60" value="${block.mins}" style="width: 45px; padding: 4px;">
+            <span style="font-size: 0.75rem;">m</span>
+            <input type="number" class="block-secs-input acu-step-num-input" min="0" max="59" value="${block.secs}" style="width: 45px; padding: 4px;">
+            <span style="font-size: 0.75rem;">s</span>
+          </div>
+          <div style="display: flex; gap: 2px;">
+            <button type="button" class="btn-block-up" aria-label="Subir" style="background:transparent; border:none; cursor:pointer; padding:2px 4px; font-size:0.75rem;" ${idx === 0 ? 'disabled' : ''}>▲</button>
+            <button type="button" class="btn-block-down" aria-label="Bajar" style="background:transparent; border:none; cursor:pointer; padding:2px 4px; font-size:0.75rem;" ${idx === tempBlocks.length - 1 ? 'disabled' : ''}>▼</button>
+            <button type="button" class="btn-delete-block" title="Eliminar bloque" style="background: transparent; border: none; color: var(--color-accent-red); cursor: pointer; font-size: 1.1rem; padding: 0 4px;">×</button>
+          </div>
+        `;
+
+        row.querySelector('.block-name-input').addEventListener('input', e => {
+          tempBlocks[idx].name = e.target.value;
+        });
+        row.querySelector('.block-mins-input').addEventListener('input', e => {
+          tempBlocks[idx].mins = Math.max(0, parseInt(e.target.value, 10) || 0);
+          updateBlocksUI();
+        });
+        row.querySelector('.block-secs-input').addEventListener('input', e => {
+          tempBlocks[idx].secs = Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0));
+          updateBlocksUI();
+        });
+        row.querySelector('.btn-block-up').addEventListener('click', () => {
+          if (idx > 0) {
+            [tempBlocks[idx - 1], tempBlocks[idx]] = [tempBlocks[idx], tempBlocks[idx - 1]];
+            updateBlocksUI();
+          }
+        });
+        row.querySelector('.btn-block-down').addEventListener('click', () => {
+          if (idx < tempBlocks.length - 1) {
+            [tempBlocks[idx], tempBlocks[idx + 1]] = [tempBlocks[idx + 1], tempBlocks[idx]];
+            updateBlocksUI();
+          }
+        });
+        row.querySelector('.btn-delete-block').addEventListener('click', () => {
+          if (tempBlocks.length <= 1) {
+            alert('La secuencia debe contener al menos un bloque.');
+            return;
+          }
+          tempBlocks.splice(idx, 1);
+          updateBlocksUI();
+        });
+
+        blocksContainer.appendChild(row);
+      });
+    };
+
+    updateBlocksUI();
+
+    addBlockBtn.addEventListener('click', () => {
+      if (tempBlocks.length >= 7) {
+        alert('Se ha alcanzado el límite máximo de 7 bloques.');
+        return;
+      }
+      tempBlocks.push({ name: `Bloque ${tempBlocks.length + 1}`, mins: 5, secs: 0 });
+      updateBlocksUI();
+    });
+
+    const cancelBtn = wrapper.querySelector('#btn-syllabus-med-cancel');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => {
+        editingItem = null;
+        editingStore = '';
+        isMeditationFormOpen = false;
+        refresh();
+      });
+    }
+
+    wrapper.querySelector('#meditation-syllabus-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const name = wrapper.querySelector('#syllabus-med-name').value.trim();
+      const description = wrapper.querySelector('#syllabus-med-desc').value.trim();
+      const validation = validateMeditationSequence({ name, blocks: tempBlocks });
+      if (!validation.isValid) {
+        alert(validation.reason);
+        return;
+      }
+      const data = sanitizeMeditationSequence({
+        id: isEditing ? editingItem.id : `med-seq-${Date.now()}`,
+        name,
+        description,
+        blocks: tempBlocks
+      });
+      await putData(db, 'meditation_presets', data);
+      editingItem = null;
+      editingStore = '';
+      isMeditationFormOpen = false;
+      await refresh();
+    });
+
+    // Renderizar catálogo de secuencias guardadas
+    const listEl = wrapper.querySelector('#syllabus-meditation-list');
+    if (meditationPresets.length === 0) {
+      listEl.innerHTML = '<p class="strength-manager__empty" style="padding: 24px 0;">No hay secuencias de meditación registradas. Crea tu primera secuencia con el botón superior.</p>';
+      return;
+    }
+
+    meditationPresets.forEach(preset => {
+      const card = document.createElement('div');
+      card.className = 'acu-point-card';
+      const totalSecs = preset.totalDuration || calculateSequenceDuration(preset.blocks);
+      const totalLabel = `${Math.floor(totalSecs / 60)}m ${totalSecs % 60 ? `${totalSecs % 60}s` : ''}`;
+      const blocksFlow = (preset.blocks || []).map(b => {
+        const time = b.secs > 0 ? `${b.mins}m ${b.secs}s` : `${b.mins}m`;
+        return `${escapeHTML(b.name)} (${time})`;
+      }).join(' → ');
+
+      card.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div style="flex:1;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-weight:600; font-size:0.92rem; color:var(--color-text-main);">${escapeHTML(preset.name)}</span>
+              <span style="font-family:var(--font-digital); font-size:0.75rem; color:var(--color-accent-red); font-weight:600;">[ ${totalLabel.trim()} ]</span>
+            </div>
+            ${preset.description ? `<p style="font-size:0.75rem; color:var(--color-text-muted); margin:4px 0 8px 0; line-height:1.4;">${escapeHTML(preset.description)}</p>` : ''}
+            <div style="font-size:0.72rem; color:var(--color-text-muted); line-height:1.4; margin-top:6px;">
+              <strong style="color:var(--color-text-main);">Fases:</strong> ${blocksFlow || 'Sin bloques'}
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
+            <span style="font-family:var(--font-mono); font-size:0.65rem; color:var(--color-text-muted); text-transform:uppercase;">${escapeHTML(preset.id)}</span>
+            <div style="display:flex; gap:4px;">
+              <button class="btn-action-icon btn-edit-med-preset" title="Editar" aria-label="Editar">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+              </button>
+              <button class="btn-action-icon delete-icon btn-delete-med-preset" title="Borrar" aria-label="Borrar">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      card.querySelector('.btn-edit-med-preset').addEventListener('click', () => {
+        editingItem = preset;
+        editingStore = 'meditation_presets';
+        isMeditationFormOpen = true;
+        refresh();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+
+      card.querySelector('.btn-delete-med-preset').addEventListener('click', async () => {
+        if (confirm(`¿Seguro que deseas eliminar la secuencia de meditación "${preset.name}"?`)) {
+          await deleteData(db, 'meditation_presets', preset.id);
+          const lastId = localStorage.getItem('meridiano_last_meditation_preset');
+          if (lastId === preset.id) localStorage.removeItem('meridiano_last_meditation_preset');
           refresh();
         }
       });

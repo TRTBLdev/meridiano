@@ -1,5 +1,6 @@
-import { addData } from '../db.js';
+import { addData, getAllData, putData, deleteData } from '../db.js';
 import { renderDotMatrix } from '../utils/dotmatrix.js';
+import { escapeAttribute, escapeHTML } from '../utils/sanitize.js';
 import {
   bindSynthPanel,
   bindWakeLockPreference,
@@ -12,7 +13,12 @@ import {
 import { createSynthEngine, playQuartzBowlRing } from '../utils/synth.js';
 import { getFreqLabel, valueToFreq, freqToValue } from '../utils/freqUtils.js';
 import { renderLobbyAction, renderLobbyShell, renderLobbyTabs } from './lobbyUi.js';
-
+import {
+  calculateSequenceDuration,
+  validateMeditationSequence,
+  formatSequenceBlocksSummary,
+  sanitizeMeditationSequence
+} from '../utils/meditationUtils.js';
 
 export async function renderMeditationScreen(container, db, onNavigate) {
   const synth = createSynthEngine();
@@ -29,6 +35,10 @@ export async function renderMeditationScreen(container, db, onNavigate) {
     { name: 'Fase Profunda', mins: 5, secs: 0 }
   ];
 
+  let savedPresets = [];
+  let activePresetId = null;
+  let activePresetName = '';
+
   let randomTimes = [];
   let blockBoundaries = [];
   let localFreq = 6.0;
@@ -42,6 +52,24 @@ export async function renderMeditationScreen(container, db, onNavigate) {
   let elapsedSeconds = 0;
   let isPaused = false;
   const wakeLockController = createWakeLockController();
+
+  async function loadPresets() {
+    try {
+      const all = await getAllData(db, 'meditation_presets');
+      savedPresets = (all || []).filter(item => Array.isArray(item.blocks) && item.blocks.length > 0);
+      savedPresets.sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+
+      const lastId = localStorage.getItem('meridiano_last_meditation_preset');
+      if (lastId && savedPresets.some(p => p.id === lastId)) {
+        const found = savedPresets.find(p => p.id === lastId);
+        activePresetId = found.id;
+        activePresetName = found.name;
+        blocks = structuredClone(found.blocks);
+      }
+    } catch (err) {
+      console.error('[Meditation] Error loading presets:', err);
+    }
+  }
 
   const render = () => {
     container.innerHTML = '';
@@ -84,12 +112,34 @@ export async function renderMeditationScreen(container, db, onNavigate) {
 
     const renderIntervalSettings = () => {
       if (intervalType === 'sequential') {
-        const totalSeconds = blocks.reduce((sum, block) => sum + block.mins * 60 + block.secs, 0);
+        const totalSeconds = calculateSequenceDuration(blocks);
         const totalLabel = `${Math.floor(totalSeconds / 60)}m ${totalSeconds % 60}s`;
         intervalContainer.innerHTML = `
+          <div class="timer-config-group" style="margin-bottom: 16px;">
+            <label>SECUENCIA GUARDADA</label>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <select id="med-preset-select" class="acu-select-flat" style="flex: 1; font-size: 0.8rem;">
+                <option value="">${savedPresets.length ? '(Personalizada / Sin guardar)' : '(No hay secuencias guardadas)'}</option>
+                ${savedPresets.map(p => `
+                  <option value="${escapeAttribute(p.id)}" ${p.id === activePresetId ? 'selected' : ''}>
+                    ${escapeHTML(p.name)} (${Math.floor((p.totalDuration || 0)/60)}m ${((p.totalDuration || 0)%60)}s)
+                  </option>
+                `).join('')}
+              </select>
+              ${activePresetId ? `
+                <button type="button" id="btn-med-delete-preset" class="btn-action-icon delete-icon" title="Eliminar secuencia" aria-label="Eliminar secuencia" style="padding: 6px;">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  </svg>
+                </button>
+              ` : ''}
+            </div>
+          </div>
+
           <div class="timer-config-group">
             <div class="timer-config-heading">
-              <label>SECUENCIA DE BLOQUES</label>
+              <label>BLOQUES ${activePresetName ? `· ${escapeHTML(activePresetName.toUpperCase())}` : ''}</label>
               <span style="font-family: var(--font-digital); color: var(--color-text-muted); font-size: 0.75rem;">TOTAL: ${totalLabel}</span>
             </div>
             <div class="meditation-block-list">
@@ -113,8 +163,97 @@ export async function renderMeditationScreen(container, db, onNavigate) {
               className: 'btn-block-action',
               disabled: blocks.length >= 7
             })}
+            <div style="display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;">
+              ${activePresetId ? `
+                <button type="button" class="btn-braun-tab active" id="btn-med-update-preset" style="font-size: 0.72rem; padding: 6px 14px; font-family: var(--font-digital); text-transform: uppercase;">
+                  Guardar cambios
+                </button>
+              ` : ''}
+              <button type="button" class="btn-braun-tab" id="btn-med-save-new-preset" style="font-size: 0.72rem; padding: 6px 14px; font-family: var(--font-digital); text-transform: uppercase;">
+                + Guardar como nueva
+              </button>
+            </div>
           </div>
         `;
+
+        const presetSelect = intervalContainer.querySelector('#med-preset-select');
+        if (presetSelect) {
+          presetSelect.addEventListener('change', (e) => {
+            const val = e.target.value;
+            if (!val) {
+              activePresetId = null;
+              activePresetName = '';
+              localStorage.removeItem('meridiano_last_meditation_preset');
+              renderIntervalSettings();
+            } else {
+              const found = savedPresets.find(p => p.id === val);
+              if (found) {
+                activePresetId = found.id;
+                activePresetName = found.name;
+                blocks = structuredClone(found.blocks);
+                localStorage.setItem('meridiano_last_meditation_preset', found.id);
+                renderIntervalSettings();
+              }
+            }
+          });
+        }
+
+        const deletePresetBtn = intervalContainer.querySelector('#btn-med-delete-preset');
+        if (deletePresetBtn) {
+          deletePresetBtn.addEventListener('click', async () => {
+            if (!activePresetId) return;
+            if (confirm(`¿Eliminar la secuencia "${activePresetName}" de tus secuencias de meditación?`)) {
+              await deleteData(db, 'meditation_presets', activePresetId);
+              activePresetId = null;
+              activePresetName = '';
+              localStorage.removeItem('meridiano_last_meditation_preset');
+              await loadPresets();
+              renderIntervalSettings();
+            }
+          });
+        }
+
+        const updatePresetBtn = intervalContainer.querySelector('#btn-med-update-preset');
+        if (updatePresetBtn) {
+          updatePresetBtn.addEventListener('click', async () => {
+            if (!activePresetId) return;
+            const validation = validateMeditationSequence({ name: activePresetName, blocks });
+            if (!validation.isValid) {
+              alert(validation.reason);
+              return;
+            }
+            const updated = sanitizeMeditationSequence({ id: activePresetId, name: activePresetName, blocks });
+            await putData(db, 'meditation_presets', updated);
+            await loadPresets();
+            alert(`Secuencia "${activePresetName}" actualizada con éxito.`);
+            renderIntervalSettings();
+          });
+        }
+
+        const saveNewPresetBtn = intervalContainer.querySelector('#btn-med-save-new-preset');
+        if (saveNewPresetBtn) {
+          saveNewPresetBtn.addEventListener('click', async () => {
+            const enteredName = prompt(
+              'Nombre para la nueva secuencia de meditación:',
+              activePresetName ? `${activePresetName} (Copia)` : 'Mi Secuencia de Meditación'
+            );
+            if (enteredName === null) return;
+            const name = enteredName.trim();
+            const validation = validateMeditationSequence({ name, blocks });
+            if (!validation.isValid) {
+              alert(validation.reason);
+              return;
+            }
+            const newSeq = sanitizeMeditationSequence({ name, blocks });
+            await putData(db, 'meditation_presets', newSeq);
+            activePresetId = newSeq.id;
+            activePresetName = newSeq.name;
+            localStorage.setItem('meridiano_last_meditation_preset', newSeq.id);
+            await loadPresets();
+            alert(`Secuencia "${name}" guardada con éxito.`);
+            renderIntervalSettings();
+          });
+        }
 
         intervalContainer.querySelectorAll('.meditation-block-row').forEach(row => {
           const index = parseInt(row.dataset.index);
@@ -445,14 +584,18 @@ export async function renderMeditationScreen(container, db, onNavigate) {
         ? `Fijos: campanas cada ${bellMins}m ${bellSecs}s`
         : intervalType === 'random'
           ? `Aleatorios: ${randomBellsCount} campanas`
-          : `Secuenciales: ${blocks.length} bloques`;
+          : `Secuencia: ${activePresetName ? `"${activePresetName}" · ` : ''}${formatSequenceBlocksSummary(blocks)}`;
+
+      const notes = intervalType === 'sequential' && activePresetName
+        ? `Secuencia "${activePresetName}" completada (${durationMin} min).`
+        : `Meditacion silenciosa completada (${durationMin} min).`;
 
       try {
         await addData(db, 'sessions_log', {
           type: 'meditation',
           date: new Date().toISOString(),
           duration: durationMin,
-          notes: `Meditacion silenciosa completada (${durationMin} min).`,
+          notes,
           details
         });
       } catch (err) {
@@ -461,6 +604,7 @@ export async function renderMeditationScreen(container, db, onNavigate) {
 
       alert('Sesion de meditacion completada.');
       activeView = 'lobby';
+      await loadPresets();
       render();
     };
 
@@ -535,5 +679,6 @@ export async function renderMeditationScreen(container, db, onNavigate) {
     if (next.isAudioActive !== undefined) localAudioActive = next.isAudioActive;
   };
 
+  await loadPresets();
   render();
 }
