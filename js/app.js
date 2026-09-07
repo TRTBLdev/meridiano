@@ -10,6 +10,7 @@ import { renderYogaScreen } from './components/yoga.js';
 import { renderConfigScreen } from './components/config.js';
 import { renderStrengthScreen } from './components/strength.js';
 import { renderSessionsScreen } from './components/sessions.js';
+import { renderBodyScreen } from './components/body.js';
 
 // Estado global de la aplicación
 const state = {
@@ -115,6 +116,8 @@ function handleNavigation(target, param = null) {
     renderSyllabusScreen(appContainer, state.db, handleNavigation);
   } else if (target === 'config') {
     renderConfigScreen(appContainer, state.db, handleNavigation);
+  } else if (target === 'body') {
+    renderBodyScreen(appContainer, state.db, handleNavigation);
   }
 }
 

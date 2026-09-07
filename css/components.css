@@ -4419,3 +4419,376 @@ body.dark-theme .breath-dropdown-options {
   background-color: var(--color-text-muted) !important;
   box-shadow: 0 0 2px rgba(255, 255, 255, 0.25) !important;
 }
+
+/* =============================================================
+   MÓDULO CUERPO — Seguimiento de Peso y Medidas
+   ============================================================= */
+
+/* --- Screen Layout --- */
+.body-screen {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  color: var(--color-text-main);
+}
+
+.module-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem clamp(1rem, 5vw, 2.5rem) 1rem;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: var(--color-surface-subtle);
+  color: var(--color-text-main);
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+  flex-shrink: 0;
+}
+.back-btn:hover {
+  background: var(--color-surface-hover);
+  transform: translateX(-2px);
+}
+
+.module-title {
+  font-size: 1.1rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin: 0;
+  color: var(--color-text-main);
+}
+
+.body-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 clamp(1rem, 5vw, 2.5rem);
+  max-width: 40rem;
+  width: 100%;
+  margin: 0 auto;
+  padding-bottom: 3rem;
+}
+
+/* --- Tabs --- */
+.body-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--color-divider);
+  margin-bottom: 1.5rem;
+}
+
+.body-tab {
+  flex: 1;
+  padding: 0.75rem 0.5rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted);
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease;
+  margin-bottom: -1px;
+}
+.body-tab:hover { color: var(--color-text-main); }
+.body-tab.active {
+  color: var(--color-text-main);
+  border-bottom-color: var(--color-text-main);
+}
+
+/* --- Tab Panels --- */
+.body-tab-panel { display: none; }
+.body-tab-panel.active { display: block; }
+
+.body-tab-hint {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  margin: 0 0 1.5rem;
+  line-height: 1.5;
+}
+
+/* --- Form --- */
+.body-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.body-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.body-label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.body-unit {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.body-input {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-divider);
+  border-radius: 4px;
+  background: var(--color-surface-subtle);
+  color: var(--color-text-main);
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+.body-input:focus {
+  border-color: var(--color-text-main);
+  background: var(--color-surface-hover);
+}
+.body-input::placeholder { color: var(--color-text-muted); opacity: 0.6; }
+
+.body-textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.body-save-btn {
+  margin-top: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--color-control-active-bg);
+  color: var(--color-control-active-text);
+  border: none;
+  border-radius: 4px;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.15s ease;
+  align-self: flex-start;
+}
+.body-save-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+.body-save-btn:active { transform: translateY(0); }
+
+/* --- Charts --- */
+.chart-block {
+  margin-bottom: 2.5rem;
+}
+
+.chart-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin: 0 0 0.75rem;
+}
+
+.chart-wrapper {
+  position: relative;
+  height: 220px;
+  width: 100%;
+}
+
+/* Measure toggles */
+.measure-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.measure-toggle {
+  padding: 0.3rem 0.65rem;
+  font-family: var(--font-ui);
+  font-size: 0.73rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  border: 1px solid var(--color-divider);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.measure-toggle.active {
+  border-color: var(--toggle-color, var(--color-text-main));
+  color: var(--toggle-color, var(--color-text-main));
+  background: color-mix(in srgb, var(--toggle-color, var(--color-text-main)) 10%, transparent);
+}
+
+/* --- History --- */
+.body-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.body-history-card {
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--color-divider);
+  border-radius: 6px;
+  background: var(--color-surface-subtle);
+  transition: background 0.2s ease;
+}
+.body-history-card:hover { background: var(--color-surface-hover); }
+
+.history-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.history-date {
+  font-family: var(--font-digital);
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  letter-spacing: 0.04em;
+}
+
+.btn-delete-metric {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: 50%;
+  opacity: 0.4;
+  transition: opacity 0.2s ease, background 0.2s ease;
+}
+.btn-delete-metric:hover { opacity: 1; background: var(--color-surface-hover); }
+
+.history-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  font-size: 0.85rem;
+}
+
+.history-field { color: var(--color-text-muted); }
+.history-field strong { color: var(--color-text-main); font-weight: 600; }
+
+.history-notes {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+  line-height: 1.4;
+}
+
+.body-empty {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 2rem 0;
+}
+
+/* --- Toast --- */
+.body-toast {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--color-control-active-bg);
+  color: var(--color-control-active-text);
+  padding: 0.65rem 1.25rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  z-index: 1000;
+}
+.body-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* --- Historial: Card resumen de Cuerpo --- */
+.body-summary-card {
+  margin: 1.5rem 0;
+  padding: 1rem 0;
+  border-top: 1px solid var(--color-divider-soft);
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+.body-summary-card:hover {
+  opacity: 0.92;
+}
+
+.body-card-content {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin: 0.5rem 0 0.75rem;
+  flex-wrap: wrap;
+}
+
+.body-card-weight {
+  font-family: var(--font-digital);
+  font-size: 1.5rem;
+  color: var(--color-text-main);
+  letter-spacing: 0.04em;
+}
+
+.body-card-delta {
+  font-family: var(--font-digital);
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+}
+.body-card-delta.delta-down { color: #34d399; } /* verde = bajó */
+.body-card-delta.delta-up   { color: #f472b6; } /* rosa = subió */
+.body-card-delta.delta-neutral { color: var(--color-text-muted); }
+
+.body-card-date {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  font-family: var(--font-digital);
+  letter-spacing: 0.04em;
+}
+
+.body-card-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+.body-card-btn:hover { color: var(--color-text-main); }
+

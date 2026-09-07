@@ -8,7 +8,7 @@ import { defaultStrengthExercises, defaultStrengthCircuits } from './seeds/stren
 import { defaultCompoundSessions } from './seeds/compound_sessions_seed.js';
 
 const DB_NAME = 'meridiano_db';
-const DB_VERSION = 11;
+const DB_VERSION = 12;
 
 /**
  * Abre la conexión a IndexedDB y crea las tablas/almacenes necesarios.
@@ -102,6 +102,17 @@ export function openDB() {
       // 11. Módulo Sesiones Compuestas
       if (!db.objectStoreNames.contains('compound_sessions')) {
         db.createObjectStore('compound_sessions', { keyPath: 'id' });
+      }
+
+      // 12. Módulo Seguimiento Corporal (Métricas)
+      if (!db.objectStoreNames.contains('body_metrics')) {
+        const metricsStore = db.createObjectStore('body_metrics', { keyPath: 'id', autoIncrement: true });
+        metricsStore.createIndex('by_date', 'date', { unique: false });
+      }
+
+      // 12b. Módulo Seguimiento Corporal (Metas)
+      if (!db.objectStoreNames.contains('body_goals')) {
+        db.createObjectStore('body_goals', { keyPath: 'id' });
       }
     };
   });

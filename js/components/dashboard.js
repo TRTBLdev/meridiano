@@ -123,7 +123,6 @@ export async function renderDashboard(container, session, db, onNavigate) {
               <div class="pilar-list-item strength" data-module="strength">
                 <span>Fuerza</span>
               </div>
- 
             </div>
           </section>
 
@@ -144,6 +143,17 @@ export async function renderDashboard(container, session, db, onNavigate) {
               <div id="calendar-grid-container" class="calendar-grid">
                 <!-- Cargado dinámicamente -->
               </div>
+            </div>
+
+            <!-- Card de Cuerpo en Historial -->
+            <div id="body-summary-card" class="body-summary-card">
+              ${renderTechnicalTitle('Cuerpo', { className: 'hilo-agua-title' })}
+              <div class="body-card-content">
+                <span id="body-card-weight" class="body-card-weight">—</span>
+                <span id="body-card-delta" class="body-card-delta"></span>
+                <span id="body-card-date" class="body-card-date"></span>
+              </div>
+              <button id="body-card-btn" class="body-card-btn" data-module="body">Ver detalles &rarr;</button>
             </div>
  
             ${renderTechnicalTitle('El Hilo de Agua', { className: 'hilo-agua-title' })}
@@ -197,6 +207,11 @@ export async function renderDashboard(container, session, db, onNavigate) {
     });
   });
 
+  // Listener del card de Cuerpo en Historial
+  const bodyCard = container.querySelector('#body-summary-card');
+  if (bodyCard) {
+    bodyCard.addEventListener('click', () => onNavigate('body'));
+  }
 
 }
 
@@ -207,6 +222,9 @@ async function loadHistoryAndCalendar(db) {
   const calendarContainer = document.getElementById('calendar-grid-container');
   const timelineNodes = document.getElementById('timeline-nodes-list');
   const svgCurve = document.getElementById('timeline-svg-curve');
+
+  // Cargar datos de métricas corporales para el card rápido
+  loadBodySummaryCard(db);
 
   try {
     const logs = await getAllData(db, 'sessions_log');
@@ -354,5 +372,55 @@ async function loadHistoryAndCalendar(db) {
     console.error('[Dashboard] Error rendering history:', error);
     calendarContainer.innerHTML = 'Error al cargar calendario';
     timelineNodes.innerHTML = 'Error al cargar Hilo de Agua';
+  }
+}
+
+/**
+ * Carga las dos métricas corporales más recientes y actualiza el card resumen en el panel de Historial.
+ */
+async function loadBodySummaryCard(db) {
+  const card = document.getElementById('body-summary-card');
+  if (!card) return;
+  const weightEl = document.getElementById('body-card-weight');
+  const deltaEl = document.getElementById('body-card-delta');
+  const dateEl = document.getElementById('body-card-date');
+  const btnEl = document.getElementById('body-card-btn');
+
+  try {
+    const records = await getAllData(db, 'body_metrics');
+    if (!records || records.length === 0) {
+      if (weightEl) weightEl.textContent = 'Sin registros';
+      if (deltaEl) deltaEl.textContent = '';
+      if (dateEl) dateEl.textContent = '';
+      if (btnEl) btnEl.textContent = 'Registrar medidas →';
+      return;
+    }
+    records.sort((a, b) => b.date.localeCompare(a.date));
+    const latest = records[0];
+    const prev = records[1] || null;
+
+    if (weightEl) {
+      weightEl.textContent = latest.weight != null ? `${latest.weight} kg` : 'Sin peso';
+    }
+
+    if (deltaEl) {
+      if (latest.weight != null && prev?.weight != null) {
+        const diff = (latest.weight - prev.weight).toFixed(1);
+        const sign = diff > 0 ? '+' : '';
+        deltaEl.textContent = `${sign}${diff} kg`;
+        deltaEl.className = 'body-card-delta ' + (diff > 0 ? 'delta-up' : diff < 0 ? 'delta-down' : 'delta-neutral');
+      } else {
+        deltaEl.textContent = '';
+      }
+    }
+
+    if (dateEl) {
+      dateEl.textContent = latest.date;
+    }
+    if (btnEl) {
+      btnEl.textContent = 'Ver detalles →';
+    }
+  } catch (err) {
+    console.error('[Dashboard] Error cargando card de Cuerpo:', err);
   }
 }
