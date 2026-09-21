@@ -12,34 +12,117 @@
 }
 
 
-.nav-item {
+.nav-header {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 36px;
+  padding: 0 4px;
+}
+
+.nav-toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 4px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.2s ease;
+  opacity: 0.5;
+}
+
+.nav-toggle-btn:hover {
+  color: var(--color-text-main);
+  opacity: 1;
+}
+
+.nav-toggle-btn svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dashboard-layout.sidebar-collapsed .nav-toggle-btn svg {
+  transform: rotate(180deg);
+}
+
+.dashboard-layout.sidebar-collapsed .nav-header {
+  justify-content: center;
+  margin-bottom: 28px;
+  padding: 0;
+}
+
+.dashboard-layout.sidebar-collapsed .nav-logo {
+  display: none;
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
   cursor: pointer;
   color: var(--color-text-muted);
-  transition: all 0.3s ease;
-  padding: 10px;
-  border-radius: 12px;
-  font-size: 0.75rem;
+  transition: all 0.25s ease;
+  padding: 9px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
   font-weight: 500;
+  width: 100%;
 }
 
 .nav-item svg {
-  width: 22px;
-  height: 22px;
-  margin-bottom: 2px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
   stroke: var(--color-text-muted);
-  transition: stroke 0.3s ease;
+  transition: stroke 0.25s ease;
+}
+
+.nav-item span {
+  font-size: 0.8rem;
+  white-space: nowrap;
+  transition: opacity 0.2s ease;
 }
 
 .nav-item:hover, .nav-item.active {
   color: var(--color-text-main);
+  background: var(--color-surface-hover);
 }
 
 .nav-item:hover svg, .nav-item.active svg {
   stroke: var(--color-text-main);
+}
+
+.dashboard-layout.sidebar-collapsed .nav-item {
+  justify-content: center;
+  padding: 10px 0;
+  gap: 0;
+}
+
+.dashboard-layout.sidebar-collapsed .nav-item span {
+  display: none;
+}
+
+@media (max-width: 600px) and (orientation: portrait) {
+  .nav-header {
+    display: none !important;
+  }
+  .nav-item {
+    flex-direction: column !important;
+    justify-content: center !important;
+    padding: 6px !important;
+    gap: 2px !important;
+  }
+  .nav-item span {
+    display: block !important;
+    font-size: 0.65rem !important;
+  }
 }
 
 /* Viewport Principal (Deslizamiento continuo) */
@@ -208,7 +291,7 @@
 .hilo-agua-panel {
   display: flex;
   flex-direction: column;
-  padding: 48px 0;
+  padding: 8px 0 48px 0;
   width: 100%;
 }
 
@@ -287,6 +370,480 @@
 .calendar-day.practice-breathwork::before { background-color: #29B6F6; }
 .calendar-day.practice-acupuncture::before { background-color: var(--color-accent-green); }
 .calendar-day.practice-meditation::before { background-color: #AB47BC; }
+.calendar-day.practice-strength::before { background-color: #FF9800; }
+.calendar-day.practice-compound::before { background-color: #00E676; }
+
+.calendar-day.has-practice {
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+.calendar-day.has-practice:hover {
+  background-color: rgba(46, 43, 40, 0.06);
+}
+body.dark-theme .calendar-day.has-practice:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+.calendar-day.selected-day {
+  background-color: rgba(46, 43, 40, 0.1) !important;
+  font-weight: 700;
+}
+body.dark-theme .calendar-day.selected-day {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Acordeones Interactivos con Chevrons */
+.section-accordion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  padding: 10px 0;
+  width: 100%;
+  transition: opacity 0.2s ease;
+}
+.section-accordion-header:hover {
+  opacity: 0.85;
+}
+.accordion-chevron {
+  width: 16px;
+  height: 16px;
+  stroke: var(--color-text-muted);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), stroke 0.2s ease;
+  display: inline-flex;
+}
+.section-accordion-header:hover .accordion-chevron {
+  stroke: var(--color-text-main);
+}
+.accordion-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+.accordion-content {
+  overflow: hidden;
+  transition: max-height 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+  max-height: 1500px;
+  opacity: 1;
+}
+.accordion-content.collapsed {
+  max-height: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* El Hilo de Agua: Cinta Cronométrica Continua (Partitura Analógica Rams) */
+.chronometric-stream {
+  position: relative;
+  width: 100%;
+  padding-left: 36px;
+  margin-top: 20px;
+}
+/* Eje continuo de 1px con margen de seguridad (left: 14px) para evitar cualquier recorte */
+.chronometric-stream::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(46, 43, 40, 0.14);
+}
+body.dark-theme .chronometric-stream::before {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.stream-entry {
+  position: relative;
+  margin-bottom: 36px;
+  transition: opacity 0.2s ease;
+}
+
+.stream-led {
+  position: absolute;
+  left: -25.5px;
+  top: 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--color-text-muted);
+  z-index: 2;
+}
+.stream-led.practice-yoga { background-color: var(--color-accent-red); }
+.stream-led.practice-breathwork { background-color: #29B6F6; }
+.stream-led.practice-acupuncture { background-color: var(--color-accent-green); }
+.stream-led.practice-meditation { background-color: #AB47BC; }
+.stream-led.practice-strength { background-color: #FF9800; }
+.stream-led.practice-compound { background-color: #00E676; }
+
+.stream-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.stream-badge-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.stream-date {
+  font-family: var(--font-digital);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+.stream-tag {
+  font-family: var(--font-digital);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.stream-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.stream-duration {
+  font-family: var(--font-digital);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.stream-title {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--color-text-main);
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.stream-notes {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.compound-accordion-toggle {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-family: var(--font-digital);
+  font-size: 0.68rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 2px 0;
+  transition: color 0.2s ease;
+  letter-spacing: 0.05em;
+}
+.compound-accordion-toggle:hover {
+  color: var(--color-text-main);
+}
+.compound-accordion-toggle svg {
+  width: 12px;
+  height: 12px;
+  transition: transform 0.2s ease;
+}
+.compound-accordion-toggle.expanded svg {
+  transform: rotate(180deg);
+}
+
+.stream-blocks-detail {
+  margin-top: 12px;
+  padding-left: 14px;
+  border-left: 1px solid rgba(46, 43, 40, 0.12);
+  font-size: 0.78rem;
+  display: none;
+}
+body.dark-theme .stream-blocks-detail {
+  border-left-color: rgba(255, 255, 255, 0.12);
+}
+.stream-blocks-detail.expanded {
+  display: block;
+}
+
+/* Filtro de Fecha en Hilo de Agua */
+.timeline-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(46, 43, 40, 0.03);
+  border: 1px solid rgba(46, 43, 40, 0.08);
+  padding: 6px 12px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-size: 0.75rem;
+  color: var(--color-text-main);
+}
+body.dark-theme .timeline-filter-bar {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.timeline-clear-filter {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-family: var(--font-digital);
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 3px;
+  transition: color 0.2s ease;
+}
+.timeline-clear-filter:hover {
+  color: var(--color-accent-red);
+}
+.timeline-load-more-btn {
+  width: 100%;
+  background: transparent;
+  border: 1px dashed rgba(46, 43, 40, 0.2);
+  color: var(--color-text-muted);
+  font-family: var(--font-digital);
+  font-size: 0.7rem;
+  padding: 10px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-top: 12px;
+  transition: all 0.2s ease;
+}
+body.dark-theme .timeline-load-more-btn {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.timeline-load-more-btn:hover {
+  border-color: var(--color-text-main);
+  color: var(--color-text-main);
+}
+
+/* Instrumentos de Medición Analógica: Progreso y Cuerpo Sin Cajas */
+.monitoring-instruments-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  width: 100%;
+  padding: 16px 0 20px;
+  border-bottom: none;
+  margin-bottom: 0;
+}
+@media (max-width: 600px) and (orientation: portrait) {
+  .monitoring-instruments-row {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
+
+.instrument-column {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  padding: 0;
+}
+.instrument-column:hover {
+  opacity: 0.88;
+}
+
+.instrument-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.instrument-title {
+  font-family: var(--font-digital);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  margin: 0;
+  transition: color 0.2s ease;
+}
+
+.instrument-arrow {
+  font-family: var(--font-digital);
+  font-size: 0.95rem;
+  color: var(--color-text-muted);
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.instrument-column:hover .instrument-arrow {
+  transform: translateX(3px);
+  color: var(--color-text-main);
+}
+
+.instrument-column:hover .instrument-title {
+  color: var(--color-text-main);
+}
+
+.instrument-reading-value {
+  font-family: var(--font-digital);
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: var(--color-text-main);
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+
+.instrument-reading-sub {
+  font-family: var(--font-digital);
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.instrument-reading-desc {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}
+
+/* Pantalla de Cierre con Vitalidad */
+.vitality-completion-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  max-width: 480px;
+  width: 100%;
+  padding: 32px 24px;
+  margin: 0 auto;
+}
+.vitality-options-grid {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  margin: 24px 0;
+  justify-content: center;
+}
+.btn-vitality-option {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 10px;
+  background: rgba(46, 43, 40, 0.03);
+  border: 1px solid rgba(46, 43, 40, 0.12);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--color-text-main);
+}
+body.dark-theme .btn-vitality-option {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.btn-vitality-option:hover,
+.btn-vitality-option.selected {
+  border-color: var(--color-accent-green);
+  background: rgba(0, 230, 118, 0.08);
+  transform: translateY(-2px);
+}
+.vitality-option-emoji {
+  font-size: 1.5rem;
+}
+.vitality-option-text {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* Pantalla de Progreso Integral - Estética Analógica Sin Frames */
+.progress-screen {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 32px 20px 80px;
+  width: 100%;
+}
+.progress-section {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin-bottom: 48px;
+}
+body.dark-theme .progress-section {
+  background: transparent;
+  border-color: transparent;
+}
+
+.progress-metrics-row {
+  display: flex;
+  gap: 32px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--color-divider-soft);
+}
+.progress-metric-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.progress-metric-sub {
+  font-size: 0.65rem;
+  font-family: var(--font-digital);
+  color: var(--color-text-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.progress-metric-val {
+  font-family: var(--font-digital);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text-main);
+}
+.progress-metric-val.highlight {
+  color: var(--color-accent-green);
+}
+.progress-pattern-selector {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 16px 0 20px;
+}
+.btn-pattern-pill {
+  background: transparent;
+  border: 1px solid rgba(46, 43, 40, 0.15);
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  padding: 6px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+body.dark-theme .btn-pattern-pill {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+.btn-pattern-pill:hover,
+.btn-pattern-pill.active {
+  background: var(--color-text-main);
+  color: var(--color-bg-base);
+  border-color: var(--color-text-main);
+}
+.progress-chart-container {
+  position: relative;
+  width: 100%;
+  height: 260px;
+}
 
 /* El Hilo de Agua - Lista Curva SVG Amplia */
 .hilo-agua-svg-area {

@@ -37,13 +37,22 @@ export async function renderDashboard(container, session, db, onNavigate) {
   const options = { day: 'numeric', month: 'long' };
   const dateString = `HOY ${today.toLocaleDateString('es-ES', options).toUpperCase()}`;
 
+  const isSidebarCollapsed = localStorage.getItem('meridiano_sidebar_collapsed') === 'true';
+
   container.innerHTML = `
-    <div class="dashboard-layout fade-in">
+    <div class="dashboard-layout fade-in ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}">
       <!-- 1. Barra de Navegación Lateral Fija -->
       <nav class="nav-bar">
-        <div class="nav-logo dot-digital">M.</div>
+        <div class="nav-header">
+          <div class="nav-logo dot-digital">M.</div>
+          <button id="btn-toggle-sidebar" class="nav-toggle-btn" title="Plegar / Desplegar barra de navegación">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </button>
+        </div>
         <ul class="nav-links">
-          <li class="nav-item active" data-target="inicio">
+          <li class="nav-item active" data-target="inicio" title="Inicio">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
               <polyline points="9 22 9 12 15 12 15 22"></polyline>
@@ -51,7 +60,7 @@ export async function renderDashboard(container, session, db, onNavigate) {
             <span>Inicio</span>
           </li>
 
-          <li class="nav-item" data-target="syllabus">
+          <li class="nav-item" data-target="syllabus" title="Syllabus">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
               <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
@@ -71,7 +80,7 @@ export async function renderDashboard(container, session, db, onNavigate) {
             </svg>
             <span>Tema</span>
           </li>
-          <li class="nav-item" data-target="logout">
+          <li class="nav-item" data-target="logout" title="Cerrar Sesión">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
               <polyline points="16 17 21 12 16 7"></polyline>
@@ -133,39 +142,81 @@ export async function renderDashboard(container, session, db, onNavigate) {
               <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
           </div>
- 
-          <!-- 3. Panel de Historial Integrado en el Scroll Continuo -->
-          <aside class="hilo-agua-panel">
-            ${renderTechnicalTitle('Historial', { className: 'hilo-agua-title' })}
-            
-            <!-- Calendario sin bordes -->
-            <div class="calendar-section">
-              <div id="calendar-grid-container" class="calendar-grid">
-                <!-- Cargado dinámicamente -->
+
+          <!-- Fila de Instrumentos de Medición Analógica: Progreso & Cuerpo -->
+          <div class="monitoring-instruments-row">
+            <!-- Instrumento: Progreso Integral -->
+            <div id="progress-instrument-col" class="instrument-column" title="Ver análisis de progreso y sobrecarga">
+              <div class="instrument-header">
+                ${renderTechnicalTitle('Progreso', { className: 'instrument-title', style: 'margin: 0;' })}
+                <span class="instrument-arrow">&rarr;</span>
+              </div>
+              <div class="instrument-body">
+                <div id="progress-col-val" class="instrument-reading-value">0 / 2</div>
+                <div class="instrument-reading-sub">SESIONES SEMANALES</div>
+                <div class="instrument-reading-desc">Fuerza · Hábitos · Vitalidad</div>
               </div>
             </div>
 
-            <!-- Card de Cuerpo en Historial -->
-            <div id="body-summary-card" class="body-summary-card">
-              ${renderTechnicalTitle('Cuerpo', { className: 'hilo-agua-title' })}
-              <div class="body-card-content">
-                <span id="body-card-weight" class="body-card-weight">—</span>
-                <span id="body-card-delta" class="body-card-delta"></span>
-                <span id="body-card-date" class="body-card-date"></span>
+            <!-- Instrumento: Cuerpo -->
+            <div id="body-instrument-col" class="instrument-column" title="Ver registro y métricas corporales">
+              <div class="instrument-header">
+                ${renderTechnicalTitle('Cuerpo', { className: 'instrument-title', style: 'margin: 0;' })}
+                <span class="instrument-arrow">&rarr;</span>
               </div>
-              <button id="body-card-btn" class="body-card-btn" data-module="body">Ver detalles &rarr;</button>
+              <div class="instrument-body">
+                <div id="body-card-weight" class="instrument-reading-value">—</div>
+                <div class="instrument-reading-sub">
+                  <span id="body-card-delta" class="body-card-delta"></span>
+                  <span id="body-card-date" class="body-card-date"></span>
+                </div>
+                <div class="instrument-reading-desc">Registro métrico corporal</div>
+              </div>
             </div>
- 
-            ${renderTechnicalTitle('El Hilo de Agua', { className: 'hilo-agua-title' })}
-            <!-- Timeline Orbital SVG sin puntos -->
-            <div class="hilo-agua-svg-area">
-              <svg style="position: absolute; left: 0; top: 0; width: 30px; height: 100%; pointer-events: none; overflow: visible;">
-                <path id="timeline-svg-curve" class="hilo-agua-path" d="" />
+          </div>
+
+          <!-- 3. Panel de Historial Integrado en el Scroll Continuo -->
+          <aside class="hilo-agua-panel">
+            <!-- Acordeón 1: Calendario de Práctica -->
+            <div id="header-accordion-calendar" class="section-accordion-header" title="Plegar / desplegar calendario">
+              ${renderTechnicalTitle('Calendario', { className: 'hilo-agua-title', style: 'margin: 0;' })}
+              <svg id="chevron-accordion-calendar" class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
               </svg>
-              
-              <div id="timeline-nodes-list" class="timeline-list-container">
-                <!-- Cargado dinámicamente -->
+            </div>
+            
+            <div id="calendar-accordion-content" class="accordion-content">
+              <div class="calendar-section" style="margin-top: 16px; margin-bottom: 32px;">
+                <div id="calendar-grid-container" class="calendar-grid">
+                  <!-- Cargado dinámicamente -->
+                </div>
               </div>
+            </div>
+
+            <!-- Acordeón 2: El Hilo de Agua -->
+            <div id="header-accordion-timeline" class="section-accordion-header" style="margin-top: 24px;" title="Plegar / desplegar Hilo de Agua">
+              ${renderTechnicalTitle('El Hilo de Agua', { className: 'hilo-agua-title', style: 'margin: 0;' })}
+              <svg id="chevron-accordion-timeline" class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </div>
+
+            <div id="timeline-accordion-content" class="accordion-content">
+              <!-- Barra de Filtro Activo por Fecha (dinámica) -->
+              <div id="timeline-filter-bar" class="timeline-filter-bar" style="display: none; margin-top: 12px;">
+                <span id="timeline-filter-text">Filtrando por fecha</span>
+                <button id="btn-clear-timeline-filter" class="timeline-clear-filter">✕ Quitar filtro</button>
+              </div>
+
+              <!-- El Hilo de Agua: Cinta Cronométrica Continua -->
+              <div id="timeline-nodes-list" class="chronometric-stream">
+                <!-- Cargado dinámicamente como Cinta Cronométrica Rams -->
+              </div>
+
+              <!-- Botón Ver Más Registros -->
+              <button id="btn-timeline-load-more" class="timeline-load-more-btn" style="display: none;">
+                Ver sesiones anteriores
+              </button>
             </div>
           </aside>
         </div>
@@ -174,8 +225,18 @@ export async function renderDashboard(container, session, db, onNavigate) {
   `;
  
   // Cargar datos de IndexedDB y renderizar calendario e Hilo de Agua
-  await loadHistoryAndCalendar(db);
- 
+  await loadHistoryAndCalendar(db, onNavigate);
+
+  // Toggle de la Barra Lateral (Sidebar)
+  const dashboardLayout = container.querySelector('.dashboard-layout');
+  const btnToggleSidebar = container.querySelector('#btn-toggle-sidebar');
+  if (btnToggleSidebar && dashboardLayout) {
+    btnToggleSidebar.addEventListener('click', () => {
+      const isCollapsed = dashboardLayout.classList.toggle('sidebar-collapsed');
+      localStorage.setItem('meridiano_sidebar_collapsed', isCollapsed ? 'true' : 'false');
+    });
+  }
+
   // Listeners de navegación de la barra lateral
   const navItems = container.querySelectorAll('.nav-item');
   navItems.forEach(item => {
@@ -207,10 +268,15 @@ export async function renderDashboard(container, session, db, onNavigate) {
     });
   });
 
-  // Listener del card de Cuerpo en Historial
-  const bodyCard = container.querySelector('#body-summary-card');
-  if (bodyCard) {
-    bodyCard.addEventListener('click', () => onNavigate('body'));
+  // Listeners para instrumentos de monitoreo analógico
+  const progressCol = container.querySelector('#progress-instrument-col');
+  if (progressCol) {
+    progressCol.addEventListener('click', () => onNavigate('progress'));
+  }
+
+  const bodyCol = container.querySelector('#body-instrument-col');
+  if (bodyCol) {
+    bodyCol.addEventListener('click', () => onNavigate('body'));
   }
 
 }
@@ -218,16 +284,52 @@ export async function renderDashboard(container, session, db, onNavigate) {
 /**
  * Carga las sesiones de IndexedDB y dibuja el calendario estructurado y el Hilo de Agua orbital.
  */
-async function loadHistoryAndCalendar(db) {
+async function loadHistoryAndCalendar(db, onNavigate) {
   const calendarContainer = document.getElementById('calendar-grid-container');
   const timelineNodes = document.getElementById('timeline-nodes-list');
-  const svgCurve = document.getElementById('timeline-svg-curve');
+  const filterBar = document.getElementById('timeline-filter-bar');
+  const filterText = document.getElementById('timeline-filter-text');
+  const btnClearFilter = document.getElementById('btn-clear-timeline-filter');
+  const btnLoadMore = document.getElementById('btn-timeline-load-more');
+
+  // Acordeón de Calendario
+  const headerAccordionCalendar = document.getElementById('header-accordion-calendar');
+  const chevronAccordionCalendar = document.getElementById('chevron-accordion-calendar');
+  const calendarContent = document.getElementById('calendar-accordion-content');
+
+  if (headerAccordionCalendar && calendarContent) {
+    headerAccordionCalendar.addEventListener('click', () => {
+      const isCollapsed = calendarContent.classList.toggle('collapsed');
+      if (chevronAccordionCalendar) {
+        chevronAccordionCalendar.classList.toggle('collapsed', isCollapsed);
+      }
+    });
+  }
+
+  // Acordeón de Hilo de Agua
+  const headerAccordionTimeline = document.getElementById('header-accordion-timeline');
+  const chevronAccordionTimeline = document.getElementById('chevron-accordion-timeline');
+  const timelineContent = document.getElementById('timeline-accordion-content');
+
+  if (headerAccordionTimeline && timelineContent) {
+    headerAccordionTimeline.addEventListener('click', () => {
+      const isCollapsed = timelineContent.classList.toggle('collapsed');
+      if (chevronAccordionTimeline) {
+        chevronAccordionTimeline.classList.toggle('collapsed', isCollapsed);
+      }
+    });
+  }
+
+  // Estado local para paginación y filtro
+  let selectedFilterDate = null;
+  let displayedLimit = 5;
 
   // Cargar datos de métricas corporales para el card rápido
   loadBodySummaryCard(db);
 
   try {
     const logs = await getAllData(db, 'sessions_log');
+    logs.sort((a, b) => new Date(b.date) - new Date(a.date));
     
     // -------------------------------------------------------------
     // RENDER DEL CALENDARIO SIN BORDES
@@ -258,14 +360,16 @@ async function loadHistoryAndCalendar(db) {
       });
 
       let practiceClass = '';
+      let datasetAttr = '';
       if (dayLogs.length > 0) {
         practiceClass = 'has-practice';
         const type = dayLogs[0].type;
         practiceClass += ` practice-${toSafeClassToken(type)}`;
+        datasetAttr = `data-date="${dateToCheck.toISOString()}" data-day="${day}"`;
       }
 
       calendarHTML += `
-        <div class="calendar-day ${practiceClass}">
+        <div class="calendar-day ${practiceClass}" ${datasetAttr} title="${dayLogs.length > 0 ? `${dayLogs.length} práctica(s)` : ''}">
           <span class="calendar-day-num">${day}</span>
         </div>
       `;
@@ -273,126 +377,236 @@ async function loadHistoryAndCalendar(db) {
 
     calendarContainer.innerHTML = calendarHTML;
 
-    // -------------------------------------------------------------
-    // RENDER DEL HILO DE AGUA CRONOLÓGICO SIN PUNTOS
-    // -------------------------------------------------------------
-    if (logs.length === 0) {
-      timelineNodes.innerHTML = `
-        <div class="timeline-node-wrapper">
-          <div class="node-date">HOY</div>
-          <div class="node-content">◌ Flujo de integración en calma</div>
-        </div>
-      `;
-      return;
-    }
-
-    logs.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    let timelineHTML = '';
-    logs.forEach(log => {
-      const logDate = new Date(log.date);
-      const dateString = logDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
-      
-      let label = 'YOGA';
-      if (log.type === 'breathwork') label = 'BREATH';
-      if (log.type === 'acupuncture') label = 'ACU';
-      if (log.type === 'meditation') label = 'MED';
-      if (log.type === 'strength') label = 'FUERZA';
-      if (log.type === 'compound') label = 'INTEGRAL';
-
-      let blocksHtml = '';
-      if (log.type === 'compound' && log.blocks && log.blocks.length > 0) {
-        blocksHtml = `
-          <div class="compound-blocks-list" style="margin-top: 12px; font-size: 0.85rem; border-left: 2px solid rgba(255,255,255,0.1); padding-left: 12px;">
-            ${log.blocks.map(b => `
-              <div style="margin-bottom: 6px; color: var(--color-text-muted);">
-                <span style="font-weight: 600; color: var(--color-text-main);">[${escapeHTML(b.module.toUpperCase())}]</span>
-                ${escapeHTML(b.name || '')}
-                · REAL ${formatDurationSeconds(b.actualDurationSeconds)}
-                · PLAN ${formatDurationSeconds(b.plannedDurationSeconds)}
-              </div>
-            `).join('')}
-          </div>
-        `;
-      }
-      const durationSummary = log.activeDurationSeconds != null
-        ? `ACTIVO ${formatDurationSeconds(log.activeDurationSeconds)} · TOTAL ${formatDurationSeconds(log.elapsedDurationSeconds ?? log.activeDurationSeconds)}`
-        : `${escapeHTML(log.duration)}m`;
-      const detailText = typeof log.details === 'string' ? log.details : 'Práctica';
-
-      timelineHTML += `
-        <div class="timeline-node-wrapper practice-${toSafeClassToken(log.type)}" data-id="${log.id}">
-          <div class="node-date">${escapeHTML(dateString)}</div>
-          <div class="node-content" style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-            <span>${escapeHTML(label)} / ${escapeHTML(detailText)}</span>
-            <button class="btn-delete-log" data-id="${log.id}" title="Eliminar registro" style="background: none; border: none; cursor: pointer; color: var(--color-text-muted); opacity: 0.4; padding: 4px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s ease;">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
-          </div>
-          <div class="node-desc">
-            ${escapeHTML(log.notes || '')} (${durationSummary})
-            ${blocksHtml}
-          </div>
-        </div>
-      `;
-    });
-
-    timelineNodes.innerHTML = timelineHTML;
-
-    // Agregar listeners para eliminar registros
-    timelineNodes.querySelectorAll('.btn-delete-log').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const logId = parseInt(btn.getAttribute('data-id'));
-        if (confirm('¿Deseas eliminar este registro de práctica de tu historial?')) {
-          try {
-            await deleteData(db, 'sessions_log', logId);
-            // Volver a cargar el historial y calendario
-            await loadHistoryAndCalendar(db);
-          } catch (err) {
-            console.error('Error al eliminar registro:', err);
-            alert('No se pudo eliminar el registro.');
-          }
+    // Listener de clic en días con práctica para filtrar el Hilo de Agua
+    calendarContainer.querySelectorAll('.calendar-day.has-practice').forEach(dayEl => {
+      dayEl.addEventListener('click', () => {
+        const dateIso = dayEl.getAttribute('data-date');
+        const dayNum = dayEl.getAttribute('data-day');
+        
+        // Si ya estaba seleccionado, deseleccionar
+        if (selectedFilterDate && new Date(selectedFilterDate).toDateString() === new Date(dateIso).toDateString()) {
+          clearDateFilter();
+          return;
         }
+
+        // Marcar visualmente el día seleccionado
+        calendarContainer.querySelectorAll('.calendar-day').forEach(d => d.classList.remove('selected-day'));
+        dayEl.classList.add('selected-day');
+
+        selectedFilterDate = dateIso;
+        filterText.textContent = `Sesiones del ${dayNum} de ${today.toLocaleDateString('es-ES', { month: 'long' })}`;
+        filterBar.style.display = 'flex';
+        renderTimeline();
       });
     });
 
-    // Calcular y dibujar una línea recta vertical técnica en SVG
-    requestAnimationFrame(() => {
-      const height = timelineNodes.offsetHeight || 300;
-      // Línea recta estilo Dieter Rams
-      const d = `M 5,0 L 5,${height}`;
-      svgCurve.setAttribute('d', d);
-    });
+    // Limpiar filtro
+    function clearDateFilter() {
+      selectedFilterDate = null;
+      calendarContainer.querySelectorAll('.calendar-day').forEach(d => d.classList.remove('selected-day'));
+      filterBar.style.display = 'none';
+      displayedLimit = 5;
+      renderTimeline();
+    }
+
+    if (btnClearFilter) {
+      btnClearFilter.addEventListener('click', clearDateFilter);
+    }
+
+    // Botón Ver Más
+    if (btnLoadMore) {
+      btnLoadMore.addEventListener('click', () => {
+        displayedLimit += 5;
+        renderTimeline();
+      });
+    }
+
+    // Calcular sesiones de la semana actual para el indicador de Progreso
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    const dayOfWeek = startOfWeek.getDay() || 7; // 1 = Lunes, 7 = Domingo
+    startOfWeek.setDate(startOfWeek.getDate() - dayOfWeek + 1);
+    startOfWeek.setHours(0,0,0,0);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(endOfWeek.getDate() + 7);
+
+    const currentWeekSessions = logs.filter(l => {
+      const d = new Date(l.date);
+      return d >= startOfWeek && d < endOfWeek;
+    }).length;
+
+    const progressValEl = document.getElementById('progress-col-val');
+    if (progressValEl) {
+      progressValEl.textContent = `${currentWeekSessions} / 2`;
+    }
+
+    // -------------------------------------------------------------
+    // RENDER DEL HILO DE AGUA: CINTA CRONOMÉTRICA CONTINUA (RAMS)
+    // -------------------------------------------------------------
+    function renderTimeline() {
+      let filteredLogs = logs;
+      if (selectedFilterDate) {
+        const filterDayTime = new Date(selectedFilterDate);
+        filterDayTime.setHours(0,0,0,0);
+        filteredLogs = logs.filter(log => {
+          const lDate = new Date(log.date);
+          lDate.setHours(0,0,0,0);
+          return lDate.getTime() === filterDayTime.getTime();
+        });
+      }
+
+      if (filteredLogs.length === 0) {
+        timelineNodes.innerHTML = `
+          <div style="color: var(--color-text-muted); font-size: 0.85rem; padding: 20px 0; font-family: var(--font-digital);">
+            ◌ No hay registros para la fecha seleccionada
+          </div>
+        `;
+        if (btnLoadMore) btnLoadMore.style.display = 'none';
+        return;
+      }
+
+      const visibleLogs = selectedFilterDate ? filteredLogs : filteredLogs.slice(0, displayedLimit);
+      if (btnLoadMore) {
+        btnLoadMore.style.display = (!selectedFilterDate && filteredLogs.length > displayedLimit) ? 'block' : 'none';
+      }
+
+      let timelineHTML = '';
+      visibleLogs.forEach(log => {
+        const logDate = new Date(log.date);
+        const dateString = logDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }).toUpperCase();
+        
+        let label = 'YOGA';
+        if (log.type === 'breathwork') label = 'BREATH';
+        if (log.type === 'acupuncture') label = 'ACU';
+        if (log.type === 'meditation') label = 'MED';
+        if (log.type === 'strength') label = 'FUERZA';
+        if (log.type === 'compound') label = 'INTEGRAL';
+
+        let vitalityTag = '';
+        if (log.vitality === 'vital') {
+          vitalityTag = `<span style="font-size: 0.65rem; color: var(--color-accent-green); background: rgba(0,230,118,0.1); padding: 2px 6px; border-radius: 3px; font-family: var(--font-digital);">⚡ VITAL</span>`;
+        } else if (log.vitality === 'calm') {
+          vitalityTag = `<span style="font-size: 0.65rem; color: #29B6F6; background: rgba(41,182,246,0.1); padding: 2px 6px; border-radius: 3px; font-family: var(--font-digital);">🌿 CALMA</span>`;
+        } else if (log.vitality === 'fatigued') {
+          vitalityTag = `<span style="font-size: 0.65rem; color: var(--color-accent-red); background: rgba(239,83,80,0.1); padding: 2px 6px; border-radius: 3px; font-family: var(--font-digital);">⏳ FATIGA</span>`;
+        }
+
+        const durationSummary = log.activeDurationSeconds != null
+          ? `${formatDurationSeconds(log.activeDurationSeconds)}`
+          : `${escapeHTML(log.duration)}m`;
+
+        const detailText = typeof log.details === 'string' ? log.details : 'Práctica';
+
+        let compoundBlocksHtml = '';
+        if (log.type === 'compound' && log.blocks && log.blocks.length > 0) {
+          compoundBlocksHtml = `
+            <button class="compound-accordion-toggle" data-log-id="${log.id}">
+              <span>Desglose de bloques (${log.blocks.length})</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <div id="compound-blocks-${log.id}" class="stream-blocks-detail">
+              ${log.blocks.map(b => `
+                <div style="margin-bottom: 6px; color: var(--color-text-muted); display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
+                  <span>
+                    <strong style="color: var(--color-text-main); font-family: var(--font-digital); font-size: 0.72rem;">[${escapeHTML(b.module.toUpperCase())}]</strong>
+                    ${escapeHTML(b.name || '')}
+                  </span>
+                  <span style="font-family: var(--font-digital); font-size: 0.72rem; white-space: nowrap;">
+                    ${formatDurationSeconds(b.actualDurationSeconds)} / ${formatDurationSeconds(b.plannedDurationSeconds)}
+                  </span>
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }
+
+        timelineHTML += `
+          <div class="stream-entry" data-id="${log.id}">
+            <span class="stream-led practice-${toSafeClassToken(log.type)}"></span>
+            <div class="stream-header">
+              <div class="stream-badge-row">
+                <span class="stream-date">${escapeHTML(dateString)}</span>
+                <span class="stream-tag">${escapeHTML(label)}</span>
+              </div>
+              <div class="stream-meta">
+                <span class="stream-duration">${durationSummary}</span>
+                ${vitalityTag}
+                <button class="btn-delete-log" data-id="${log.id}" title="Eliminar registro" style="background: none; border: none; cursor: pointer; color: var(--color-text-muted); opacity: 0.4; padding: 2px 4px; display: inline-flex; align-items: center; justify-content: center; transition: opacity 0.2s ease;">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div class="stream-title">${escapeHTML(detailText)}</div>
+            ${log.notes ? `<div class="stream-notes">${escapeHTML(log.notes)}</div>` : ''}
+            ${compoundBlocksHtml}
+          </div>
+        `;
+      });
+
+      timelineNodes.innerHTML = timelineHTML;
+
+      // Listeners para acordeón de bloques de sesiones compuestas
+      timelineNodes.querySelectorAll('.compound-accordion-toggle').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const logId = btn.getAttribute('data-log-id');
+          const detailEl = document.getElementById(`compound-blocks-${logId}`);
+          if (detailEl) {
+            const isExpanded = detailEl.classList.toggle('expanded');
+            btn.classList.toggle('expanded', isExpanded);
+          }
+        });
+      });
+
+      // Listeners para eliminar registros
+      timelineNodes.querySelectorAll('.btn-delete-log').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const logId = parseInt(btn.getAttribute('data-id'));
+          if (confirm('¿Deseas eliminar este registro de práctica de tu historial?')) {
+            try {
+              await deleteData(db, 'sessions_log', logId);
+              await loadHistoryAndCalendar(db, onNavigate);
+            } catch (err) {
+              console.error('Error al eliminar registro:', err);
+              alert('No se pudo eliminar el registro.');
+            }
+          }
+        });
+      });
+    }
+
+    // Primer renderizado del timeline
+    renderTimeline();
 
   } catch (error) {
     console.error('[Dashboard] Error rendering history:', error);
-    calendarContainer.innerHTML = 'Error al cargar calendario';
-    timelineNodes.innerHTML = 'Error al cargar Hilo de Agua';
+    if (calendarContainer) calendarContainer.innerHTML = 'Error al cargar calendario';
+    if (timelineNodes) timelineNodes.innerHTML = 'Error al cargar Hilo de Agua';
   }
 }
 
 /**
- * Carga las dos métricas corporales más recientes y actualiza el card resumen en el panel de Historial.
+ * Carga las dos métricas corporales más recientes y actualiza el instrumento en el panel del Dashboard.
  */
 async function loadBodySummaryCard(db) {
-  const card = document.getElementById('body-summary-card');
-  if (!card) return;
+  const col = document.getElementById('body-instrument-col');
+  if (!col) return;
   const weightEl = document.getElementById('body-card-weight');
   const deltaEl = document.getElementById('body-card-delta');
   const dateEl = document.getElementById('body-card-date');
-  const btnEl = document.getElementById('body-card-btn');
 
   try {
     const records = await getAllData(db, 'body_metrics');
     if (!records || records.length === 0) {
-      if (weightEl) weightEl.textContent = 'Sin registros';
+      if (weightEl) weightEl.textContent = '—';
       if (deltaEl) deltaEl.textContent = '';
-      if (dateEl) dateEl.textContent = '';
-      if (btnEl) btnEl.textContent = 'Registrar medidas →';
+      if (dateEl) dateEl.textContent = 'Sin registros';
       return;
     }
     records.sort((a, b) => b.date.localeCompare(a.date));
@@ -400,14 +614,14 @@ async function loadBodySummaryCard(db) {
     const prev = records[1] || null;
 
     if (weightEl) {
-      weightEl.textContent = latest.weight != null ? `${latest.weight} kg` : 'Sin peso';
+      weightEl.textContent = latest.weight != null ? `${latest.weight} KG` : '—';
     }
 
     if (deltaEl) {
       if (latest.weight != null && prev?.weight != null) {
         const diff = (latest.weight - prev.weight).toFixed(1);
         const sign = diff > 0 ? '+' : '';
-        deltaEl.textContent = `${sign}${diff} kg`;
+        deltaEl.textContent = `${sign}${diff} KG`;
         deltaEl.className = 'body-card-delta ' + (diff > 0 ? 'delta-up' : diff < 0 ? 'delta-down' : 'delta-neutral');
       } else {
         deltaEl.textContent = '';
@@ -417,10 +631,7 @@ async function loadBodySummaryCard(db) {
     if (dateEl) {
       dateEl.textContent = latest.date;
     }
-    if (btnEl) {
-      btnEl.textContent = 'Ver detalles →';
-    }
   } catch (err) {
-    console.error('[Dashboard] Error cargando card de Cuerpo:', err);
+    console.error('[Dashboard] Error cargando instrumento de Cuerpo:', err);
   }
 }

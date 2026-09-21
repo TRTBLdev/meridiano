@@ -37,7 +37,9 @@
   --glass-inset: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 
   /* Layout Dimensions */
-  --sidebar-width: 160px;
+  --sidebar-width: 165px;
+  --sidebar-width-expanded: 165px;
+  --sidebar-width-collapsed: 62px;
 
   /* Fuentes */
   --font-ui: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;

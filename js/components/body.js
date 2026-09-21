@@ -55,14 +55,30 @@ export async function renderBodyScreen(container, db, onNavigate) {
 
       <div class="body-content">
         <nav class="body-tabs">
-          <button class="body-tab active" data-tab="registro">Registro</button>
-          <button class="body-tab" data-tab="metas">Metas</button>
-          <button class="body-tab" data-tab="graficos">Gr&#225;ficos</button>
+          <button class="body-tab active" data-tab="graficos">Gr&#225;ficos</button>
+          <button class="body-tab" data-tab="registro">Registro</button>
           <button class="body-tab" data-tab="historial">Historial</button>
+          <button class="body-tab" data-tab="metas">Metas</button>
         </nav>
 
+        <!-- GRAFICOS -->
+        <section id="body-tab-graficos" class="body-tab-panel active">
+          <div id="body-charts-container">
+            <div class="chart-block">
+              <h2 class="chart-title">Peso (kg)</h2>
+              <div class="chart-wrapper"><canvas id="chart-weight"></canvas></div>
+            </div>
+            <div class="chart-block">
+              <h2 class="chart-title">Medidas corporales (cm)</h2>
+              <div id="measure-toggles" class="measure-toggles"></div>
+              <div class="chart-wrapper"><canvas id="chart-measures"></canvas></div>
+            </div>
+          </div>
+          <p id="body-charts-empty" class="body-empty" style="display:none;">Sin datos suficientes. Registra al menos una medici&#243;n.</p>
+        </section>
+
         <!-- REGISTRO -->
-        <section id="body-tab-registro" class="body-tab-panel active">
+        <section id="body-tab-registro" class="body-tab-panel">
           <p class="body-tab-hint">Todos los campos son opcionales excepto la fecha.</p>
           <form id="body-form" class="body-form">
             <div class="body-field-group">
@@ -83,6 +99,13 @@ export async function renderBodyScreen(container, db, onNavigate) {
           </form>
         </section>
 
+        <!-- HISTORIAL -->
+        <section id="body-tab-historial" class="body-tab-panel">
+          <div id="body-history-list" class="body-history-list">
+            <p class="body-empty">Cargando&#8230;</p>
+          </div>
+        </section>
+
         <!-- METAS -->
         <section id="body-tab-metas" class="body-tab-panel">
           <p class="body-tab-hint">Define tus objetivos. Aparecer&#225;n como l&#237;neas de referencia en los gr&#225;ficos.</p>
@@ -95,29 +118,6 @@ export async function renderBodyScreen(container, db, onNavigate) {
             `).join('')}
             <button type="submit" class="body-save-btn">Guardar Metas</button>
           </form>
-        </section>
-
-        <!-- GRAFICOS -->
-        <section id="body-tab-graficos" class="body-tab-panel">
-          <div id="body-charts-container">
-            <div class="chart-block">
-              <h2 class="chart-title">Peso (kg)</h2>
-              <div class="chart-wrapper"><canvas id="chart-weight"></canvas></div>
-            </div>
-            <div class="chart-block">
-              <h2 class="chart-title">Medidas corporales (cm)</h2>
-              <div id="measure-toggles" class="measure-toggles"></div>
-              <div class="chart-wrapper"><canvas id="chart-measures"></canvas></div>
-            </div>
-          </div>
-          <p id="body-charts-empty" class="body-empty" style="display:none;">Sin datos suficientes. Registra al menos una medici&#243;n.</p>
-        </section>
-
-        <!-- HISTORIAL -->
-        <section id="body-tab-historial" class="body-tab-panel">
-          <div id="body-history-list" class="body-history-list">
-            <p class="body-empty">Cargando&#8230;</p>
-          </div>
         </section>
       </div>
 
@@ -142,6 +142,7 @@ export async function renderBodyScreen(container, db, onNavigate) {
   });
 
   await loadGoalsForm(db, container);
+  await renderCharts(db, container);
 
   // Guardar registro
   container.querySelector('#body-form').addEventListener('submit', async (e) => {

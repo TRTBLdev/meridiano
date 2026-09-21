@@ -11,6 +11,7 @@ import { renderConfigScreen } from './components/config.js';
 import { renderStrengthScreen } from './components/strength.js';
 import { renderSessionsScreen } from './components/sessions.js';
 import { renderBodyScreen } from './components/body.js';
+import { renderProgressScreen } from './components/progress.js';
 
 // Estado global de la aplicación
 const state = {
@@ -118,6 +119,8 @@ function handleNavigation(target, param = null) {
     renderConfigScreen(appContainer, state.db, handleNavigation);
   } else if (target === 'body') {
     renderBodyScreen(appContainer, state.db, handleNavigation);
+  } else if (target === 'progress') {
+    renderProgressScreen(appContainer, state.db, handleNavigation);
   }
 }
 

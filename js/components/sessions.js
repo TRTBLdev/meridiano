@@ -437,6 +437,7 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
   }
 
   async function finishCompoundSession() {
+    let completedLogId = null;
     try {
       const completedAt = Date.now();
       const sessionResult = createCompoundSessionResult(
@@ -446,7 +447,7 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
         completedAt
       );
 
-      await addData(db, 'sessions_log', {
+      completedLogId = await addData(db, 'sessions_log', {
         type: 'compound',
         version: 2,
         date: new Date(completedAt).toISOString(),
@@ -457,14 +458,79 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
         elapsedDurationSeconds: sessionResult.elapsedDurationSeconds,
         notes: `Sesión Compuesta Completada: ${currentSession.name}`,
         details: `Compuesta: ${escapeHTML(currentSession.name)}`,
-        blocks: sessionResult.blocks
+        blocks: sessionResult.blocks,
+        vitality: null
       });
     } catch (err) {
       console.error('[Sessions] Error saving compound session log:', err);
     }
 
-    alert('¡Sesión Integral Completada con éxito!');
-    onNavigate('inicio');
+    renderCompletionScreen(completedLogId);
+  }
+
+  function renderCompletionScreen(logId) {
+    activeView = 'completed';
+    container.innerHTML = `
+      <div class="dashboard-layout" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background: #0A0A0A; color: #E8E6E3; padding: 24px;">
+        <div class="vitality-completion-modal">
+          ${renderTechnicalTitle('Sesión Completada', { style: 'font-size: 1.3rem; margin-bottom: 8px; color: var(--color-accent-green);' })}
+          <div style="font-size: 1.8rem; font-weight: 300; margin-bottom: 6px;">${escapeHTML(currentSession.name)}</div>
+          <p style="color: var(--color-text-muted); font-size: 0.85rem; margin: 0;">¿Cómo percibes tu energía al cerrar esta práctica?</p>
+          
+          <div class="vitality-options-grid">
+            <button class="btn-vitality-option" data-vitality="calm">
+              <span class="vitality-option-emoji">🌿</span>
+              <span class="vitality-option-text">En Calma</span>
+            </button>
+            <button class="btn-vitality-option" data-vitality="vital">
+              <span class="vitality-option-emoji">⚡</span>
+              <span class="vitality-option-text">Vital</span>
+            </button>
+            <button class="btn-vitality-option" data-vitality="fatigued">
+              <span class="vitality-option-emoji">⏳</span>
+              <span class="vitality-option-text">Fatigada</span>
+            </button>
+          </div>
+
+          <button id="btn-finish-vitality" class="btn-primary" style="width: 100%; max-width: 280px; padding: 12px 24px; background: var(--color-text-main); color: var(--color-bg-base); cursor: pointer; border: none; border-radius: 4px; font-weight: 600;">
+            Continuar &rarr;
+          </button>
+        </div>
+      </div>
+    `;
+
+    let selectedVitality = null;
+    const optionBtns = container.querySelectorAll('.btn-vitality-option');
+    optionBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        optionBtns.forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedVitality = btn.getAttribute('data-vitality');
+      });
+    });
+
+    container.querySelector('#btn-finish-vitality').addEventListener('click', async () => {
+      if (selectedVitality && logId) {
+        try {
+          await new Promise((resolve, reject) => {
+            const tx = db.transaction('sessions_log', 'readwrite');
+            const req = tx.objectStore('sessions_log').get(logId);
+            req.onsuccess = () => {
+              const record = req.result;
+              if (record) {
+                record.vitality = selectedVitality;
+                tx.objectStore('sessions_log').put(record);
+              }
+              resolve(record);
+            };
+            req.onerror = () => reject(req.error);
+          });
+        } catch (e) {
+          console.warn('[Sessions] No se pudo actualizar vitalidad en log:', e);
+        }
+      }
+      onNavigate('inicio');
+    });
   }
 
   // Inicio

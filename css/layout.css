@@ -135,9 +135,9 @@ body {
 ------------------------------------------------------------- */
 
 /* ==========================================
-   1. MÓVIL (< 600px)
+   1. MÓVIL EN VERTICAL (<= 600px y portrait)
    ========================================== */
-@media (max-width: 767px) {
+@media (max-width: 600px) and (orientation: portrait) {
   .dashboard-layout {
     display: block;
     height: auto;
@@ -183,6 +183,14 @@ body {
     overflow: visible;
   }
 
+  .monitoring-grid-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+    width: 100%;
+    margin-bottom: 24px;
+  }
+
   .welcome-quote-center .quote-text {
     font-size: 1.2rem;
   }
@@ -209,46 +217,56 @@ body {
 }
 
 /* ==========================================
-   2. TABLET Y DESKTOP (>= 768px)
+   2. TABLET, DESKTOP Y MÓVIL EN HORIZONTAL
    Una sola columna de contenido a la derecha,
    scroll continuo vertical. Nav bar fija a la izq.
    ========================================== */
-@media (min-width: 768px) {
+@media (min-width: 601px), (orientation: landscape) {
   .dashboard-layout {
-    grid-template-columns: var(--sidebar-width) 1fr; /* Columna fija e Columna fluida única */
+    grid-template-columns: var(--sidebar-width-expanded) 1fr; /* Columna fija y columna fluida única */
     grid-template-rows: 1fr;
     height: 100vh;
+    transition: grid-template-columns 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .dashboard-layout.sidebar-collapsed {
+    grid-template-columns: var(--sidebar-width-collapsed) 1fr;
   }
   
   .nav-bar {
     grid-column: 1;
     flex-direction: column;
-    padding: 48px 16px;
+    padding: 40px 14px;
     height: 100vh;
     border-right: 1px solid var(--glass-border);
     position: sticky;
     top: 0;
+    overflow: hidden;
+    transition: padding 0.3s ease;
+  }
+
+  .dashboard-layout.sidebar-collapsed .nav-bar {
+    padding: 40px 6px;
   }
   
   .nav-logo {
-    font-size: 1.3rem;
-    margin-bottom: 56px;
+    font-size: 1.25rem;
   }
   
   .nav-links {
     flex-direction: column;
-    gap: 32px;
-    align-items: center;
+    gap: 16px;
+    align-items: stretch;
+    width: 100%;
   }
   
-  .nav-item {
+  /* Fila Compartida Horizontal para Progreso y Cuerpo */
+  .monitoring-grid-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
     width: 100%;
-    padding: 12px;
-    gap: 8px;
-  }
-
-  .nav-item span {
-    font-size: 0.8rem;
+    margin-bottom: 24px;
   }
   
   /* Scroll principal único vertical de todo el dashboard */
@@ -263,7 +281,7 @@ body {
   .hilo-agua-panel {
     border-top: 1px solid rgba(46, 43, 40, 0.08); /* Línea divisoria muy fina */
     margin-top: 48px;
-    padding: 64px 0 0;
+    padding: 48px 0 0;
   }
 }
 
