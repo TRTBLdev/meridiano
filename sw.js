@@ -1,8 +1,17 @@
-const CACHE_NAME = 'meridiano-cache-v31';
+// MERIDIANO PWA - Service Worker con Estrategia de 3 Capas
+// 1. Cache-busting con BUILD_VERSION y cache: 'reload' en instalación
+// 2. Stale-While-Revalidate en tiempo de ejecución (offline instantáneo + actualización en segundo plano)
+// 3. skipWaiting y clients.claim para activación inmediata coordinada con app.js
+
+const BUILD_VERSION = '2026.09.23.1158';
+const CACHE_NAME = `meridiano-cache-v${BUILD_VERSION}`;
+
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
+  './icons/icon.svg',
+  // Estilos
   './css/style.css',
   './css/variables.css',
   './css/layout.css',
@@ -10,57 +19,91 @@ const ASSETS = [
   './css/lobbies.css',
   './css/strengthTimer.css',
   './css/timerTechnique.css',
+  // Núcleo
   './js/app.js',
   './js/db.js',
+  // Semillas de datos
   './js/seeds/acupuncture_points_seed.js',
-  './js/seeds/meridians_seed.js',
-  './js/seeds/yoga_seeds.js',
-  './js/seeds/breathwork_seeds.js',
-  './js/seeds/meditation_seeds.js',
   './js/seeds/acupuncture_sequences_seed.js',
-  './js/utils/crypto.js',
-  './js/utils/sanitize.js',
-  './js/components/login.js',
-  './js/components/dashboard.js',
+  './js/seeds/breathwork_seeds.js',
+  './js/seeds/compound_sessions_seed.js',
+  './js/seeds/meditation_seeds.js',
+  './js/seeds/meridians_seed.js',
+  './js/seeds/strength_exercises_seed.js',
+  './js/seeds/yoga_seeds.js',
+  // Componentes de interfaz
   './js/components/acupuncture.js',
-  './js/components/syllabus.js',
-  './js/components/config.js',
+  './js/components/body.js',
   './js/components/breathwork.js',
-  './js/components/meditation.js',
-  './js/components/yoga.js',
+  './js/components/config.js',
+  './js/components/dashboard.js',
   './js/components/lobbyUi.js',
+  './js/components/login.js',
+  './js/components/meditation.js',
+  './js/components/progress.js',
+  './js/components/sessions.js',
+  './js/components/sessionsUi.js',
   './js/components/strength.js',
   './js/components/strengthDotField.js',
+  './js/components/strengthManager.js',
   './js/components/strengthTimerUi.js',
+  './js/components/syllabus.js',
   './js/components/techniqueDetails.js',
   './js/components/timerShell.js',
-  './js/utils/dotmatrix.js',
+  './js/components/ui.js',
+  './js/components/yoga.js',
+  // Utilidades
   './js/utils/acupunctureUtils.js',
   './js/utils/breathworkUtils.js',
-  './js/utils/strengthUtils.js',
+  './js/utils/crypto.js',
+  './js/utils/dotmatrix.js',
+  './js/utils/freqUtils.js',
+  './js/utils/meditationUtils.js',
+  './js/utils/sanitize.js',
   './js/utils/sessionResults.js',
-  './js/utils/yogaUtils.js',
-  './icons/icon.svg'
+  './js/utils/strengthUtils.js',
+  './js/utils/synth.js',
+  './js/utils/yogaUtils.js'
 ];
 
-// Instalación del Service Worker y almacenamiento de assets en caché
-self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('[Service Worker] Caching core assets');
-      return cache.addAll(ASSETS);
+// Capa 1: Instalación con descarga limpia de assets evitando HTTP Cache
+self.addEventListener('install', (event) => {
+  console.log(`[Service Worker] Instalando versión: ${BUILD_VERSION}`);
+  
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(async (cache) => {
+      // Descargamos cada asset con ?v= y cache: 'reload' para saltarse la caché HTTP de disco
+      const precachePromises = ASSETS.map(async (url) => {
+        try {
+          const requestUrl = url.includes('?') ? `${url}&v=${BUILD_VERSION}` : `${url}?v=${BUILD_VERSION}`;
+          const response = await fetch(new Request(requestUrl, { cache: 'reload' }));
+          if (response.ok) {
+            // Guardamos bajo la clave canónica 'url' para que coincida con las peticiones de la app
+            await cache.put(url, response);
+          } else {
+            console.warn(`[Service Worker] Respuesta no OK (${response.status}) para: ${url}`);
+          }
+        } catch (err) {
+          console.warn(`[Service Worker] Fallo de precache en: ${url}`, err);
+        }
+      });
+
+      await Promise.all(precachePromises);
+      console.log(`[Service Worker] Precaching completado para v${BUILD_VERSION}`);
     }).then(() => self.skipWaiting())
   );
 });
 
-// Activación y limpieza de cachés antiguas
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
+// Activación y purga de cachés obsoletas
+self.addEventListener('activate', (event) => {
+  console.log(`[Service Worker] Activando versión: ${BUILD_VERSION}`);
+  
+  event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
           if (key !== CACHE_NAME) {
-            console.log('[Service Worker] Removing old cache', key);
+            console.log(`[Service Worker] Purgando caché obsoleta: ${key}`);
             return caches.delete(key);
           }
         })
@@ -69,27 +112,54 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// Estrategia Cache-First con caída a Network (y actualización en background opcional)
-self.addEventListener('fetch', (e) => {
-  // Evitar interceptar llamadas no locales o solicitudes externas que no se puedan cachear fácilmente
-  if (e.request.method !== 'GET' || !e.request.url.startsWith(self.location.origin)) {
+// Capa 2: Estrategia Stale-While-Revalidate
+self.addEventListener('fetch', (event) => {
+  // Solo interceptar peticiones GET originadas en el mismo dominio
+  if (event.request.method !== 'GET' || !event.request.url.startsWith(self.location.origin)) {
     return;
   }
 
-  e.respondWith(
-    caches.match(e.request).then((cachedResponse) => {
+  event.respondWith(
+    caches.open(CACHE_NAME).then(async (cache) => {
+      const cachedResponse = await cache.match(event.request);
+
+      // Revalidación en segundo plano contra Vercel / Servidor
+      const revalidatePromise = fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            cache.put(event.request, networkResponse.clone());
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          // Si no hay red (modo offline), la promesa se resuelve sin error
+          return null;
+        });
+
+      // Mantiene el Service Worker activo hasta que se actualice la caché en 2º plano
+      event.waitUntil(revalidatePromise);
+
+      // Si existe en caché, devolver de inmediato (0ms de latencia)
       if (cachedResponse) {
         return cachedResponse;
       }
-      return fetch(e.request).then((networkResponse) => {
-        // Guardar nuevas solicitudes en caché dinámicamente si pertenecen a la app
-        if (networkResponse.status === 200) {
-          const cacheCopy = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(e.request, cacheCopy);
-          });
-        }
+
+      // Si no estaba en caché, esperar a la red
+      const networkResponse = await revalidatePromise;
+      if (networkResponse) {
         return networkResponse;
+      }
+
+      // Fallback de navegación si todo falla y estamos offline
+      if (event.request.mode === 'navigate') {
+        const fallback = await cache.match('./index.html') || await cache.match('./');
+        if (fallback) return fallback;
+      }
+
+      return new Response('MERIDIANO offline: Recurso no disponible', {
+        status: 503,
+        statusText: 'Service Unavailable',
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' }
       });
     })
   );

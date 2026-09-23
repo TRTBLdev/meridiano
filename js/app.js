@@ -55,11 +55,54 @@ async function init() {
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
+    let isRefreshing = false;
+
+    // Capa 3: Auto-refresh reactivo e invisible al activarse una nueva versión
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (isRefreshing) return;
+      isRefreshing = true;
+      console.log('[PWA] Nueva versión activada. Auto-recarga invisible...');
+      window.location.reload();
+    });
+
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js')
-        .then((reg) => console.log('[PWA] Service Worker activo:', reg.scope))
+      // updateViaCache: 'none' fuerza al navegador a saltarse la HTTP Cache para sw.js
+      navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+        .then((reg) => {
+          console.log('[PWA] Service Worker activo:', reg.scope);
+
+          // Verificar si ya hay una nueva versión lista
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            if (newWorker) {
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  console.log('[PWA] Nueva versión descargada e instalada en segundo plano.');
+                }
+              });
+            }
+          });
+        })
         .catch((err) => console.error('[PWA] Error en Service Worker:', err));
     });
+
+    // Comprobación proactiva al volver a la app o desbloquear pantalla
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.getRegistration().then((reg) => {
+          if (reg) reg.update();
+        });
+      }
+    });
+
+    // Comprobación periódica en segundo plano cada 15 minutos
+    setInterval(() => {
+      if (navigator.serviceWorker.controller) {
+        navigator.serviceWorker.getRegistration().then((reg) => {
+          if (reg) reg.update();
+        });
+      }
+    }, 15 * 60 * 1000);
   }
 }
 
