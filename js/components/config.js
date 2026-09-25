@@ -15,6 +15,8 @@ export async function renderConfigScreen(container, db, onNavigate) {
 
   const stores = [
     { id: 'sessions_log', label: 'Historial de Prácticas' },
+    { id: 'body_metrics', label: 'Métricas Corporales (Antropometría)' },
+    { id: 'body_goals', label: 'Metas Corporales y Frecuencia' },
     { id: 'yoga_sequences', label: 'Secuencias de Yoga' },
     { id: 'yoga_blocks', label: 'Bloques de Secuencia (Yoga)' },
     { id: 'yoga_postures', label: 'Asanas de Yin Yoga' },

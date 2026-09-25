@@ -845,6 +845,103 @@ body.dark-theme .btn-pattern-pill {
   height: 260px;
 }
 
+/* Progress Enhancements: Stepper, Milestones, Badges */
+.nuclear-goal-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(46, 43, 40, 0.04);
+  border: 1px solid rgba(46, 43, 40, 0.12);
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+body.dark-theme .nuclear-goal-stepper {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.btn-stepper {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-family: var(--font-digital);
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 0 4px;
+  line-height: 1;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+.btn-stepper:hover {
+  color: var(--color-accent-green);
+  transform: scale(1.15);
+}
+.nuclear-goal-label {
+  font-size: 0.65rem;
+  font-family: var(--font-digital);
+  color: var(--color-accent-green);
+  letter-spacing: 0.5px;
+  user-select: none;
+}
+.progress-milestone-banner {
+  background: rgba(46, 43, 40, 0.03);
+  border: 1px solid rgba(46, 43, 40, 0.08);
+  border-radius: 4px;
+  padding: 14px 18px;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+body.dark-theme .progress-milestone-banner {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.progress-milestone-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.progress-milestone-label {
+  font-family: var(--font-digital);
+  font-size: 0.62rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.progress-milestone-value {
+  font-family: var(--font-digital);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-text-main);
+  font-variant-numeric: tabular-nums;
+}
+.progress-milestone-value.accent {
+  color: var(--color-accent-green);
+}
+.progress-delta-pill {
+  font-family: var(--font-digital);
+  font-size: 0.7rem;
+  padding: 3px 8px;
+  border-radius: 12px;
+  background: rgba(0, 230, 118, 0.1);
+  color: var(--color-accent-green);
+  border: 1px solid rgba(0, 230, 118, 0.2);
+}
+.week-achievement-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-digital);
+  font-size: 0.65rem;
+  color: var(--color-accent-green);
+  background: rgba(0, 230, 118, 0.08);
+  border: 1px solid rgba(0, 230, 118, 0.25);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
 /* El Hilo de Agua - Lista Curva SVG Amplia */
 .hilo-agua-svg-area {
   position: relative;

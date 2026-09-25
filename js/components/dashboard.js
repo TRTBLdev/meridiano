@@ -153,8 +153,8 @@ export async function renderDashboard(container, session, db, onNavigate) {
               </div>
               <div class="instrument-body">
                 <div id="progress-col-val" class="instrument-reading-value">0 / 2</div>
-                <div class="instrument-reading-sub">SESIONES SEMANALES</div>
-                <div class="instrument-reading-desc">Fuerza · Hábitos · Vitalidad</div>
+                <div class="instrument-reading-sub">SESIONES NUCLEARES</div>
+                <div id="progress-col-desc" class="instrument-reading-desc">Fuerza · Hábitos · Vitalidad</div>
               </div>
             </div>
 
@@ -421,7 +421,7 @@ async function loadHistoryAndCalendar(db, onNavigate) {
       });
     }
 
-    // Calcular sesiones de la semana actual para el indicador de Progreso
+    // Calcular sesiones de la semana actual para el indicador de Progreso (Sesiones Nucleares vs Activaciones)
     const now = new Date();
     const startOfWeek = new Date(now);
     const dayOfWeek = startOfWeek.getDay() || 7; // 1 = Lunes, 7 = Domingo
@@ -430,14 +430,28 @@ async function loadHistoryAndCalendar(db, onNavigate) {
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(endOfWeek.getDate() + 7);
 
-    const currentWeekSessions = logs.filter(l => {
+    // Cargar meta semanal desde body_goals
+    const bodyGoalsList = await getAllData(db, 'body_goals');
+    const bodyGoals = (bodyGoalsList && bodyGoalsList.find(g => g.id === 'main')) || {};
+    const nuclearGoal = Number.isInteger(bodyGoals.nuclearSessionsWeekly) ? bodyGoals.nuclearSessionsWeekly : 2;
+
+    const currentWeekLogs = logs.filter(l => {
       const d = new Date(l.date);
       return d >= startOfWeek && d < endOfWeek;
-    }).length;
+    });
+
+    const currentWeekNucleares = currentWeekLogs.filter(l => l.type === 'compound').length;
+    const currentWeekActivaciones = currentWeekLogs.filter(l => l.type === 'strength' || l.notes?.includes('Activación')).length;
 
     const progressValEl = document.getElementById('progress-col-val');
     if (progressValEl) {
-      progressValEl.textContent = `${currentWeekSessions} / 2`;
+      progressValEl.textContent = `${currentWeekNucleares} / ${nuclearGoal}`;
+    }
+    const progressDescEl = document.getElementById('progress-col-desc');
+    if (progressDescEl) {
+      progressDescEl.textContent = currentWeekActivaciones > 0
+        ? `+ ${currentWeekActivaciones} activación${currentWeekActivaciones > 1 ? 'es' : ''} matutina${currentWeekActivaciones > 1 ? 's' : ''}`
+        : 'Fuerza · Hábitos · Vitalidad';
     }
 
     // -------------------------------------------------------------

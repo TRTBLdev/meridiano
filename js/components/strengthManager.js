@@ -96,6 +96,7 @@ export async function renderStrengthManager(container, db) {
               <label class="strength-manager__field strength-manager__field--wide"><span>Nombre</span><input id="strength-ex-name" class="acu-input-flat" placeholder="Ej. Sentadilla con Peso Corporal" required></label>
               <label class="strength-manager__field"><span>ID / Código Único</span><input id="strength-ex-id" class="acu-input-flat" placeholder="Ej. str-squat" ${editingExercise ? 'disabled' : ''} required></label>
               <label class="strength-manager__field"><span>Modo</span><select id="strength-ex-mode" class="acu-select-flat"><option value="reps">Repeticiones</option><option value="time">Tiempo</option></select></label>
+              <label class="strength-manager__field"><span>Carga habitual (kg)</span><input id="strength-ex-weight" type="number" min="0" step="0.5" class="acu-input-flat" placeholder="0 = Corporal"></label>
               <label class="strength-manager__field strength-manager__field--full"><span>Enfoque (Cadenas Musculares y Grupos Objetivo)</span><textarea id="strength-ex-focus" class="acu-input-flat" placeholder="Ej. Cuádriceps, glúteos y estabilidad del core..." required></textarea></label>
               <label class="strength-manager__field strength-manager__field--full"><span>Preparación (Postura y Alineación Inicial)</span><textarea id="strength-ex-preparation" class="acu-input-flat" placeholder="Ej. Pies al ancho de hombros, mirada al frente..." required></textarea></label>
               <label class="strength-manager__field strength-manager__field--full"><span>Ejecución (Movimiento y Respiración)</span><textarea id="strength-ex-execution" class="acu-input-flat" placeholder="Ej. Descender manteniendo el tronco erguido..." required></textarea></label>
@@ -122,6 +123,7 @@ export async function renderStrengthManager(container, db) {
       target.querySelector('#strength-ex-name').value = editingExercise.name || '';
       target.querySelector('#strength-ex-focus').value = editingExercise.focus || '';
       modeSelect.value = editingExercise.mode || 'reps';
+      target.querySelector('#strength-ex-weight').value = editingExercise.defaultWeight ?? 0;
       target.querySelector('#strength-ex-preparation').value = editingExercise.preparation || '';
       target.querySelector('#strength-ex-execution').value = editingExercise.execution || '';
       target.querySelector('#strength-ex-equipment').value = (editingExercise.equipment || []).join(', ');
@@ -140,6 +142,7 @@ export async function renderStrengthManager(container, db) {
         name: target.querySelector('#strength-ex-name').value.trim(),
         focus: target.querySelector('#strength-ex-focus').value.trim(),
         mode,
+        defaultWeight: Math.max(0, Number(target.querySelector('#strength-ex-weight').value) || 0),
         preparation: target.querySelector('#strength-ex-preparation').value.trim(),
         execution: target.querySelector('#strength-ex-execution').value.trim(),
         equipment: parseList(target.querySelector('#strength-ex-equipment').value)
@@ -178,6 +181,7 @@ export async function renderStrengthManager(container, db) {
           ${detailsHtml}
           <div style="font-family:var(--font-mono); font-size:0.72rem; color:var(--color-text-muted); margin-top:4px;">
             Modo: <span style="color:var(--color-text-main); font-weight:500;">${exercise.mode === 'time' ? 'Prescripción por tiempo' : 'Prescripción por repeticiones'}</span>
+            ${exercise.defaultWeight > 0 ? ` &nbsp;|&nbsp; Carga habitual: <span style="color:var(--color-accent-green); font-weight:600;">${exercise.defaultWeight} kg</span>` : ` &nbsp;|&nbsp; Carga: <span style="color:var(--color-text-muted);">Corporal (0 kg)</span>`}
             ${(exercise.equipment || []).length ? ` &nbsp;|&nbsp; Equipo: <span style="color:var(--color-text-main);">${(exercise.equipment || []).map(escapeHTML).join(', ')}</span>` : ''}
           </div>
           ${dependencies.length ? `<div style="font-size:0.68rem; color:var(--color-text-muted); margin-top:4px;">Usado en ${dependencies.length} circuito${dependencies.length === 1 ? '' : 's'}</div>` : ''}
@@ -274,10 +278,23 @@ export async function renderStrengthManager(container, db) {
         const row = document.createElement('div');
         row.className = `strength-circuit-entry ${exercise ? '' : 'invalid'}`;
         const override = exercise?.mode === 'time' ? entry.durationOverride : entry.repsOverride;
+        const defaultWeight = exercise?.defaultWeight > 0 ? exercise.defaultWeight : null;
+        const weightValue = entry.weightOverride != null ? entry.weightOverride : (defaultWeight ?? '');
         row.innerHTML = `
           <span class="strength-circuit-entry__index">${index + 1}</span>
           <div class="strength-circuit-entry__main"><strong>${escapeHTML(exercise?.name || 'Ejercicio no disponible')}</strong><small>${exercise ? (exercise.mode === 'time' ? 'Asignar tiempo en este circuito' : 'Asignar repeticiones en este circuito') : escapeHTML(entry.exerciseId)}</small></div>
-          ${exercise ? `<label class="strength-circuit-entry__override"><span>${exercise.mode === 'time' ? 'Tiempo (s)' : 'Repeticiones'}</span><input type="number" class="acu-input-flat" min="1" value="${override ?? ''}" placeholder="Asignar" required></label>` : ''}
+          ${exercise ? `
+            <div style="display: flex; gap: 8px; align-items: flex-end;">
+              <label class="strength-circuit-entry__override" style="max-width: 90px;">
+                <span>${exercise.mode === 'time' ? 'Tiempo (s)' : 'Repeticiones'}</span>
+                <input type="number" class="acu-input-flat input-prescription" min="1" value="${override ?? ''}" placeholder="Asignar" required>
+              </label>
+              <label class="strength-circuit-entry__override" style="max-width: 75px;">
+                <span>Carga (kg)</span>
+                <input type="number" class="acu-input-flat input-weight" min="0" step="0.5" value="${weightValue}" placeholder="0 (PC)">
+              </label>
+            </div>
+          ` : ''}
           <div class="strength-circuit-entry__actions">
             <button type="button" class="strength-entry-up" aria-label="Subir" ${index === 0 ? 'disabled' : ''}>▲</button>
             <button type="button" class="strength-entry-down" aria-label="Bajar" ${index === circuitEntries.length - 1 ? 'disabled' : ''}>▼</button>
@@ -295,12 +312,19 @@ export async function renderStrengthManager(container, db) {
           circuitEntries.splice(index, 1);
           renderEntries();
         });
-        const overrideInput = row.querySelector('input');
-        if (overrideInput && exercise) {
-          overrideInput.addEventListener('input', () => {
-            const value = overrideInput.value ? Number(overrideInput.value) : null;
+        const prescriptionInput = row.querySelector('.input-prescription');
+        if (prescriptionInput && exercise) {
+          prescriptionInput.addEventListener('input', () => {
+            const value = prescriptionInput.value ? Number(prescriptionInput.value) : null;
             entry.repsOverride = exercise.mode === 'reps' ? value : null;
             entry.durationOverride = exercise.mode === 'time' ? value : null;
+          });
+        }
+        const weightInput = row.querySelector('.input-weight');
+        if (weightInput && exercise) {
+          weightInput.addEventListener('input', () => {
+            const val = weightInput.value.trim();
+            entry.weightOverride = val !== '' ? Number(val) : null;
           });
         }
         entriesContainer.appendChild(row);
@@ -312,7 +336,9 @@ export async function renderStrengthManager(container, db) {
     target.querySelector('#strength-circuit-add').addEventListener('click', () => {
       const select = target.querySelector('#strength-circuit-add-select');
       if (!select.value) return;
-      circuitEntries.push({ exerciseId: select.value, repsOverride: null, durationOverride: null });
+      const exercise = getStrengthExercise(exercises, select.value);
+      const defaultWeight = exercise?.defaultWeight > 0 ? exercise.defaultWeight : null;
+      circuitEntries.push({ exerciseId: select.value, repsOverride: null, durationOverride: null, weightOverride: defaultWeight });
       select.value = '';
       renderEntries();
     });

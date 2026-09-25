@@ -94,11 +94,15 @@ export function buildStrengthPhaseList(circuit, exercises) {
   for (let round = 0; round < rounds; round++) {
     resolved.forEach(({ entry, exercise }, index) => {
       const prescription = getEffectiveStrengthPrescription(entry, exercise);
+      const weightKg = Number.isFinite(Number(entry.weightOverride))
+        ? Number(entry.weightOverride)
+        : (Number.isFinite(Number(exercise.defaultWeight)) ? Number(exercise.defaultWeight) : 0);
       phases.push({
         type: 'exercise',
         round,
         exerciseIndex: index,
         exercise,
+        weightKg,
         ...prescription
       });
       if (index < resolved.length - 1) {
@@ -131,6 +135,7 @@ export function createStrengthResult(circuit) {
 
 export function recordStrengthResultEntry(result, phase, {
   actualValue = null,
+  actualWeight = null,
   elapsedSeconds = 0,
   status = 'completed'
 } = {}) {
@@ -147,6 +152,10 @@ export function recordStrengthResultEntry(result, phase, {
     throw new RangeError('Las repeticiones realizadas deben ser un entero mayor que cero.');
   }
 
+  const resolvedWeight = Number.isFinite(Number(actualWeight))
+    ? Math.max(0, Number(actualWeight))
+    : (Number.isFinite(Number(phase.weightKg)) ? Number(phase.weightKg) : (phase.exercise?.defaultWeight ?? 0));
+
   const entry = {
     round: Number(phase.round) + 1,
     exerciseId: phase.exercise.id,
@@ -155,6 +164,7 @@ export function recordStrengthResultEntry(result, phase, {
     unit: isReps ? 'reps' : 'seconds',
     targetValue: isReps ? Number(phase.reps) : Number(phase.duration),
     actualValue: status === 'skipped' ? null : normalizedActual,
+    weightKg: resolvedWeight,
     elapsedSeconds: Math.max(0, Math.round(Number(elapsedSeconds) || 0)),
     status
   };

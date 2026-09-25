@@ -1,11 +1,5 @@
 import { defaultAcupuncture } from './seeds/acupuncture_points_seed.js';
 import { defaultMeridians } from './seeds/meridians_seed.js';
-import { defaultPostures, defaultBlocks, defaultSequences } from './seeds/yoga_seeds.js';
-import { defaultBreathwork } from './seeds/breathwork_seeds.js';
-import { defaultMeditation } from './seeds/meditation_seeds.js';
-import { defaultAcupunctureSequences } from './seeds/acupuncture_sequences_seed.js';
-import { defaultStrengthExercises, defaultStrengthCircuits } from './seeds/strength_exercises_seed.js';
-import { defaultCompoundSessions } from './seeds/compound_sessions_seed.js';
 
 const DB_NAME = 'meridiano_db';
 const DB_VERSION = 12;
@@ -119,12 +113,13 @@ export function openDB() {
 }
 
 /**
- * Llena la base de datos con datos semilla por defecto si está vacía.
+ * Llena la base de datos con los datos anatómicos esenciales (Puntos OMS y Meridianos MTC).
+ * Las rutinas, secuencias y circuitos permanecen limpios para ser cargados o creados por el usuario.
  */
 export async function seedDatabase() {
   const db = await openDB();
 
-  console.log('[DB] Seeding default database items for Wabi-Sabi experience...');
+  console.log('[DB] Verificando catálogo anatómico esencial (Puntos OMS y Meridianos)...');
 
   // 0. Sembrar Meridianos Lookup (MTC)
   const needsMeridiansReseed = await new Promise((resolve) => {
@@ -143,7 +138,7 @@ export async function seedDatabase() {
   });
 
   if (needsMeridiansReseed) {
-    console.log('[DB] Clearing old meridians to apply new fields (pinyin_code, description)...');
+    console.log('[DB] Sincronizando catálogo de meridianos...');
     const txClear = db.transaction('meridians', 'readwrite');
     txClear.objectStore('meridians').clear();
     await new Promise(r => txClear.oncomplete = r);
@@ -154,37 +149,7 @@ export async function seedDatabase() {
     await saveBatch(db, 'meridians', defaultMeridians);
   }
 
-  // 1. Sembrar Posturas Base de Yin Yoga
-  const posturesCount = await countItems(db, 'yoga_postures');
-  if (posturesCount === 0) {
-    await saveBatch(db, 'yoga_postures', defaultPostures);
-  }
-
-  // 2. Sembrar Bloques (Sub-secuencias reutilizables)
-  const blocksCount = await countItems(db, 'yoga_blocks');
-  if (blocksCount === 0) {
-    await saveBatch(db, 'yoga_blocks', defaultBlocks);
-  }
-
-  // 3. Sembrar Secuencia de Yoga Yin Completa (que mezcla posturas y bloques)
-  const sequencesCount = await countItems(db, 'yoga_sequences');
-  if (sequencesCount === 0) {
-    await saveBatch(db, 'yoga_sequences', defaultSequences);
-  }
-
-  // 4. Sembrar Patrones de Breathwork
-  const breathworkCount = await countItems(db, 'breathwork_patterns');
-  if (breathworkCount === 0) {
-    await saveBatch(db, 'breathwork_patterns', defaultBreathwork);
-  }
-
-  // 5. Sembrar Presets de Meditación (Binaural)
-  const meditationCount = await countItems(db, 'meditation_presets');
-  if (meditationCount === 0) {
-    await saveBatch(db, 'meditation_presets', defaultMeditation);
-  }
-
-  // 6. Sembrar Puntos de Acupuntura TENS / Digitopuntura
+  // 1. Sembrar Puntos de Acupuntura OMS (Catálogo enciclopédico de 361 puntos)
   const needsReseed = await new Promise((resolve) => {
     const tx = db.transaction('acupuncture_points', 'readonly');
     const store = tx.objectStore('acupuncture_points');
@@ -204,19 +169,15 @@ export async function seedDatabase() {
   });
 
   if (needsReseed) {
-    console.log('[DB] Clearing old acupuncture points to apply normalized WHO schema (Spanish corrected & traditional_code added)...');
+    console.log('[DB] Sincronizando catálogo de 361 puntos de acupuntura OMS...');
     const txClearPoints = db.transaction('acupuncture_points', 'readwrite');
     txClearPoints.objectStore('acupuncture_points').clear();
     await new Promise(r => txClearPoints.oncomplete = r);
-    
-    const txClearSeq = db.transaction('acupuncture_sequences', 'readwrite');
-    txClearSeq.objectStore('acupuncture_sequences').clear();
-    await new Promise(r => txClearSeq.oncomplete = r);
   }
 
   const acupuncturePointsCount = await countItems(db, 'acupuncture_points');
   if (acupuncturePointsCount < 300) {
-    console.log('[DB] Seeding full WHO acupuncture point database...');
+    console.log('[DB] Sembrando catálogo completo de puntos OMS...');
     const txClear = db.transaction('acupuncture_points', 'readwrite');
     txClear.objectStore('acupuncture_points').clear();
     await new Promise(r => txClear.oncomplete = r);
@@ -224,32 +185,44 @@ export async function seedDatabase() {
     await saveBatch(db, 'acupuncture_points', defaultAcupuncture);
   }
 
-  // 6b. Sembrar Secuencias de Acupuntura TENS (Presets)
-  const acupunctureSequencesCount = await countItems(db, 'acupuncture_sequences');
-  if (acupunctureSequencesCount === 0) {
-    await saveBatch(db, 'acupuncture_sequences', defaultAcupunctureSequences);
-  }
+  // 2. Limpieza transparente de ejercicios duplicados hardcoded de 5kg
+  await cleanupDuplicate5kgExercises(db);
+}
 
-  // 7. Sembrar Ejercicios de Fuerza
-  const strengthExCount = await countItems(db, 'strength_exercises');
-  if (strengthExCount === 0) {
-    await saveBatch(db, 'strength_exercises', defaultStrengthExercises);
-  }
+/**
+ * Elimina cualquier ejercicio residual duplicado con sufijo '-5kg' y reconecta
+ * los circuitos existentes al ejercicio base con weightOverride: 5.
+ */
+export async function cleanupDuplicate5kgExercises(db) {
+  try {
+    const duplicateMap = {
+      'str-sentadilla-pelota-5kg': 'str-sentadilla-pelota',
+      'str-puente-gluteos-5kg': 'str-puente-gluteos',
+      'str-bisagra-cadera-5kg': 'str-bisagra-cadera'
+    };
 
-  // 8. Sembrar Circuitos de Fuerza
-  const strengthCircuitCount = await countItems(db, 'strength_circuits');
-  if (strengthCircuitCount === 0) {
-    await saveBatch(db, 'strength_circuits', defaultStrengthCircuits);
-  }
+    for (const dupId of Object.keys(duplicateMap)) {
+      await deleteData(db, 'strength_exercises', dupId);
+    }
 
-  // Convertir prescripciones heredadas en valores explícitos dentro de bloques y circuitos.
-  await normalizeYogaPrescriptions(db);
-  await normalizeStrengthPrescriptions(db);
-
-  // 9. Sembrar Sesiones Compuestas
-  const compoundSessionCount = await countItems(db, 'compound_sessions');
-  if (compoundSessionCount === 0) {
-    await saveBatch(db, 'compound_sessions', defaultCompoundSessions);
+    const circuits = await getAllData(db, 'strength_circuits');
+    for (const circuit of circuits) {
+      if (Array.isArray(circuit.exercises)) {
+        let modified = false;
+        circuit.exercises.forEach(entry => {
+          if (duplicateMap[entry.exerciseId]) {
+            entry.exerciseId = duplicateMap[entry.exerciseId];
+            entry.weightOverride = 5;
+            modified = true;
+          }
+        });
+        if (modified) {
+          await putData(db, 'strength_circuits', circuit);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[DB] Error during cleanupDuplicate5kgExercises:', err);
   }
 }
 
@@ -383,9 +356,11 @@ export async function exportDatabase(db, mode = 'all') {
   let targetStores = [];
 
   if (mode === 'history') {
-    targetStores = ['sessions_log'];
+    // Historial de prácticas y métricas/metas corporales
+    targetStores = allStoreNames.filter(s => ['sessions_log', 'body_metrics', 'body_goals'].includes(s));
   } else if (mode === 'content') {
-    targetStores = allStoreNames.filter(s => s !== 'sessions_log');
+    // Contenido personalizado (rutinas, secuencias, circuitos, ejercicios, etc.) sin historial
+    targetStores = allStoreNames.filter(s => !['sessions_log', 'body_metrics', 'body_goals'].includes(s));
   } else {
     targetStores = allStoreNames;
   }
@@ -454,56 +429,5 @@ export async function importDatabase(db, backup) {
   return results;
 }
 
-async function normalizeYogaPrescriptions(db) {
-  const blocks = await getAllData(db, 'yoga_blocks');
-  for (const block of blocks) {
-    let modified = false;
-    const normalizedPostures = (block.postures || []).map(p => {
-      if (typeof p.holdTime === 'undefined') {
-        modified = true;
-        return { postureId: p.postureId, holdTime: 180, side: p.side || null };
-      }
-      return p;
-    });
-    if (modified) {
-      block.postures = normalizedPostures;
-      await putData(db, 'yoga_blocks', block);
-    }
-  }
-}
 
-async function normalizeStrengthPrescriptions(db) {
-  const circuits = await getAllData(db, 'strength_circuits');
-  const exercises = await getAllData(db, 'strength_exercises');
-  const exerciseMap = new Map(exercises.map(ex => [ex.id, ex]));
 
-  for (const circuit of circuits) {
-    let modified = false;
-    const normalizedExercises = (circuit.exercises || []).map(entry => {
-      const ex = exerciseMap.get(entry.exerciseId);
-      const isTimeMode = ex && ex.mode === 'time';
-      const isRepsUndefined = typeof entry.targetReps === 'undefined';
-      const isSecondsUndefined = typeof entry.targetSeconds === 'undefined';
-
-      if (isRepsUndefined && isSecondsUndefined) {
-        modified = true;
-        return {
-          ...entry,
-          targetReps: isTimeMode ? 0 : 10,
-          targetSeconds: isTimeMode ? 30 : 0
-        };
-      }
-
-      return {
-        ...entry,
-        targetReps: typeof entry.targetReps === 'number' ? entry.targetReps : (isTimeMode ? 0 : 10),
-        targetSeconds: typeof entry.targetSeconds === 'number' ? entry.targetSeconds : (isTimeMode ? 30 : 0)
-      };
-    });
-
-    if (modified) {
-      circuit.exercises = normalizedExercises;
-      await putData(db, 'strength_circuits', circuit);
-    }
-  }
-}

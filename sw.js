@@ -3,7 +3,7 @@
 // 2. Stale-While-Revalidate en tiempo de ejecución (offline instantáneo + actualización en segundo plano)
 // 3. skipWaiting y clients.claim para activación inmediata coordinada con app.js
 
-const BUILD_VERSION = '2026.09.23.1158';
+const BUILD_VERSION = '2026.09.25.0855';
 const CACHE_NAME = `meridiano-cache-v${BUILD_VERSION}`;
 
 const ASSETS = [
@@ -112,18 +112,51 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Capa 2: Estrategia Stale-While-Revalidate
+// Capa 2: Estrategia de Fetch con Protección de Navegación SPA y Stale-While-Revalidate
 self.addEventListener('fetch', (event) => {
   // Solo interceptar peticiones GET originadas en el mismo dominio
   if (event.request.method !== 'GET' || !event.request.url.startsWith(self.location.origin)) {
     return;
   }
 
+  // 1. Manejo Especial para Navegación (Recarga, acceso directo por index.html o subrutas SPA)
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      (async () => {
+        try {
+          // Intentar red primero si el servidor está en línea
+          const networkResponse = await fetch(event.request);
+          if (networkResponse && networkResponse.status === 200) {
+            const cache = await caches.open(CACHE_NAME);
+            cache.put(event.request, networkResponse.clone());
+            return networkResponse;
+          }
+        } catch (err) {
+          // Servidor no disponible, conexión caída o modo offline
+        }
+
+        // Si la red falla o el servidor devuelve error al recargar una ruta,
+        // servir index.html precacheado para que la SPA continúe ejecutándose sin interrupciones
+        const cached = await caches.match(event.request)
+                    || await caches.match('./index.html', { ignoreSearch: true })
+                    || await caches.match('./', { ignoreSearch: true });
+        if (cached) return cached;
+
+        return new Response('MERIDIANO offline: Recurso no disponible', {
+          status: 503,
+          statusText: 'Service Unavailable',
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+        });
+      })()
+    );
+    return;
+  }
+
+  // 2. Peticiones de Assets (CSS, JS, iconos): Stale-While-Revalidate
   event.respondWith(
     caches.open(CACHE_NAME).then(async (cache) => {
       const cachedResponse = await cache.match(event.request);
 
-      // Revalidación en segundo plano contra Vercel / Servidor
       const revalidatePromise = fetch(event.request)
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
@@ -131,36 +164,22 @@ self.addEventListener('fetch', (event) => {
           }
           return networkResponse;
         })
-        .catch(() => {
-          // Si no hay red (modo offline), la promesa se resuelve sin error
-          return null;
-        });
+        .catch(() => null);
 
-      // Mantiene el Service Worker activo hasta que se actualice la caché en 2º plano
       event.waitUntil(revalidatePromise);
 
-      // Si existe en caché, devolver de inmediato (0ms de latencia)
+      // Si existe en caché, responder de inmediato
       if (cachedResponse) {
         return cachedResponse;
       }
 
       // Si no estaba en caché, esperar a la red
       const networkResponse = await revalidatePromise;
-      if (networkResponse) {
+      if (networkResponse && networkResponse.status === 200) {
         return networkResponse;
       }
 
-      // Fallback de navegación si todo falla y estamos offline
-      if (event.request.mode === 'navigate') {
-        const fallback = await cache.match('./index.html') || await cache.match('./');
-        if (fallback) return fallback;
-      }
-
-      return new Response('MERIDIANO offline: Recurso no disponible', {
-        status: 503,
-        statusText: 'Service Unavailable',
-        headers: { 'Content-Type': 'text/plain; charset=utf-8' }
-      });
+      return cachedResponse || new Response('Recurso no disponible', { status: 404 });
     })
   );
 });

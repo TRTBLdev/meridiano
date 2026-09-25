@@ -189,6 +189,15 @@ body.dark-theme .strength-timer {
   line-height: 1.45;
 }
 
+.strength-timer__metrics-group {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: center;
+  gap: clamp(1rem, 3vw, 2.5rem);
+  flex-wrap: wrap;
+}
+
 .strength-timer__rep-metric {
   display: grid;
   grid-template-columns: 2.75rem minmax(5rem, auto) auto minmax(4rem, auto) 2.75rem;
@@ -196,6 +205,90 @@ body.dark-theme .strength-timer {
   justify-content: center;
   gap: clamp(0.4rem, 2vw, 1rem);
   margin: 0;
+}
+
+.strength-timer__weight-metric {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(5rem, auto) 2.5rem;
+  align-items: end;
+  justify-content: center;
+  gap: clamp(0.35rem, 1.5vw, 0.75rem);
+  margin: 0;
+}
+
+.strength-timer__weight-metric label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.strength-timer__weight-metric label > span {
+  color: var(--strength-muted);
+  font-family: var(--font-digital);
+  font-size: 0.59rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.strength-timer__weight-val-wrap {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+}
+
+.strength-timer__weight-metric input {
+  width: 3.5ch;
+  margin-top: 0.2rem;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--strength-line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--strength-ink);
+  font-family: var(--font-digital);
+  font-size: clamp(2.5rem, 8vw, 4rem);
+  font-variant-numeric: tabular-nums;
+  line-height: 0.95;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.strength-timer__weight-metric input::-webkit-inner-spin-button,
+.strength-timer__weight-metric input::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+.strength-timer__weight-unit {
+  color: var(--color-accent-green, #10B981);
+  font-family: var(--font-digital);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  text-transform: uppercase;
+  min-width: 2.5ch;
+}
+
+.strength-timer__weight-metric button {
+  width: 2.5rem;
+  min-height: 2.5rem;
+  padding: 0;
+  border: 0;
+  border-bottom: 2px solid var(--color-accent-green, #10B981);
+  border-radius: 0;
+  background: transparent;
+  color: var(--strength-ink);
+  font-family: var(--font-digital);
+  font-size: 1.35rem;
+  cursor: pointer;
+}
+
+.strength-timer__weight-metric button:disabled,
+.strength-timer__weight-metric input:disabled {
+  border-color: var(--color-disabled);
+  color: var(--color-disabled);
+  cursor: not-allowed;
 }
 
 .strength-timer__measurements {
@@ -548,7 +641,13 @@ body.dark-theme .strength-timer {
 
   .strength-timer__measurements {
     grid-template-columns: 1fr;
-    gap: 1rem;
+    gap: 1.25rem;
+  }
+
+  .strength-timer__metrics-group {
+    flex-direction: column;
+    align-items: center;
+    gap: 1.25rem;
   }
 
   .strength-timer__rep-metric {

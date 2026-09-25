@@ -261,7 +261,7 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
     }
 
     function setPhaseControlsEnabled(enabled) {
-      phaseContent.querySelectorAll('#strength-actual-reps, #btn-strength-rep-minus, #btn-strength-rep-plus, #btn-strength-register, #btn-strength-skip')
+      phaseContent.querySelectorAll('#strength-actual-reps, #btn-strength-rep-minus, #btn-strength-rep-plus, #strength-actual-weight, #btn-strength-weight-minus, #btn-strength-weight-plus, #btn-strength-register, #btn-strength-skip')
         .forEach(control => { control.disabled = !enabled; });
     }
 
@@ -287,6 +287,45 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
           input.value = clampReps(Number(input.value) + 1);
         });
         input.addEventListener('change', () => { input.value = clampReps(input.value); });
+
+        // Controles de sobrecarga / peso utilizado
+        const weightInput = phaseContent.querySelector('#strength-actual-weight');
+        const weightHint = phaseContent.querySelector('#strength-weight-hint');
+        const clampWeight = val => Math.max(0, Math.min(500, Math.round((Number(val) || 0) * 10) / 10));
+        const syncHint = () => {
+          if (weightHint && weightInput) {
+            const val = Number(weightInput.value) || 0;
+            weightHint.textContent = val === 0 ? 'CORP' : 'KG';
+          }
+        };
+
+        const minusWeightBtn = phaseContent.querySelector('#btn-strength-weight-minus');
+        const plusWeightBtn = phaseContent.querySelector('#btn-strength-weight-plus');
+
+        if (minusWeightBtn && weightInput) {
+          minusWeightBtn.addEventListener('click', () => {
+            const cur = Number(weightInput.value) || 0;
+            const step = cur > 5 ? 1 : 0.5;
+            weightInput.value = clampWeight(Math.max(0, cur - step));
+            syncHint();
+          });
+        }
+        if (plusWeightBtn && weightInput) {
+          plusWeightBtn.addEventListener('click', () => {
+            const cur = Number(weightInput.value) || 0;
+            const step = cur >= 5 ? 1 : 0.5;
+            weightInput.value = clampWeight(cur + step);
+            syncHint();
+          });
+        }
+        if (weightInput) {
+          weightInput.addEventListener('input', syncHint);
+          weightInput.addEventListener('change', () => {
+            weightInput.value = clampWeight(weightInput.value);
+            syncHint();
+          });
+        }
+
         phaseContent.querySelector('#btn-strength-register').addEventListener('click', () => {
           if (currentPhaseIndex !== boundPhaseIndex) return;
           const actualReps = Number(input.value);
@@ -296,7 +335,8 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
             return;
           }
           input.setCustomValidity('');
-          if (recordCurrentExercise('completed', actualReps)) advancePhase();
+          const actualWeight = weightInput ? (parseFloat(weightInput.value) || 0) : 0;
+          if (recordCurrentExercise('completed', actualReps, actualWeight)) advancePhase();
         });
       }
 
@@ -350,11 +390,12 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
       }
     }
 
-    function recordCurrentExercise(status, actualValue = null) {
+    function recordCurrentExercise(status, actualValue = null, actualWeight = null) {
       const phase = currentPhase();
       if (!phase || phase.type !== 'exercise') return false;
       result = recordStrengthResultEntry(result, phase, {
         actualValue,
+        actualWeight,
         elapsedSeconds: phaseElapsed,
         status
       });
@@ -412,16 +453,18 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
       playQuartzBowlRing(432, 4.5);
       finalResult = finalizeStrengthResult(result, elapsedSeconds);
 
+      let savedLogId = null;
       if (!orchestratorConfig) {
         try {
-          await addData(db, 'sessions_log', {
+          savedLogId = await addData(db, 'sessions_log', {
             type: 'strength',
             date: new Date().toISOString(),
             duration: Math.max(1, Math.round(elapsedSeconds / 60)),
             activeDurationSeconds: elapsedSeconds,
             notes: `Circuito completado: ${currentCircuit.name} (${currentCircuit.rounds} rondas).`,
             details: `Fuerza: ${escapeHTML(currentCircuit.name)}`,
-            strengthResult: finalResult
+            strengthResult: finalResult,
+            vitality: null
           });
         } catch (error) {
           console.error('[Strength] Error saving session log:', error);
@@ -434,8 +477,40 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
       phaseContent.innerHTML = renderStrengthCompletion({
         circuitName: currentCircuit.name,
         summary: summarizeStrengthResult(finalResult),
-        continueLabel: orchestratorConfig ? 'CONTINUAR SESIÓN' : 'VOLVER A FUERZA'
+        continueLabel: orchestratorConfig ? 'CONTINUAR SESIÓN' : 'VOLVER A FUERZA',
+        showVitality: !orchestratorConfig
       });
+
+      const vitalityBtns = phaseContent.querySelectorAll('.btn-vitality-option');
+      vitalityBtns.forEach(btn => {
+        btn.addEventListener('click', async () => {
+          vitalityBtns.forEach(b => {
+            b.style.borderColor = 'rgba(46,43,40,0.12)';
+            b.style.background = 'rgba(46,43,40,0.04)';
+          });
+          btn.style.borderColor = 'var(--color-accent-green)';
+          btn.style.background = 'rgba(0, 230, 118, 0.1)';
+          const selectedVitality = btn.getAttribute('data-vitality');
+
+          if (savedLogId && selectedVitality) {
+            try {
+              const tx = db.transaction('sessions_log', 'readwrite');
+              const store = tx.objectStore('sessions_log');
+              const req = store.get(savedLogId);
+              req.onsuccess = () => {
+                const rec = req.result;
+                if (rec) {
+                  rec.vitality = selectedVitality;
+                  store.put(rec);
+                }
+              };
+            } catch (e) {
+              console.warn('[Strength] Could not update vitality:', e);
+            }
+          }
+        });
+      });
+
       phaseContent.querySelector('#btn-strength-completion-continue').addEventListener('click', () => {
         if (orchestratorConfig) {
           orchestratorConfig.onComplete(finalResult);
