@@ -3,7 +3,7 @@
 // 2. Stale-While-Revalidate en tiempo de ejecución (offline instantáneo + actualización en segundo plano)
 // 3. skipWaiting y clients.claim para activación inmediata coordinada con app.js
 
-const BUILD_VERSION = '2026.09.25.0915';
+const BUILD_VERSION = '2026.09.25.0935';
 const CACHE_NAME = `meridiano-cache-v${BUILD_VERSION}`;
 
 const ASSETS = [

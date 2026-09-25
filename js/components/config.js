@@ -75,17 +75,20 @@ export async function renderConfigScreen(container, db, onNavigate) {
                   [ 02 / EXPORTAR RESPALDO ]
                 </h3>
                 <p style="font-size: 0.75rem; color: var(--color-text-muted); margin-bottom: 16px; line-height: 1.4;">
-                  Descargue una copia de sus datos locales (historial de prácticas, secuencias personalizadas y presets) en un archivo consolidado en formato .json.
+                  Descargue sus datos en archivos .json modulares según lo que desee transferir o respaldar:
                 </p>
                 <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-                  <button id="btn-export-history" class="btn-braun-tab active" style="font-family: var(--font-digital); text-transform: uppercase; padding: 8px 16px; cursor: pointer; border-radius: 0;">
-                    Historial de Prácticas
+                  <button id="btn-export-history" class="btn-braun-tab active" style="font-family: var(--font-digital); text-transform: uppercase; padding: 8px 16px; cursor: pointer; border-radius: 0;" title="Descarga historial de prácticas realizadas + registros corporales (peso/medidas) + metas">
+                    Historial + Datos Corporales
                   </button>
-                  <button id="btn-export-content" class="btn-braun-tab active" style="font-family: var(--font-digital); text-transform: uppercase; padding: 8px 16px; cursor: pointer; border-radius: 0;">
-                    Contenido Personalizado
+                  <button id="btn-export-body" class="btn-braun-tab active" style="font-family: var(--font-digital); text-transform: uppercase; padding: 8px 16px; cursor: pointer; border-radius: 0;" title="Descarga únicamente métricas corporales y metas de peso">
+                    Solo Datos Corporales
                   </button>
-                  <button id="btn-export-all" class="btn-braun-tab active" style="font-family: var(--font-digital); text-transform: uppercase; padding: 8px 16px; cursor: pointer; border-radius: 0;">
-                    Todo
+                  <button id="btn-export-content" class="btn-braun-tab active" style="font-family: var(--font-digital); text-transform: uppercase; padding: 8px 16px; cursor: pointer; border-radius: 0;" title="Descarga ejercicios, circuitos, secuencias de yoga, respiraciones y sesiones compuestas sin historial personal">
+                    Contenido Modular
+                  </button>
+                  <button id="btn-export-all" class="btn-braun-tab active" style="font-family: var(--font-digital); text-transform: uppercase; padding: 8px 16px; cursor: pointer; border-radius: 0;" title="Descarga todo el contenido y todo el historial consolidado">
+                    Todo Consolidado
                   </button>
                 </div>
               </div>
@@ -193,9 +196,10 @@ export async function renderConfigScreen(container, db, onNavigate) {
     }
   }
 
-  layout.querySelector('#btn-export-history').addEventListener('click', () => handleExport('history', 'meridiano_history'));
-  layout.querySelector('#btn-export-content').addEventListener('click', () => handleExport('content', 'meridiano_content'));
-  layout.querySelector('#btn-export-all').addEventListener('click', () => handleExport('all', 'meridiano_backup'));
+  layout.querySelector('#btn-export-history').addEventListener('click', () => handleExport('history', 'meridiano_historial_y_cuerpo'));
+  layout.querySelector('#btn-export-body').addEventListener('click', () => handleExport('body', 'meridiano_datos_corporales'));
+  layout.querySelector('#btn-export-content').addEventListener('click', () => handleExport('content', 'meridiano_contenido'));
+  layout.querySelector('#btn-export-all').addEventListener('click', () => handleExport('all', 'meridiano_backup_completo'));
 
   // 3. Importación de base de datos
   const fileInput = layout.querySelector('#file-import-db');

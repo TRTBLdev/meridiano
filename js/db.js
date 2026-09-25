@@ -356,10 +356,13 @@ export async function exportDatabase(db, mode = 'all') {
   let targetStores = [];
 
   if (mode === 'history') {
-    // Historial de prácticas y métricas/metas corporales
+    // Historial de prácticas y registros/metas corporales
     targetStores = allStoreNames.filter(s => ['sessions_log', 'body_metrics', 'body_goals'].includes(s));
+  } else if (mode === 'body') {
+    // Exclusivamente métricas y metas corporales
+    targetStores = allStoreNames.filter(s => ['body_metrics', 'body_goals'].includes(s));
   } else if (mode === 'content') {
-    // Contenido personalizado (rutinas, secuencias, circuitos, ejercicios, etc.) sin historial
+    // Contenido modular (rutinas, secuencias, circuitos, ejercicios, etc.) sin historial
     targetStores = allStoreNames.filter(s => !['sessions_log', 'body_metrics', 'body_goals'].includes(s));
   } else {
     targetStores = allStoreNames;

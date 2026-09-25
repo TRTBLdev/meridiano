@@ -382,18 +382,45 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
 
       container.innerHTML = '';
 
-      if (block.module === 'breathwork') {
-        renderBreathworkScreen(container, db, onNavigate, orchestratorConfig);
-      } else if (block.module === 'strength') {
-        renderStrengthScreen(container, db, onNavigate, orchestratorConfig);
-      } else if (block.module === 'yoga') {
-        renderYogaScreen(container, db, onNavigate, orchestratorConfig);
-      } else if (block.module === 'acupuncture') {
-        renderAcupunctureScreen(container, db, onNavigate, orchestratorConfig);
-      } else {
-        console.warn(`[Sessions] Módulo desconocido: ${block.module}`);
-        currentBlockIndex++;
-        runCurrentBlock();
+      try {
+        if (block.module === 'breathwork') {
+          renderBreathworkScreen(container, db, onNavigate, orchestratorConfig);
+        } else if (block.module === 'strength') {
+          renderStrengthScreen(container, db, onNavigate, orchestratorConfig);
+        } else if (block.module === 'yoga') {
+          renderYogaScreen(container, db, onNavigate, orchestratorConfig);
+        } else if (block.module === 'acupuncture') {
+          renderAcupunctureScreen(container, db, onNavigate, orchestratorConfig);
+        } else {
+          console.warn(`[Sessions] Módulo desconocido: ${block.module}`);
+          currentBlockIndex++;
+          runCurrentBlock();
+        }
+      } catch (err) {
+        console.error(`[Sessions] Error ejecutando bloque ${block.module}:`, err);
+        container.innerHTML = `
+          <div class="dashboard-layout" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #0A0A0A; color: #E8E6E3; padding: 24px; text-align: center;">
+            <h2 style="color: #EF4444; font-size: 1.5rem; margin-bottom: 16px;">Error al Iniciar Bloque</h2>
+            <p style="color: var(--color-text-muted); max-width: 500px; margin-bottom: 24px;">
+              No se pudo cargar el ejercicio o técnica <strong>${escapeHTML(block.nameOverride || block.presetId)}</strong> del módulo <em>${escapeHTML(block.module)}</em>.
+            </p>
+            <div style="display: flex; gap: 12px;">
+              <button id="btn-skip-failed-block" style="background: var(--color-accent, #F59E0B); color: #000; border: none; padding: 10px 20px; font-weight: 600; cursor: pointer;">
+                Saltar este bloque
+              </button>
+              <button id="btn-abort-failed-session" style="background: transparent; border: 1px solid rgba(255,255,255,0.2); color: #E8E6E3; padding: 10px 20px; cursor: pointer;">
+                Salir
+              </button>
+            </div>
+          </div>
+        `;
+        container.querySelector('#btn-skip-failed-block')?.addEventListener('click', () => {
+          currentBlockIndex++;
+          runCurrentBlock();
+        });
+        container.querySelector('#btn-abort-failed-session')?.addEventListener('click', () => {
+          onNavigate('sesiones');
+        });
       }
     });
   }
