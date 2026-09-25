@@ -3,7 +3,7 @@
 // 2. Stale-While-Revalidate en tiempo de ejecución (offline instantáneo + actualización en segundo plano)
 // 3. skipWaiting y clients.claim para activación inmediata coordinada con app.js
 
-const BUILD_VERSION = '2026.09.25.0855';
+const BUILD_VERSION = '2026.09.25.0915';
 const CACHE_NAME = `meridiano-cache-v${BUILD_VERSION}`;
 
 const ASSETS = [
@@ -137,10 +137,22 @@ self.addEventListener('fetch', (event) => {
 
         // Si la red falla o el servidor devuelve error al recargar una ruta,
         // servir index.html precacheado para que la SPA continúe ejecutándose sin interrupciones
-        const cached = await caches.match(event.request)
+        const cache = await caches.open(CACHE_NAME);
+        const cached = await cache.match(event.request)
+                    || await cache.match('./index.html', { ignoreSearch: true })
+                    || await cache.match('./', { ignoreSearch: true })
+                    || await caches.match(event.request)
                     || await caches.match('./index.html', { ignoreSearch: true })
                     || await caches.match('./', { ignoreSearch: true });
         if (cached) return cached;
+
+        // Búsqueda de rescate: cualquier entrada HTML precacheada
+        const keys = await cache.keys();
+        const fallbackKey = keys.find(k => k.url.endsWith('/index.html') || k.url.endsWith('/'));
+        if (fallbackKey) {
+          const fallbackRes = await cache.match(fallbackKey);
+          if (fallbackRes) return fallbackRes;
+        }
 
         return new Response('MERIDIANO offline: Recurso no disponible', {
           status: 503,
