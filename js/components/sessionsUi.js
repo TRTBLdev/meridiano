@@ -11,7 +11,7 @@ export function renderCompoundAction(label, { type = 'button', className = '', i
   return `<button type="${type}" ${id ? `id="${id}"` : ''} class="compound-text-action ${className}" ${disabled ? 'disabled' : ''}>${label}</button>`;
 }
 
-export function renderCompoundSessionCard(session, { invalidReason = '' } = {}) {
+export function renderCompoundSessionCard(session, { invalidReason = '', system = false, suggested = false } = {}) {
   const blocks = (session.blocks || []).map(block => `
     <div class="compound-session-card__block">
       <span class="compound-session-card__module">[${escapeHTML(block.module.toUpperCase())}]</span>
@@ -26,11 +26,13 @@ export function renderCompoundSessionCard(session, { invalidReason = '' } = {}) 
         <div class="compound-session-card__description">${escapeHTML(session.description || '')}</div>
       </div>
       <div class="compound-session-card__icons">
-        ${renderLobbyAction({ kind: 'icon', icon: 'edit', label: 'Editar sesión', className: 'btn-edit-session' })}
-        ${renderLobbyAction({ kind: 'icon', icon: 'delete', label: 'Borrar sesión', className: 'btn-delete-session' })}
+        ${suggested ? '<span class="routine-suggestion-badge">Sugerencia de hoy</span>' : ''}
+        ${system ? '' : `${renderLobbyAction({ kind: 'icon', icon: 'edit', label: 'Editar sesión', className: 'btn-edit-session' })}
+        ${renderLobbyAction({ kind: 'icon', icon: 'delete', label: 'Borrar sesión', className: 'btn-delete-session' })}`}
       </div>
     </div>
     <div class="compound-session-card__blocks">${blocks}</div>
+    ${session.parentGroupId ? '<div class="compound-session-card__description">Extensión independiente del ancla correspondiente.</div>' : ''}
     ${invalidReason ? `<div class="compound-session-warning" role="status">${escapeHTML(invalidReason)}</div>` : ''}
     ${renderLobbyAction({ kind: 'icon', icon: 'play', label: 'Iniciar sesión', className: 'btn-play-session', disabled: Boolean(invalidReason) })}
   `;

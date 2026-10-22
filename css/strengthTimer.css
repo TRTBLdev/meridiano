@@ -23,7 +23,7 @@
 body.dark-theme .strength-timer {
   --strength-canvas: #151412;
   --strength-ink: #f3f0ea;
-  --strength-muted: #aaa49c;
+  --strength-muted: #c8c3bd;
   --strength-line: rgba(255, 255, 255, 0.16);
   --strength-line-soft: rgba(255, 255, 255, 0.08);
   --strength-layer: rgba(24, 23, 21, 0.66);
@@ -83,6 +83,31 @@ body.dark-theme .strength-timer {
   box-sizing: border-box;
 }
 
+.strength-timer__exit {
+  position: absolute;
+  z-index: 4;
+  top: clamp(0.8rem, 3vh, 1.5rem);
+  right: clamp(0.8rem, 3vw, 1.5rem);
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--strength-muted);
+  font-family: var(--font-ui);
+  font-size: 1.7rem;
+  font-weight: 300;
+  line-height: 1;
+  cursor: pointer;
+  appearance: none;
+}
+
+.strength-timer__exit:hover,
+.strength-timer__exit:focus-visible {
+  color: var(--color-accent-red);
+  background: transparent;
+}
+
 .strength-timer__header {
   display: flex;
   align-items: baseline;
@@ -129,6 +154,7 @@ body.dark-theme .strength-timer {
 .strength-timer__scope,
 .strength-timer__phase-meta,
 .strength-timer__metric-note,
+.strength-timer__flow-note,
 .strength-timer__focus {
   color: var(--strength-muted);
   font-family: var(--font-digital);
@@ -408,6 +434,11 @@ body.dark-theme .strength-timer {
   text-align: center;
 }
 
+.strength-timer__flow-note {
+  margin: -0.65rem 0 1.25rem;
+  text-align: center;
+}
+
 .strength-timer__matrix {
   --strength-matrix-dot: clamp(5px, 0.75vw, 8px);
   --strength-matrix-gap: clamp(3px, 0.45vw, 6px);
@@ -490,6 +521,10 @@ body.dark-theme .strength-timer {
   color: var(--strength-muted);
 }
 
+.strength-timer__icon-action--confirm {
+  color: var(--color-accent-green);
+}
+
 .strength-timer__quiet-action:hover,
 .strength-timer__quiet-action:focus-visible {
   border-bottom-color: var(--color-accent-red);
@@ -530,6 +565,11 @@ body.dark-theme .strength-timer {
 .strength-timer__icon-action:hover,
 .strength-timer__icon-action:focus-visible {
   color: var(--strength-ink);
+}
+
+.strength-timer__icon-action:disabled {
+  color: var(--color-disabled);
+  cursor: not-allowed;
 }
 
 .strength-timer__icon-action--danger:hover,

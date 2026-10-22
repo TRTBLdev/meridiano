@@ -6,6 +6,20 @@ import {
   freqToValue
 } from '../utils/freqUtils.js';
 
+// Node expone navigator como getter de solo lectura; hacerlo reemplazable solo en
+// ese entorno mantiene los tests del controlador compatibles sin tocar el navegador.
+if (typeof process !== 'undefined' && process.versions?.node && typeof globalThis !== 'undefined') {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  if (descriptor?.configurable && !descriptor.set) {
+    Object.defineProperty(globalThis, 'navigator', {
+      value: globalThis.navigator,
+      writable: true,
+      configurable: true,
+      enumerable: descriptor.enumerable
+    });
+  }
+}
+
 export function createWakeLockController() {
   let wakeLock = null;
   let videoFallback = null;
@@ -149,6 +163,34 @@ export function createTimerShell({
     </div>
   `;
   return timerEl;
+}
+
+export function requestTimerExitConfirmation(root) {
+  return new Promise(resolve => {
+    const dialog = document.createElement('div');
+    dialog.className = 'timer-exit-confirmation';
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
+    dialog.setAttribute('aria-label', 'Salir sin guardar');
+    dialog.innerHTML = `
+      <div class="timer-exit-confirmation__panel">
+        <p>¿Salir sin guardar?</p>
+        <div>
+          <button type="button" data-timer-exit="continue">Continuar</button>
+          <button type="button" data-timer-exit="discard">Salir sin guardar</button>
+        </div>
+      </div>`;
+    root.appendChild(dialog);
+    dialog.querySelector('[data-timer-exit="continue"]').addEventListener('click', () => {
+      dialog.remove();
+      resolve(false);
+    });
+    dialog.querySelector('[data-timer-exit="discard"]').addEventListener('click', () => {
+      dialog.remove();
+      resolve(true);
+    });
+    dialog.querySelector('[data-timer-exit="continue"]').focus();
+  });
 }
 
 export function renderSynthPanel({

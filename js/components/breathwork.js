@@ -4,6 +4,7 @@ import {
   bindSynthPanel,
   createTimerShell,
   createWakeLockController,
+  requestTimerExitConfirmation,
   renderSynthPanel,
   populateTimerDots
 } from './timerShell.js';
@@ -382,12 +383,11 @@ export async function renderBreathworkScreen(container, db, onNavigate, orchestr
               </div>
 
               <div class="timer-icon-control-group">
-                <button class="btn-acu-icon btn-acu-danger" id="btn-breath-stop" title="Detener" style="width:48px; height:48px; display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer;">
+                <button class="btn-acu-icon btn-acu-danger" id="btn-breath-stop" aria-label="Salir sin guardar" title="Salir sin guardar" style="width:48px; height:48px; display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer;">
                   <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                     <rect x="5" y="5" width="14" height="14" rx="1"></rect>
                   </svg>
                 </button>
-                <span>Detener</span>
               </div>
             </div>
           </div>
@@ -532,6 +532,8 @@ export async function renderBreathworkScreen(container, db, onNavigate, orchestr
       if (!orchestratorConfig) {
         addData(db, 'sessions_log', {
           type: 'breathwork',
+          sessionId: mode === 'single' ? singlePatternId : null,
+          tags: ['breathwork'],
           date: new Date().toISOString(),
           duration: Math.max(1, Math.round(activeElapsedSeconds / 60)),
           activeDurationSeconds: activeElapsedSeconds,
@@ -633,10 +635,10 @@ export async function renderBreathworkScreen(container, db, onNavigate, orchestr
     btnStop.addEventListener('click', async () => {
       const wasPaused = isPaused;
       if (!isPaused) setPaused(true);
-      if (confirm('¿Deseas detener y cancelar el ejercicio actual? No se guardará en el historial.')) {
+      if (await requestTimerExitConfirmation(timerEl)) {
         await cleanupTimer();
         if (orchestratorConfig) {
-          onNavigate('inicio');
+          onNavigate('sessions');
         } else {
           activeView = 'lobby';
           render();

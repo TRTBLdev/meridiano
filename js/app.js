@@ -147,7 +147,7 @@ function handleNavigation(target, param = null) {
   if (target === 'meditation') {
     renderMeditationScreen(appContainer, state.db, handleNavigation);
   } else if (target === 'acupuncture') {
-    renderAcupunctureScreen(appContainer, state.db, handleNavigation);
+    renderAcupunctureScreen(appContainer, state.db, handleNavigation, param ? (typeof param === 'object' ? param : { presetId: param }) : null);
   } else if (target === 'breathwork') {
     renderBreathworkScreen(appContainer, state.db, handleNavigation);
   } else if (target === 'yoga') {
@@ -164,6 +164,8 @@ function handleNavigation(target, param = null) {
     renderBodyScreen(appContainer, state.db, handleNavigation);
   } else if (target === 'progress') {
     renderProgressScreen(appContainer, state.db, handleNavigation);
+  } else {
+    console.warn(`[App] Ruta de navegación desconocida: ${target}`);
   }
 }
 

@@ -2,7 +2,7 @@ import { defaultAcupuncture } from './seeds/acupuncture_points_seed.js';
 import { defaultMeridians } from './seeds/meridians_seed.js';
 
 const DB_NAME = 'meridiano_db';
-const DB_VERSION = 12;
+export const DB_VERSION = 13;
 
 /**
  * Abre la conexión a IndexedDB y crea las tablas/almacenes necesarios.
@@ -107,6 +107,18 @@ export function openDB() {
       // 12b. Módulo Seguimiento Corporal (Metas)
       if (!db.objectStoreNames.contains('body_goals')) {
         db.createObjectStore('body_goals', { keyPath: 'id' });
+      }
+
+      // 13. Catálogo de familias, metas genéricas y preferencias de ejecución.
+      // Se crean de forma aditiva para conservar todas las tiendas y registros existentes.
+      if (!db.objectStoreNames.contains('movement_families')) {
+        db.createObjectStore('movement_families', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('goals')) {
+        db.createObjectStore('goals', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('movement_preferences')) {
+        db.createObjectStore('movement_preferences', { keyPath: 'id' });
       }
     };
   });
@@ -357,13 +369,13 @@ export async function exportDatabase(db, mode = 'all') {
 
   if (mode === 'history') {
     // Historial de prácticas y registros/metas corporales
-    targetStores = allStoreNames.filter(s => ['sessions_log', 'body_metrics', 'body_goals'].includes(s));
+    targetStores = allStoreNames.filter(s => ['sessions_log', 'body_metrics', 'body_goals', 'goals', 'movement_preferences'].includes(s));
   } else if (mode === 'body') {
     // Exclusivamente métricas y metas corporales
-    targetStores = allStoreNames.filter(s => ['body_metrics', 'body_goals'].includes(s));
+    targetStores = allStoreNames.filter(s => ['body_metrics', 'body_goals', 'goals'].includes(s));
   } else if (mode === 'content') {
     // Contenido modular (rutinas, secuencias, circuitos, ejercicios, etc.) sin historial
-    targetStores = allStoreNames.filter(s => !['sessions_log', 'body_metrics', 'body_goals'].includes(s));
+    targetStores = allStoreNames.filter(s => !['sessions_log', 'body_metrics', 'body_goals', 'goals', 'movement_preferences'].includes(s));
   } else {
     targetStores = allStoreNames;
   }
@@ -385,6 +397,14 @@ export async function exportDatabase(db, mode = 'all') {
 export async function importDatabase(db, backup) {
   if (!backup || typeof backup !== 'object' || !backup.stores) {
     throw new Error('Formato de archivo JSON inválido. Debe contener una estructura de base de datos válida.');
+  }
+  if (backup.version && Number(backup.version) > DB_VERSION) {
+    throw new Error(`El respaldo v${backup.version} requiere una aplicación más nueva que v${DB_VERSION}.`);
+  }
+  for (const [storeName, items] of Object.entries(backup.stores)) {
+    if (!Array.isArray(items)) throw new Error(`La tienda ${storeName} no contiene una lista válida.`);
+    const ids = items.map(item => item?.id).filter(id => id !== undefined).map(String);
+    if (new Set(ids).size !== ids.length) throw new Error(`La tienda ${storeName} contiene IDs duplicados.`);
   }
 
   const results = {};
@@ -431,6 +451,3 @@ export async function importDatabase(db, backup) {
 
   return results;
 }
-
-
-

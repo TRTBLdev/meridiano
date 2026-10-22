@@ -4,43 +4,54 @@ import { renderTechniqueDetails } from './techniqueDetails.js';
 const ICONS = {
   play: '<polygon points="6 4 19 12 6 20 6 4"></polygon>',
   pause: '<rect x="6" y="4" width="3" height="16"></rect><rect x="15" y="4" width="3" height="16"></rect>',
-  stop: '<rect x="5" y="5" width="14" height="14"></rect>'
+  previous: '<path d="M18 5v14L8 12z"></path><rect x="4" y="5" width="2" height="14"></rect>',
+  next: '<path d="M6 5v14l10-7z"></path><rect x="18" y="5" width="2" height="14"></rect>',
+  restart: '<path d="M3 12a9 9 0 1 0 3-6.7"></path><polyline points="3 4 3 10 9 10"></polyline>',
+  confirm: '<path d="m5 12 4 4L19 6"></path>'
 };
 
 function renderIcon(name) {
-  return `<svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">${ICONS[name]}</svg>`;
+  const outlined = name === 'restart' || name === 'confirm';
+  return `<svg viewBox="0 0 24 24" aria-hidden="true" ${outlined ? 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"' : 'fill="currentColor"'}>${ICONS[name]}</svg>`;
 }
 
-export function renderStrengthTimerShell({ circuitName, totalRounds, totalExercises }) {
+function formatDurationLabel(seconds) {
+  const safeSeconds = Math.max(0, Math.round(Number(seconds) || 0));
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainder = safeSeconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
+}
+
+export function renderStrengthTimerShell({ circuitName, totalRounds, totalExercises, warmupStepsCount = 0 }) {
   return `
     <main class="strength-timer fade-in" aria-label="Circuito ${escapeAttribute(circuitName)}">
       <div class="strength-timer__grid" id="strength-dots-grid" aria-hidden="true"></div>
       <div class="strength-timer__ambient" aria-hidden="true"></div>
       <section class="strength-timer__instrument">
+        <button class="strength-timer__exit" id="btn-strength-exit" type="button" aria-label="Salir sin guardar" title="Salir sin guardar">×</button>
         <header class="strength-timer__header">
           <span class="strength-timer__circuit">${escapeHTML(circuitName)}</span>
           <div class="strength-timer__header-data">
-            <span class="strength-timer__scope">${Number(totalRounds)} RONDAS · ${Number(totalExercises)} EJERCICIOS</span>
+            <span class="strength-timer__scope">${Number(warmupStepsCount) > 0 ? `${Number(warmupStepsCount)} PASOS INICIALES · ` : ''}${Number(totalRounds)} RONDAS · ${Number(totalExercises)} EJERCICIOS</span>
             <span class="strength-timer__total-time">TIEMPO TOTAL <output id="strength-session-elapsed">00:00</output></span>
           </div>
         </header>
         <div class="strength-timer__phase" id="strength-phase-content"></div>
         <div class="strength-timer__skip-confirm" id="strength-skip-confirm" hidden></div>
         <footer class="strength-timer__global-controls">
+          <button class="strength-timer__icon-action" id="btn-strength-prev" type="button" aria-label="Paso anterior" title="Paso anterior">${renderIcon('previous')}</button>
           <button class="strength-timer__icon-action" id="btn-strength-flow" type="button" aria-label="Iniciar circuito" title="Iniciar circuito">
             <span id="strength-flow-icon">${renderIcon('play')}</span>
-            <span id="strength-flow-label">INICIAR</span>
           </button>
-          <button class="strength-timer__icon-action strength-timer__icon-action--danger" id="btn-strength-exit" type="button" aria-label="Detener circuito" title="Detener circuito">
-            ${renderIcon('stop')}
-            <span>DETENER</span>
-          </button>
+          <button class="strength-timer__icon-action strength-timer__icon-action--confirm" id="btn-strength-confirm" type="button" aria-label="Registrar ejercicio" title="Registrar ejercicio" hidden>${renderIcon('confirm')}</button>
+          <button class="strength-timer__icon-action" id="btn-strength-next" type="button" aria-label="Siguiente" title="Siguiente">${renderIcon('next')}</button>
+          <button class="strength-timer__icon-action" id="btn-strength-restart" type="button" aria-label="Reiniciar paso" title="Reiniciar paso">${renderIcon('restart')}</button>
         </footer>
       </section>
     </main>`;
 }
 
-export function renderStrengthPhase({ phase, totalExercises, totalRounds, started, waitingForRound = false }) {
+export function renderStrengthPhase({ phase, totalExercises, totalRounds, warmupStepsCount = 0, started }) {
   if (phase.type === 'exercise') {
     const isReps = phase.mode === 'reps';
     const target = isReps ? phase.reps : phase.duration;
@@ -89,11 +100,23 @@ export function renderStrengthPhase({ phase, totalExercises, totalRounds, starte
         <p class="strength-timer__metric-note">REGISTRO SIN CONFIRMAR</p>` : `
         <div class="strength-timer__matrix" id="strength-countdown-matrix" aria-label="Tiempo restante"></div>
         <p class="strength-timer__metric-note">OBJETIVO · ${Number(target)} SEGUNDOS</p>`}
-      ${renderInstructions(phase.exercise)}
-      <div class="strength-timer__phase-actions">
-        ${isReps ? `<button class="strength-timer__text-action" id="btn-strength-register" type="button" ${started ? '' : 'disabled'}>REGISTRAR Y CONTINUAR</button>` : ''}
-        <button class="strength-timer__quiet-action" id="btn-strength-skip" type="button" ${started ? '' : 'disabled'}>SALTAR EJERCICIO</button>
-      </div>`;
+      ${renderInstructions(phase.exercise)}`;
+  }
+
+  if (phase.type === 'warmup') {
+    const segmentCount = Math.max(1, Number(phase.warmupSegmentCount) || 1);
+    const isSegmented = segmentCount > 1;
+    const segmentLabel = isSegmented
+      ? `SEGMENTO ${Number(phase.warmupSegmentIndex) + 1}/${segmentCount}`
+      : `PASO ${Number(phase.warmupIndex) + 1}/${Math.max(1, Number(warmupStepsCount) || 1)}`;
+    const durationLabel = isSegmented ? 'TIEMPO DEL SEGMENTO' : 'TIEMPO DEL PASO';
+    return `
+      <div class="strength-timer__phase-meta"><span>CALENTAMIENTO · ${escapeHTML(phase.stepName || phase.name)}</span><span>${segmentLabel}</span></div>
+      <h1 class="strength-timer__title">${escapeHTML(phase.name)}</h1>
+      <div class="strength-timer__matrix" id="strength-countdown-matrix" aria-label="Tiempo de calentamiento restante"></div>
+      <p class="strength-timer__metric-note">${durationLabel} · ${formatDurationLabel(phase.duration)}</p>
+      <p class="strength-timer__flow-note">DESPUÉS · ${Number(totalRounds)} RONDAS × ${Number(totalExercises)} EJERCICIOS</p>
+      ${renderInstructions(phase)}`;
   }
 
   const isRoundRest = phase.type === 'rest-round';
@@ -106,15 +129,10 @@ export function renderStrengthPhase({ phase, totalExercises, totalRounds, starte
       <span>RONDA ${phase.round + 1}/${totalRounds}</span>
     </div>
     <progress class="strength-timer__progress" max="100" value="${((phase.round + (isRoundRest ? 1 : 0)) / totalRounds) * 100}" aria-label="Progreso del circuito"></progress>
-    <h1 class="strength-timer__title">${waitingForRound ? 'Descanso completado' : (isRoundRest ? `Ronda ${phase.round + 1} completada` : 'Cambio de ejercicio')}</h1>
+    <h1 class="strength-timer__title">${isRoundRest ? `Ronda ${phase.round + 1} completada` : 'Cambio de ejercicio'}</h1>
     <p class="strength-timer__focus">SIGUIENTE · ${escapeHTML(nextLabel)}</p>
-    ${waitingForRound ? `
-      <div class="strength-timer__ready-mark" aria-hidden="true">00:00</div>
-      <div class="strength-timer__phase-actions">
-        <button class="strength-timer__text-action" id="btn-strength-next-round" type="button">INICIAR SIGUIENTE RONDA</button>
-      </div>` : `
-      <div class="strength-timer__matrix" id="strength-countdown-matrix" aria-label="Tiempo de descanso restante"></div>
-      <p class="strength-timer__metric-note">RECUPERA EL ALIENTO · PREPARA LA SIGUIENTE FASE</p>`}`;
+    <div class="strength-timer__matrix" id="strength-countdown-matrix" aria-label="Tiempo de descanso restante"></div>
+    <p class="strength-timer__metric-note">RECUPERA EL ALIENTO · PREPARA LA SIGUIENTE FASE</p>`;
 }
 
 function renderInstructions(exercise) {
@@ -130,6 +148,11 @@ function renderInstructions(exercise) {
         key: 'execution',
         title: 'Ejecución',
         content: exercise.execution || 'Sin indicaciones de ejecución.'
+      },
+      {
+        key: 'caution',
+        title: 'Precaución',
+        content: exercise.caution || ''
       }
     ]
   });
@@ -158,20 +181,20 @@ export function renderStrengthCompletion({ circuitName, summary, continueLabel, 
         <div><dt>Duración</dt><dd>${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}</dd></div>
       </dl>
       ${showVitality ? `
-        <div style="margin: 20px 0 16px; text-align: center;">
-          <p style="font-size: 0.75rem; color: var(--color-text-muted); margin-bottom: 10px; font-family: var(--font-digital); text-transform: uppercase; letter-spacing: 0.05em;">¿Cómo percibes tu energía al cerrar?</p>
-          <div class="vitality-options-grid" style="display: flex; gap: 8px; justify-content: center;">
-            <button class="btn-vitality-option" data-vitality="calm" type="button" style="flex: 1; padding: 10px 8px; background: rgba(46,43,40,0.04); border: 1px solid rgba(46,43,40,0.12); border-radius: 4px; cursor: pointer; color: var(--color-text-main); display: flex; flex-direction: column; align-items: center; gap: 4px;">
-              <span class="vitality-option-emoji">🌿</span>
-              <span class="vitality-option-text" style="font-size: 0.7rem; font-family: var(--font-digital);">Calma</span>
+        <div class="strength-timer__vitality">
+          <p>¿Cómo percibes tu energía al cerrar?</p>
+          <div class="vitality-options-grid" role="group" aria-label="Vitalidad al terminar">
+            <button class="btn-vitality-option" data-vitality="calm" type="button" aria-pressed="false">
+              <span class="vitality-option-emoji" aria-hidden="true">🌿</span>
+              <span class="vitality-option-text">Calma</span>
             </button>
-            <button class="btn-vitality-option" data-vitality="vital" type="button" style="flex: 1; padding: 10px 8px; background: rgba(46,43,40,0.04); border: 1px solid rgba(46,43,40,0.12); border-radius: 4px; cursor: pointer; color: var(--color-text-main); display: flex; flex-direction: column; align-items: center; gap: 4px;">
-              <span class="vitality-option-emoji">⚡</span>
-              <span class="vitality-option-text" style="font-size: 0.7rem; font-family: var(--font-digital);">Vital</span>
+            <button class="btn-vitality-option" data-vitality="vital" type="button" aria-pressed="false">
+              <span class="vitality-option-emoji" aria-hidden="true">⚡</span>
+              <span class="vitality-option-text">Vital</span>
             </button>
-            <button class="btn-vitality-option" data-vitality="fatigued" type="button" style="flex: 1; padding: 10px 8px; background: rgba(46,43,40,0.04); border: 1px solid rgba(46,43,40,0.12); border-radius: 4px; cursor: pointer; color: var(--color-text-main); display: flex; flex-direction: column; align-items: center; gap: 4px;">
-              <span class="vitality-option-emoji">⏳</span>
-              <span class="vitality-option-text" style="font-size: 0.7rem; font-family: var(--font-digital);">Fatiga</span>
+            <button class="btn-vitality-option" data-vitality="fatigued" type="button" aria-pressed="false">
+              <span class="vitality-option-emoji" aria-hidden="true">⏳</span>
+              <span class="vitality-option-text">Fatigada</span>
             </button>
           </div>
         </div>
@@ -181,7 +204,7 @@ export function renderStrengthCompletion({ circuitName, summary, continueLabel, 
 }
 
 export function renderStrengthFlowControl({ started, paused }) {
-  if (!started) return { icon: renderIcon('play'), label: 'INICIAR', ariaLabel: 'Iniciar circuito' };
-  if (paused) return { icon: renderIcon('play'), label: 'REANUDAR', ariaLabel: 'Reanudar circuito' };
-  return { icon: renderIcon('pause'), label: 'PAUSAR', ariaLabel: 'Pausar circuito' };
+  if (!started) return { icon: renderIcon('play'), ariaLabel: 'Iniciar circuito' };
+  if (paused) return { icon: renderIcon('play'), ariaLabel: 'Reanudar circuito' };
+  return { icon: renderIcon('pause'), ariaLabel: 'Pausar circuito' };
 }

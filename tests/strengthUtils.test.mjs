@@ -4,6 +4,7 @@ import {
   buildStrengthPhaseList,
   createStrengthResult,
   finalizeStrengthResult,
+  getCircuitValidation,
   recordStrengthResultEntry,
   summarizeStrengthResult
 } from '../js/utils/strengthUtils.js';
@@ -36,6 +37,58 @@ test('construye ejercicios y descansos en el orden esperado', () => {
   assert.equal(phases[3].duration, 45);
 });
 
+test('acepta un circuito temporizado aunque sus familias de ejercicio sean de repeticiones', () => {
+  const adaptedCircuit = {
+    id: 'adapted-mobility',
+    trackingMode: 'duration',
+    rounds: 4,
+    restBetweenExercises: 0,
+    restBetweenRounds: 0,
+    exercises: [
+      { exerciseId: 'squat', repsOverride: null, durationOverride: 90 },
+      { exerciseId: 'squat', repsOverride: null, durationOverride: 90 }
+    ]
+  };
+  assert.equal(getCircuitValidation(adaptedCircuit, exercises).isValid, true);
+  const phases = buildStrengthPhaseList(adaptedCircuit, exercises);
+  assert.equal(phases[0].type, 'exercise');
+  assert.equal(phases[0].duration, 90);
+  assert.equal(phases[0].reps, null);
+});
+
+test('antepone los pasos de calentamiento definidos por el circuito', () => {
+  const phases = buildStrengthPhaseList({
+    ...circuit,
+    warmupSteps: [{ id: 'warmup-1', name: 'Movilidad', duration: 90 }]
+  }, exercises);
+  assert.equal(phases[0].type, 'warmup');
+  assert.equal(phases[0].name, 'Movilidad');
+  assert.equal(phases[0].duration, 90);
+  assert.equal(phases[1].type, 'exercise');
+});
+
+test('expande segmentos de calentamiento sin codificar su contenido', () => {
+  const phases = buildStrengthPhaseList({
+    ...circuit,
+    warmupSteps: [{
+      id: 'warmup-segmented',
+      name: 'Movilidad',
+      duration: 180,
+      segments: [
+        { id: 'one', name: 'Hombros', duration: 90, execution: 'Primer segmento.' },
+        { id: 'two', name: 'Muñecas', duration: 90, execution: 'Segundo segmento.' }
+      ]
+    }]
+  }, exercises);
+  assert.deepEqual(phases.slice(0, 2).map(phase => [phase.type, phase.name, phase.duration]), [
+    ['warmup', 'Hombros', 90],
+    ['warmup', 'Muñecas', 90]
+  ]);
+  assert.equal(phases[0].warmupSegmentCount, 2);
+  assert.equal(phases[1].execution, 'Segundo segmento.');
+  assert.equal(phases[2].type, 'exercise');
+});
+
 test('registra repeticiones reales sin modificar el objetivo', () => {
   const phase = buildStrengthPhaseList(circuit, exercises)[0];
   const result = recordStrengthResultEntry(createStrengthResult(circuit), phase, {
@@ -48,6 +101,14 @@ test('registra repeticiones reales sin modificar el objetivo', () => {
   assert.equal(result.entries[0].actualValue, 10);
   assert.equal(result.entries[0].elapsedSeconds, 58);
   assert.equal(circuit.exercises[0].repsOverride, 12);
+});
+
+test('reemplaza un registro al confirmar de nuevo la misma fase', () => {
+  const phase = buildStrengthPhaseList(circuit, exercises)[0];
+  let result = recordStrengthResultEntry(createStrengthResult(circuit), phase, { actualValue: 10, elapsedSeconds: 30 });
+  result = recordStrengthResultEntry(result, phase, { actualValue: 12, elapsedSeconds: 35 });
+  assert.equal(result.entries.length, 1);
+  assert.equal(result.entries[0].actualValue, 12);
 });
 
 test('registra ejercicios temporizados y omitidos', () => {
@@ -158,4 +219,3 @@ test('permite registrar actualWeight modificado en vivo durante el entrenamiento
   });
   assert.equal(result.entries[0].weightKg, 8);
 });
-

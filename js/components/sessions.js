@@ -19,6 +19,7 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
   let sessionStartedAt = 0;
   let strengthCircuits = [];
   let strengthExercises = [];
+  let routineMode = 'habitual';
 
   // Estado del editor (builder)
   let editingSession = null;
@@ -56,8 +57,16 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
       if (initialSessionId && !editingSession) {
         const found = sessionsCatalog.find(s => s.id === initialSessionId);
         if (found) {
-          editingSession = JSON.parse(JSON.stringify(found));
-          activeView = 'builder';
+          if (found.packId === 'integral-movimiento-v13') {
+            currentSession = found;
+            currentBlockIndex = 0;
+            currentBlockResults = [];
+            sessionStartedAt = Date.now();
+            activeView = 'transition';
+          } else {
+            editingSession = JSON.parse(JSON.stringify(found));
+            activeView = 'builder';
+          }
         }
       }
     } catch (err) {
@@ -81,6 +90,13 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
   async function refresh() {
     await loadData();
     container.innerHTML = '';
+    if (activeView === 'transition' && currentSession) {
+      // runCurrentBlock es el único lugar que presenta la transición. Llamar a
+      // renderTransitionScreen aquí creaba dos cuentas regresivas consecutivas
+      // al llegar desde una acción de cierre (p. ej. Fuerza B → B4).
+      runCurrentBlock();
+      return;
+    }
     
     if (activeView === 'lobby') {
       renderLobby();
@@ -90,6 +106,9 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
   }
 
   function renderLobby() {
+    // El selector de modo vuelve a pintar la lista en el mismo contenedor.
+    // Limpiar aquí evita apilar una segunda pantalla debajo de la anterior.
+    container.innerHTML = '';
     const staging = document.createElement('div');
     staging.innerHTML = renderLobbyShell({
       title: 'Sesiones Compuestas',
@@ -97,7 +116,14 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
       action: renderLobbyAction({ kind: 'text', label: '+ Crear Sesión', id: 'btn-create-session' }),
       variant: 'list',
       className: 'compound-sessions-lobby',
-      content: '<div class="compound-sessions-list" id="sessions-list"></div>'
+      content: `
+        <div class="routine-mode-selector" role="group" aria-label="Modo de rutina">
+          <button type="button" class="compound-text-action routine-mode-btn ${routineMode === 'habitual' ? 'is-active' : ''}" data-mode="habitual" aria-pressed="${routineMode === 'habitual' ? 'true' : 'false'}">Habitual</button>
+          <button type="button" class="compound-text-action routine-mode-btn ${routineMode === 'adapted' ? 'is-active' : ''}" data-mode="adapted" aria-pressed="${routineMode === 'adapted' ? 'true' : 'false'}">Adaptada por síntomas</button>
+        </div>
+        
+        <p class="routine-mode-status" aria-live="polite">Mostrando rutinas: <strong>${routineMode === 'adapted' ? 'Adaptada por síntomas' : 'Habitual'}</strong></p>
+        <div class="compound-sessions-list" id="sessions-list"></div>`
     });
     const layout = staging.firstElementChild;
 
@@ -116,6 +142,13 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
       refresh();
     });
 
+    layout.querySelectorAll('.routine-mode-btn').forEach(button => {
+      button.addEventListener('click', () => {
+        routineMode = button.dataset.mode === 'adapted' ? 'adapted' : 'habitual';
+        renderLobby();
+      });
+    });
+
     const listContainer = layout.querySelector('#sessions-list');
     
     if (sessionsCatalog.length === 0) {
@@ -123,20 +156,29 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
       return;
     }
 
-    sessionsCatalog.forEach(session => {
+    const visibleSessions = sessionsCatalog
+      .filter(session => session.mode === routineMode || (!session.mode && routineMode === 'habitual'))
+      .sort((a, b) => (Number(a.order) || 99) - (Number(b.order) || 99));
+
+    visibleSessions.forEach(session => {
       const el = document.createElement('div');
       const invalidReason = getSessionIssue(session);
       el.className = `compound-session-card${invalidReason ? ' compound-session-card--invalid' : ''}`;
       
-      el.innerHTML = renderCompoundSessionCard(session, { invalidReason });
+      const today = new Date().getDay();
+      el.innerHTML = renderCompoundSessionCard(session, {
+        invalidReason,
+        system: session.packId === 'integral-movimiento-v13',
+        suggested: session.suggestedWeekday === today
+      });
 
-      el.querySelector('.btn-edit-session').addEventListener('click', () => {
+      el.querySelector('.btn-edit-session')?.addEventListener('click', () => {
         editingSession = JSON.parse(JSON.stringify(session));
         activeView = 'builder';
         refresh();
       });
 
-      el.querySelector('.btn-delete-session').addEventListener('click', async () => {
+      el.querySelector('.btn-delete-session')?.addEventListener('click', async () => {
         if (confirm(`¿Seguro que deseas eliminar la sesión "${session.name}"?`)) {
           await deleteData(db, 'compound_sessions', session.id);
           refresh();
@@ -419,7 +461,7 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
           runCurrentBlock();
         });
         container.querySelector('#btn-abort-failed-session')?.addEventListener('click', () => {
-          onNavigate('sesiones');
+          onNavigate('sessions');
         });
       }
     });
@@ -477,6 +519,14 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
       completedLogId = await addData(db, 'sessions_log', {
         type: 'compound',
         version: 2,
+        sessionId: currentSession.id,
+        packId: currentSession.packId || null,
+        groupId: currentSession.groupId || null,
+        slot: currentSession.slot || null,
+        coverageKey: currentSession.coverageKey || currentSession.slot || null,
+        suggestedWeekday: currentSession.suggestedWeekday ?? null,
+        mode: currentSession.mode || 'habitual',
+        tags: currentSession.tags || [],
         date: new Date(completedAt).toISOString(),
         startedAt: new Date(sessionStartedAt).toISOString(),
         completedAt: new Date(completedAt).toISOString(),
@@ -497,47 +547,48 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
 
   function renderCompletionScreen(logId) {
     activeView = 'completed';
+    const actions = Array.isArray(currentSession.completionActions) ? currentSession.completionActions : [];
     container.innerHTML = `
-      <div class="dashboard-layout" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background: #0A0A0A; color: #E8E6E3; padding: 24px;">
+      <div class="dashboard-layout compound-completion-screen">
         <div class="vitality-completion-modal">
-          ${renderTechnicalTitle('Sesión Completada', { style: 'font-size: 1.3rem; margin-bottom: 8px; color: var(--color-accent-green);' })}
-          <div style="font-size: 1.8rem; font-weight: 300; margin-bottom: 6px;">${escapeHTML(currentSession.name)}</div>
-          <p style="color: var(--color-text-muted); font-size: 0.85rem; margin: 0;">¿Cómo percibes tu energía al cerrar esta práctica?</p>
+          ${renderTechnicalTitle('Sesión completada', { className: 'compound-completion-screen__title' })}
+          <div class="compound-completion-screen__name">${escapeHTML(currentSession.name)}</div>
+          <p class="compound-completion-screen__prompt">¿Cómo percibes tu energía al cerrar esta práctica?</p>
           
-          <div class="vitality-options-grid">
-            <button class="btn-vitality-option" data-vitality="calm">
-              <span class="vitality-option-emoji">🌿</span>
-              <span class="vitality-option-text">En Calma</span>
+          <div class="vitality-options-grid" role="group" aria-label="Vitalidad al terminar">
+            <button class="btn-vitality-option" data-vitality="calm" type="button" aria-pressed="false">
+              <span class="vitality-option-emoji" aria-hidden="true">🌿</span>
+              <span class="vitality-option-text">Calma</span>
             </button>
-            <button class="btn-vitality-option" data-vitality="vital">
-              <span class="vitality-option-emoji">⚡</span>
+            <button class="btn-vitality-option" data-vitality="vital" type="button" aria-pressed="false">
+              <span class="vitality-option-emoji" aria-hidden="true">⚡</span>
               <span class="vitality-option-text">Vital</span>
             </button>
-            <button class="btn-vitality-option" data-vitality="fatigued">
-              <span class="vitality-option-emoji">⏳</span>
+            <button class="btn-vitality-option" data-vitality="fatigued" type="button" aria-pressed="false">
+              <span class="vitality-option-emoji" aria-hidden="true">⏳</span>
               <span class="vitality-option-text">Fatigada</span>
             </button>
           </div>
 
-          <button id="btn-finish-vitality" class="btn-primary" style="width: 100%; max-width: 280px; padding: 12px 24px; background: var(--color-text-main); color: var(--color-bg-base); cursor: pointer; border: none; border-radius: 4px; font-weight: 600;">
-            Continuar &rarr;
-          </button>
+          <div class="compound-completion-screen__actions">
+            ${actions.map((action, index) => `<button type="button" class="compound-text-action" data-completion-action="${index}">${escapeHTML(action.label || 'Continuar')}</button>`).join('')}
+            <button id="btn-session-finish" type="button" class="compound-text-action">Terminar y volver a Sesiones</button>
+          </div>
         </div>
       </div>
     `;
 
-    let selectedVitality = null;
     const optionBtns = container.querySelectorAll('.btn-vitality-option');
     optionBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        optionBtns.forEach(b => b.classList.remove('selected'));
+      btn.addEventListener('click', async () => {
+        optionBtns.forEach(b => {
+          b.classList.remove('selected');
+          b.setAttribute('aria-pressed', 'false');
+        });
         btn.classList.add('selected');
-        selectedVitality = btn.getAttribute('data-vitality');
-      });
-    });
-
-    container.querySelector('#btn-finish-vitality').addEventListener('click', async () => {
-      if (selectedVitality && logId) {
+        btn.setAttribute('aria-pressed', 'true');
+        const vitality = btn.getAttribute('data-vitality');
+        if (!vitality || !logId) return;
         try {
           await new Promise((resolve, reject) => {
             const tx = db.transaction('sessions_log', 'readwrite');
@@ -545,7 +596,7 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
             req.onsuccess = () => {
               const record = req.result;
               if (record) {
-                record.vitality = selectedVitality;
+                record.vitality = vitality;
                 tx.objectStore('sessions_log').put(record);
               }
               resolve(record);
@@ -555,9 +606,27 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
         } catch (e) {
           console.warn('[Sessions] No se pudo actualizar vitalidad en log:', e);
         }
-      }
-      onNavigate('inicio');
+      });
     });
+
+    container.querySelectorAll('[data-completion-action]').forEach(button => {
+      button.addEventListener('click', () => {
+        if (button.disabled) return;
+        const action = actions[Number(button.dataset.completionAction)];
+        if (!action) return;
+        button.disabled = true;
+        if (action.type === 'continue-session' && action.sessionId) {
+          onNavigate('sessions', action.sessionId);
+          return;
+        }
+        if (action.type === 'open-complement' && action.sequenceId) {
+          onNavigate(action.module || 'acupuncture', { presetId: action.sequenceId, originLogId: logId, isComplement: true, requireFicha: true });
+          return;
+        }
+        button.disabled = false;
+      });
+    });
+    container.querySelector('#btn-session-finish').addEventListener('click', () => onNavigate('sessions'));
   }
 
   // Inicio

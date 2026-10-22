@@ -52,7 +52,7 @@
 body.dark-theme {
   --color-bg-base: #121212;
   --color-text-main: #FAF9F6;
-  --color-text-muted: #A9A49E;
+  --color-text-muted: #C8C3BD;
   --color-canvas: #121212;
   --color-surface-subtle: rgba(255, 255, 255, 0.035);
   --color-surface-hover: rgba(255, 255, 255, 0.065);
@@ -62,7 +62,7 @@ body.dark-theme {
   --color-control-active-text: #24211F;
   --color-icon: #C2BDB7;
   --color-focus: #F05A54;
-  --color-disabled: rgba(250, 249, 246, 0.38);
+  --color-disabled: #918C85;
   
   --color-accent-lavender: rgba(186, 164, 230, 0.15);
   --color-accent-pink: rgba(240, 150, 180, 0.12);

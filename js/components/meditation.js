@@ -5,6 +5,7 @@ import {
   bindSynthPanel,
   createTimerShell,
   createWakeLockController,
+  requestTimerExitConfirmation,
   populateTimerDots,
   renderSynthPanel
 } from './timerShell.js';
@@ -452,12 +453,11 @@ export async function renderMeditationScreen(container, db, onNavigate) {
             </div>
 
             <div class="timer-icon-control-group">
-              <button class="btn-acu-icon btn-acu-danger" id="btn-med-stop" title="Detener" style="width:48px; height:48px; display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer;">
+              <button class="btn-acu-icon btn-acu-danger" id="btn-med-stop" aria-label="Salir sin guardar" title="Salir sin guardar" style="width:48px; height:48px; display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer;">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                   <rect x="5" y="5" width="14" height="14" rx="1"></rect>
                 </svg>
               </button>
-              <span>Detener</span>
             </div>
           </div>
         </div>
@@ -589,6 +589,8 @@ export async function renderMeditationScreen(container, db, onNavigate) {
       try {
         await addData(db, 'sessions_log', {
           type: 'meditation',
+          sessionId: activePresetId || null,
+          tags: ['meditation'],
           date: new Date().toISOString(),
           duration: durationMin,
           notes,
@@ -642,7 +644,7 @@ export async function renderMeditationScreen(container, db, onNavigate) {
     btnStop.addEventListener('click', async () => {
       const wasPaused = isPaused;
       if (!isPaused) setPaused(true);
-      if (confirm('Deseas detener y cancelar la sesion actual? No se guardara en el historial.')) {
+      if (await requestTimerExitConfirmation(timerEl)) {
         await cleanupTimer();
         activeView = 'lobby';
         render();

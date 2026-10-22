@@ -4,6 +4,7 @@ export function renderTechniqueDetails({
   id = '',
   className = '',
   label = 'VER TÉCNICA',
+  open = false,
   sections = [],
   preserveEmpty = false
 } = {}) {
@@ -21,7 +22,7 @@ export function renderTechniqueDetails({
   if (visibleSections.length === 0) return '';
 
   return `
-    <details ${id ? `id="${escapeAttribute(id)}"` : ''} class="timer-technique ${escapeAttribute(className)}" ${hasContent ? '' : 'hidden'}>
+    <details ${id ? `id="${escapeAttribute(id)}"` : ''} class="timer-technique ${escapeAttribute(className)}" ${open && hasContent ? 'open' : ''} ${hasContent ? '' : 'hidden'}>
       <summary>${escapeHTML(label)}</summary>
       <div class="timer-technique__content">
         ${visibleSections.map(section => `

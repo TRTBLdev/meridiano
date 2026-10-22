@@ -728,42 +728,134 @@ body.dark-theme .timeline-load-more-btn {
   margin: 0 auto;
 }
 .vitality-options-grid {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   width: 100%;
   margin: 24px 0;
   justify-content: center;
 }
 .btn-vitality-option {
+  position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 16px 10px;
-  background: rgba(46, 43, 40, 0.03);
-  border: 1px solid rgba(46, 43, 40, 0.12);
-  border-radius: 8px;
+  justify-content: center;
+  min-height: 78px;
+  padding: 8px 10px 12px;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0;
   cursor: pointer;
   transition: all 0.2s ease;
   color: var(--color-text-main);
 }
 body.dark-theme .btn-vitality-option {
-  background: rgba(255, 255, 255, 0.03);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: transparent !important;
+  border-color: transparent !important;
 }
 .btn-vitality-option:hover,
-.btn-vitality-option.selected {
-  border-color: var(--color-accent-green);
-  background: rgba(0, 230, 118, 0.08);
+.btn-vitality-option:focus-visible {
+  background: transparent !important;
+  color: var(--color-accent-green);
+  transform: translateY(-2px);
+  outline: none;
+}
+.btn-vitality-option.selected,
+.btn-vitality-option[aria-pressed="true"] {
+  background: transparent !important;
+  color: var(--color-accent-green);
+  box-shadow: none;
   transform: translateY(-2px);
 }
+.btn-vitality-option.selected::after,
+.btn-vitality-option[aria-pressed="true"]::after {
+  position: absolute;
+  right: 25%;
+  bottom: 0;
+  left: 25%;
+  height: 3px;
+  background: var(--color-accent-green);
+  content: '';
+}
 .vitality-option-emoji {
-  font-size: 1.5rem;
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 1.45rem;
+  line-height: 1;
 }
 .vitality-option-text {
+  font-family: var(--font-digital);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.strength-timer__vitality {
+  width: 100%;
+  margin: 20px 0 16px;
+  text-align: center;
+}
+
+.strength-timer__vitality > p {
+  margin: 0 0 10px;
+  color: var(--color-text-muted);
+  font-family: var(--font-digital);
   font-size: 0.75rem;
-  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.compound-completion-screen {
+  display: flex;
+  min-height: 100dvh;
+  padding: 24px;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-canvas);
+  color: var(--color-text-main);
+}
+
+.compound-completion-screen__title {
+  margin-bottom: 8px;
+  color: var(--color-accent-green);
+  font-size: 1.3rem;
+}
+
+.compound-completion-screen__name {
+  margin-bottom: 6px;
+  font-size: 1.8rem;
+  font-weight: 300;
+}
+
+.compound-completion-screen__prompt {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.compound-completion-screen__actions {
+  display: grid;
+  width: 100%;
+  max-width: 280px;
+  gap: 12px;
+}
+
+.compound-completion-screen .vitality-options-grid {
+  margin: 22px 0;
+}
+
+.compound-completion-screen .btn-vitality-option {
+  min-height: 78px;
+}
+
+.compound-completion-screen__primary-action {
+  border: 0 !important;
+  border-bottom: 2px solid var(--color-accent-red) !important;
+  background: transparent !important;
+  color: var(--color-text-main);
 }
 
 /* Pantalla de Progreso Integral - Estética Analógica Sin Frames */
@@ -1454,6 +1546,62 @@ body.dark-theme .compound-sessions-panel {
   color: var(--color-text-muted) !important;
   cursor: not-allowed;
   opacity: 0.5;
+}
+
+/* Selector explícito del modo de rutina: el estado elegido debe ser visible
+   incluso antes de que cambie la lista de sesiones. */
+.routine-mode-selector {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.routine-mode-btn {
+  min-height: 44px;
+  padding: 10px 14px !important;
+  border: 0 !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--color-text-muted) !important;
+  text-decoration: none;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.routine-mode-btn:hover,
+.routine-mode-btn:focus-visible {
+  border-bottom-color: var(--color-divider) !important;
+  color: var(--color-text-main) !important;
+  background: transparent !important;
+}
+
+.routine-mode-btn.is-active,
+.routine-mode-btn[aria-pressed="true"] {
+  border-bottom-color: var(--color-focus) !important;
+  background: transparent !important;
+  color: var(--color-text-main) !important;
+  box-shadow: none;
+  opacity: 1;
+}
+
+.routine-mode-btn:not(.is-active):not([aria-pressed="true"]) {
+  opacity: 0.82;
+}
+
+.routine-mode-status {
+  margin: 0 0 8px;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.routine-mode-status {
+  color: var(--color-text-main);
+}
+
+.routine-mode-status strong {
+  color: var(--color-focus);
+  font-weight: 700;
 }
 
 .compound-session-warning,
@@ -3867,6 +4015,104 @@ body.dark-theme .btn-primary:hover {
   border-color: var(--color-text-main);
 }
 
+/* Los temporizadores usan iconos; sus etiquetas permanecen disponibles para lectores de pantalla. */
+.acu-timer-fullscreen .timer-icon-control-group > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.acu-timer-fullscreen .timer-icon-control-group:has(.btn-acu-danger) {
+  position: fixed;
+  z-index: 20;
+  top: max(14px, env(safe-area-inset-top));
+  right: max(14px, env(safe-area-inset-right));
+}
+
+.acu-timer-fullscreen .timer-icon-control-group:has(.btn-acu-danger) .btn-acu-danger {
+  width: 36px !important;
+  height: 36px !important;
+  border: 0 !important;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: var(--font-ui);
+  font-size: 1.45rem;
+  font-weight: 300;
+  line-height: 1;
+}
+
+/* Salida del temporizador de Yin: elemento independiente del sintetizador y sus controles. */
+.acu-timer-fullscreen > .yoga-timer__exit {
+  position: fixed;
+  z-index: 20;
+  top: max(14px, env(safe-area-inset-top));
+  right: max(14px, env(safe-area-inset-right));
+  width: 44px !important;
+  height: 44px !important;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--color-text-muted) !important;
+  box-shadow: none !important;
+  font-family: var(--font-ui);
+  font-size: 1.7rem;
+  font-weight: 300;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.acu-timer-fullscreen > .yoga-timer__exit:hover,
+.acu-timer-fullscreen > .yoga-timer__exit:focus-visible {
+  color: var(--color-accent-red) !important;
+  outline: none;
+}
+
+.acu-timer-fullscreen .timer-icon-control-group:has(.btn-acu-danger) .btn-acu-danger svg {
+  display: none;
+}
+
+.acu-timer-fullscreen .timer-icon-control-group:has(.btn-acu-danger) .btn-acu-danger::before {
+  content: '×';
+}
+
+.acu-timer-fullscreen .timer-icon-control-group:has(.btn-acu-danger) .btn-acu-danger:hover,
+.acu-timer-fullscreen .timer-icon-control-group:has(.btn-acu-danger) .btn-acu-danger:focus-visible {
+  border-color: var(--color-accent-red);
+  color: var(--color-accent-red);
+}
+
+.timer-exit-confirmation {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  padding: 24px;
+  place-items: center;
+  background: rgba(10, 10, 10, 0.72);
+}
+
+.timer-exit-confirmation__panel {
+  width: min(100%, 320px);
+  padding: 24px;
+  border: 1px solid var(--color-divider);
+  background: var(--color-canvas);
+  color: var(--color-text-main);
+  font-family: var(--font-digital);
+  text-align: center;
+}
+
+.timer-exit-confirmation__panel p { margin: 0 0 20px; }
+.timer-exit-confirmation__panel > div { display: flex; justify-content: flex-end; gap: 16px; }
+.timer-exit-confirmation__panel button { border: 0; border-bottom: 2px solid var(--color-accent-red); background: transparent; color: var(--color-text-main); font: inherit; cursor: pointer; text-transform: uppercase; }
+
 body.dark-theme .breath-pill {
   border-color: rgba(255, 255, 255, 0.15);
 }
@@ -4172,6 +4418,33 @@ body.dark-theme select option {
   background: rgba(210, 63, 58, 0.14) !important;
   border-color: rgba(210, 63, 58, 0.72) !important;
   color: #F4D8D6 !important;
+}
+
+/* Todos los controles del temporizador conservan el mismo círculo aunque una acción esté inactiva. */
+.acu-timer-fullscreen .timer-icon-controls .btn-acu-icon {
+  width: 48px !important;
+  height: 48px !important;
+  min-width: 48px;
+  min-height: 48px;
+  box-sizing: border-box;
+  opacity: 1 !important;
+}
+
+.acu-timer-fullscreen .timer-icon-controls .btn-acu-icon:disabled {
+  opacity: 0.52 !important;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.acu-timer-fullscreen .timer-icon-controls .btn-acu-icon svg {
+  width: 16px !important;
+  height: 16px !important;
+  flex: 0 0 16px;
+}
+
+.acu-timer-fullscreen .yoga-timer__previous-icon {
+  transform: scaleX(-1);
+  transform-origin: center;
 }
 
 .timer-control-btn {
@@ -5445,4 +5718,12 @@ body.dark-theme .breath-dropdown-options {
   transition: color 0.2s ease;
 }
 .body-card-btn:hover { color: var(--color-text-main); }
-
+.routine-suggestion-badge {
+  font-family: var(--font-digital);
+  font-size: .62rem;
+  letter-spacing: .04em;
+  color: var(--color-accent-green);
+  border: 1px solid currentColor;
+  padding: 3px 6px;
+  white-space: nowrap;
+}

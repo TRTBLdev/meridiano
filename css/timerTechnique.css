@@ -97,14 +97,39 @@
   z-index: 10;
   display: flex;
   width: 100%;
-  height: 100%;
-  padding: 1.25rem;
+  min-height: 100dvh;
+  height: auto;
+  padding: clamp(4rem, 9vh, 6rem) 1.25rem 2rem;
   overflow-y: auto;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   flex-direction: column;
   box-sizing: border-box;
   pointer-events: none;
+}
+
+/* El escenario no intercepta gestos para no bloquear los controles del timer,
+   pero el selector de nivel y la ficha técnica sí deben poder usarse. */
+.yoga-timer__stage #yoga-level-select,
+.yoga-timer__stage .timer-technique,
+.yoga-timer__stage .timer-technique summary {
+  pointer-events: auto;
+}
+
+.acu-timer-fullscreen .yoga-timer__technique {
+  width: min(90vw, 42rem);
+  max-height: min(30dvh, 16rem);
+  margin: 0 auto 1rem;
+  overflow-y: auto;
+  flex: 0 1 auto;
+  scrollbar-color: rgba(232, 230, 227, 0.35) transparent;
+  scrollbar-width: thin;
+}
+
+.acu-timer-fullscreen .yoga-timer__technique[open] .timer-technique__content {
+  max-height: min(24dvh, 12rem);
+  overflow-y: auto;
+  padding-right: 0.75rem;
 }
 
 .yoga-active-timer .timer-technique__content {

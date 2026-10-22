@@ -110,6 +110,10 @@ export async function renderBodyScreen(container, db, onNavigate) {
         <section id="body-tab-metas" class="body-tab-panel">
           <p class="body-tab-hint">Define tus objetivos. Aparecer&#225;n como l&#237;neas de referencia en los gr&#225;ficos.</p>
           <form id="body-goals-form" class="body-form">
+            <div class="body-field-group">
+              <label class="body-label">Rango de peso del programa (kg)</label>
+              <div style="display:flex;gap:8px;"><input class="body-input" type="number" step="0.1" min="0" id="goal-weight-min" name="weightRangeMin" placeholder="55"><input class="body-input" type="number" step="0.1" min="0" id="goal-weight-max" name="weightRangeMax" placeholder="60"></div>
+            </div>
             ${FIELDS.map(f => `
               <div class="body-field-group">
                 <label class="body-label" for="goal-${f.key}">${f.label} objetivo <span class="body-unit">(${f.unit})</span></label>
@@ -174,6 +178,9 @@ export async function renderBodyScreen(container, db, onNavigate) {
       const val = formData.get(f.key);
       if (val !== '' && val !== null) goals[f.key] = parseFloat(val);
     });
+    const weightRangeMin = formData.get('weightRangeMin');
+    const weightRangeMax = formData.get('weightRangeMax');
+    if (weightRangeMin !== '' && weightRangeMax !== '') goals.weightRangeKg = { min: parseFloat(weightRangeMin), max: parseFloat(weightRangeMax) };
     try {
       await putOne(db, 'body_goals', goals);
       showToast(container, '&#10003; Metas guardadas');
@@ -190,6 +197,12 @@ async function loadGoalsForm(db, container) {
     const input = container.querySelector(`#goal-${f.key}`);
     if (input && goals[f.key] != null) input.value = goals[f.key];
   });
+  if (goals.weightRangeKg) {
+    const min = container.querySelector('#goal-weight-min');
+    const max = container.querySelector('#goal-weight-max');
+    if (min) min.value = goals.weightRangeKg.min ?? '';
+    if (max) max.value = goals.weightRangeKg.max ?? '';
+  }
 }
 
 async function renderHistory(db, container) {

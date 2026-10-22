@@ -1,13 +1,14 @@
-import { addData } from '../db.js';
+import { addData, putData } from '../db.js';
 import { renderDotMatrix } from '../utils/dotmatrix.js';
-import { escapeHTML } from '../utils/sanitize.js';
+import { escapeAttribute, escapeHTML } from '../utils/sanitize.js';
 import {
   createWakeLockController,
+  requestTimerExitConfirmation,
   populateTimerDots,
   renderSynthPanel,
   bindSynthPanel
 } from './timerShell.js';
-import { createSynthEngine, playQuartzBowlRing } from '../utils/synth.js';
+import { createSynthEngine, playQuartzBowlRing, prepareQuartzAudio } from '../utils/synth.js';
 import { startResolvedYogaSequence } from '../utils/yogaUtils.js';
 import { createModuleResult } from '../utils/sessionResults.js';
 import { getFreqLabel, valueToFreq, freqToValue } from '../utils/freqUtils.js';
@@ -68,6 +69,7 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
   let posturesCatalog = [];
   let blocksCatalog = [];
   let sequencesCatalog = [];
+  let movementPreferences = [];
 
   // Secuencia cargada activa en el editor
   let currentSequenceItems = [];
@@ -154,6 +156,8 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
 
     sequencesCatalog = await getStoreData('yoga_sequences');
     if (sequencesCatalog.length === 0) sequencesCatalog = FALLBACK_SEQUENCES;
+
+    movementPreferences = await getStoreData('movement_preferences');
   }
 
   // Carga una secuencia en el constructor/editor
@@ -172,12 +176,19 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
         if (item.type === 'posture') {
           const post = posturesCatalog.find(p => p.id === item.id);
           if (post) {
+            const preference = movementPreferences.find(entry =>
+              entry.id === post.id || entry.exerciseId === post.id
+            );
             currentSequenceItems.push({
               type: 'posture',
               id: post.id,
               name: post.name,
               holdTime: Number(item.customHoldTime) || 180,
-              isAsymmetric: item.isAsymmetric || false
+              isAsymmetric: item.isAsymmetric || false,
+              segments: Array.isArray(item.segments) ? item.segments : (Array.isArray(post.segments) ? post.segments : []),
+              // La rutina fija el nivel esperado inicial; después prevalece el último nivel usado.
+              levelId: preference?.lastLevelId || preference?.levelId || item.levelId || null,
+              variantId: preference?.lastVariantId || preference?.variantId || item.variantId || null
             });
           }
         } else if (item.type === 'block') {
@@ -210,7 +221,7 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
 
     currentSequenceItems.forEach((item, idx) => {
       if (item.type === 'posture') {
-        secs += item.holdTime;
+        secs += getSegmentsDuration(item.segments, item.holdTime);
       } else if (item.type === 'block') {
         item.postures.forEach(bp => {
           secs += bp.holdTime;
@@ -218,7 +229,9 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
       }
 
       // Añadir rebote tras cada elemento principal (excepto el último)
-      if (idx < itemsCount - 1) {
+      // Cero en el catálogo significa transición inmediata; no se muestra como
+      // una fase de temporizador de duración cero.
+      if (idx < itemsCount - 1 && Number(reboundTime) > 0) {
         secs += reboundTime;
       }
     });
@@ -237,6 +250,15 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
     return `${secs} seg`;
   }
 
+  function getSegmentsDuration(segments, fallbackDuration) {
+    if (!Array.isArray(segments) || segments.length === 0) return Number(fallbackDuration) || 0;
+    return segments.reduce((total, segment, index) => {
+      const duration = Number(segment.duration) || 0;
+      const transition = index < segments.length - 1 ? (Number(segment.transitionDuration) || 0) : 0;
+      return total + duration + transition;
+    }, 0);
+  }
+
   // Calcular la duración total de una secuencia de IndexedDB
   function getSequenceDuration(seq) {
     let secs = 0;
@@ -246,7 +268,9 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
 
     items.forEach((item, idx) => {
       if (item.type === 'posture') {
-        secs += Number(item.customHoldTime) || 180;
+        const posture = posturesCatalog.find(p => p.id === item.id);
+        const segments = Array.isArray(item.segments) ? item.segments : posture?.segments;
+        secs += getSegmentsDuration(segments, Number(item.customHoldTime) || 180);
       } else if (item.type === 'block') {
         const blk = blocksCatalog.find(b => b.id === item.id);
         if (blk) {
@@ -289,6 +313,12 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
     }
   }
 
+  // Aviso breve al completar o saltar una unidad de Yoga, igual que en Fuerza.
+  // El timbre final de la sesión se reserva para finishSession().
+  function playTransitionChime({ segment = false } = {}) {
+    playQuartzBowlRing(segment ? 660 : 528, 1.5);
+  }
+
   // Lanzar sesión activa con una secuencia dada
   function startSequence(seq) {
     // Cargar la secuencia primero
@@ -301,15 +331,39 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
     currentSequenceItems.forEach((item, idx) => {
       if (item.type === 'posture') {
         const posture = posturesCatalog.find(p => p.id === item.id);
-        activePhases.push({
-          type: 'posture',
-          name: item.name,
-          duration: item.holdTime,
-          isAsymmetric: item.isAsymmetric,
-          focus: posture?.focus || '',
-          preparation: posture?.preparation || '',
-          execution: posture?.execution || '',
-          description: posture?.description || ''
+        const segments = Array.isArray(item.segments) && item.segments.length ? item.segments : [{ duration: item.holdTime }];
+        segments.forEach((segment, segmentIndex) => {
+          activePhases.push({
+            id: item.id,
+            type: 'posture',
+            name: item.name,
+            duration: Number(segment.duration) || Math.round(item.holdTime / segments.length),
+            isAsymmetric: item.isAsymmetric,
+            segmentInstruction: segment.instruction || segment.name || '',
+            chime: segment.chime === true,
+            segmentIndex,
+            segmentCount: segments.length,
+            familyId: posture?.familyId || null,
+            levels: posture?.levels || [],
+            levelId: item.levelId || posture?.levels?.[0]?.id || null,
+            variantId: item.variantId || null,
+            focus: posture?.focus || '',
+            preparation: posture?.preparation || '',
+            execution: posture?.execution || '',
+            description: posture?.description || ''
+          });
+
+          const transitionDuration = Number(segment.transitionDuration) || 0;
+          if (transitionDuration > 0 && segmentIndex < segments.length - 1) {
+            activePhases.push({
+              type: 'transition',
+              name: segment.transitionName || 'Transición entre segmentos',
+              duration: transitionDuration,
+              isAsymmetric: false,
+              segmentInstruction: segment.transitionInstruction || 'Cambia de postura con calma.',
+              description: segment.transitionInstruction || 'Cambia de postura con calma.'
+            });
+          }
         });
       } else if (item.type === 'block') {
         item.postures.forEach(bp => {
@@ -327,7 +381,9 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
         });
       }
 
-      if (idx < itemsCount - 1) {
+      // Cero en el catálogo significa transición inmediata; no se muestra como
+      // una fase de temporizador de duración cero.
+      if (idx < itemsCount - 1 && Number(reboundTime) > 0) {
         activePhases.push({
           type: 'rebound',
           name: 'Rebote de Transición',
@@ -1006,16 +1062,22 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
       <!-- Rejilla de puntos -->
       <div class="acu-fullscreen-bg grid-36" id="yoga-dots-grid" style="opacity: 0.75;"></div>
 
+      <button class="yoga-timer__exit" id="btn-yoga-stop" type="button" aria-label="Salir sin guardar" title="Salir sin guardar">
+        <span aria-hidden="true">×</span>
+      </button>
+
       <!-- Lectura del Timer -->
       <div class="yoga-timer__stage">
         
         <!-- Nombre de asana/rebote -->
         <h2 id="yoga-active-pose-name" style="font-size: 2.2rem; font-weight: 200; margin: 0 0 4px 0; color: #E8E6E3; text-transform: uppercase; letter-spacing: 0.2em; text-align: center; line-height: 1.2;">CARGANDO...</h2>
         <span id="yoga-pose-subname" style="font-family: var(--font-ui); font-weight: 300; font-size: 0.85rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; text-align: center; min-height: 1.2rem; display: block;"></span>
+        <select id="yoga-level-select" aria-label="Nivel de apoyo" title="Nivel de apoyo" style="display:none; margin:0 auto 12px; background:transparent; color:#E8E6E3; border:1px solid rgba(255,255,255,.2); padding:5px 8px;"></select>
 
         ${renderTechniqueDetails({
           id: 'yoga-technique',
           className: 'yoga-timer__technique',
+          open: true,
           preserveEmpty: true,
           sections: [
             { key: 'focus', title: 'Enfoque', content: initialPhase.focus || initialPhase.description || '', wide: true },
@@ -1064,6 +1126,14 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
 
             <!-- Centro: Saltar (Navigation) -->
             <div class="timer-icon-control-group">
+              <button class="btn-acu-icon" id="btn-yoga-prev" aria-label="Paso anterior" title="Paso anterior" disabled style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; pointer-events: auto; cursor: pointer; opacity: .4;">
+                <svg class="yoga-timer__previous-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="4 3 13 12 4 21 4 3" fill="currentColor"></polygon>
+                  <line x1="17" y1="4" x2="17" y2="20"></line>
+                </svg>
+              </button>
+            </div>
+            <div class="timer-icon-control-group">
               <button class="btn-acu-icon" id="btn-yoga-skip" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; pointer-events: auto; cursor: pointer; opacity: 0.4; pointer-events: none;">
                 <svg id="svg-skip-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                   <polygon points="4 3 13 12 4 21 4 3" fill="currentColor"></polygon>
@@ -1072,16 +1142,12 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
               </button>
               <span id="lbl-yoga-skip">Saltar</span>
             </div>
-
-            <!-- Detener -->
             <div class="timer-icon-control-group">
-              <button class="btn-acu-icon btn-acu-danger" id="btn-yoga-stop" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; pointer-events: auto; cursor: pointer;">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                  <rect x="5" y="5" width="14" height="14" rx="1"></rect>
-                </svg>
+              <button class="btn-acu-icon" id="btn-yoga-restart" aria-label="Reiniciar paso" title="Reiniciar paso" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; pointer-events: auto; cursor: pointer;">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"></path><polyline points="3 4 3 10 9 10"></polyline></svg>
               </button>
-              <span>Detener</span>
             </div>
+
           </div>
 
           <!-- Sin Bottom Label -->
@@ -1101,6 +1167,7 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
     // Selectores
     const activePoseLabel = timerEl.querySelector('#yoga-active-pose-name');
     const poseSubname = timerEl.querySelector('#yoga-pose-subname');
+    const levelSelect = timerEl.querySelector('#yoga-level-select');
     const clockLabel = timerEl.querySelector('#yoga-clock-text');
     const stepCurrent = timerEl.querySelector('#yoga-step-current');
     const stepRemaining = timerEl.querySelector('#yoga-step-remaining');
@@ -1112,6 +1179,8 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
     const lblFlow = timerEl.querySelector('#lbl-yoga-flow');
 
     const btnSkip = timerEl.querySelector('#btn-yoga-skip');
+    const btnPrev = timerEl.querySelector('#btn-yoga-prev');
+    const btnRestart = timerEl.querySelector('#btn-yoga-restart');
     const svgSkipIcon = timerEl.querySelector('#svg-skip-icon');
     const lblSkip = timerEl.querySelector('#lbl-yoga-skip');
 
@@ -1166,6 +1235,64 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
     const syncActivePhase = () => {
       const phase = activePhases[currentPhaseIdx];
       if (!phase) return;
+      if (levelSelect) {
+        const levels = phase.levels || [];
+        levelSelect.innerHTML = levels.map(level => `<option value="${escapeAttribute(level.id)}" ${level.id === phase.levelId ? 'selected' : ''}>${escapeHTML(level.name)}</option>`).join('');
+        levelSelect.style.display = levels.length > 1 ? 'block' : 'none';
+        const selectedLevel = levels.find(level => level.id === phase.levelId) || levels[0];
+        if (selectedLevel && phase.levelId !== selectedLevel.id) phase.levelId = selectedLevel.id;
+        phase.selectedLevel = selectedLevel || null;
+        levelSelect.value = phase.levelId || '';
+        levelSelect.setAttribute('aria-label', selectedLevel ? `Nivel de apoyo: ${selectedLevel.name}` : 'Nivel de apoyo');
+        levelSelect.title = selectedLevel ? `Nivel de apoyo: ${selectedLevel.name}` : 'Nivel de apoyo';
+        levelSelect.onchange = async () => {
+          const nextLevelId = levelSelect.value;
+          const nextLevel = levels.find(level => level.id === nextLevelId);
+          if (!nextLevel) return;
+
+          // Si una postura tiene segmentos, el nivel elegido acompaña a todos y queda
+          // reflejado en el resultado, no solamente en el <select> visible.
+          activePhases.forEach(candidate => {
+            if (candidate.id === phase.id) {
+              candidate.levelId = nextLevelId;
+              candidate.selectedLevel = nextLevel;
+              const defaultVariant = nextLevel.variants?.[0]?.id || null;
+              candidate.variantId = defaultVariant;
+            }
+          });
+          currentSequenceItems.forEach(item => {
+            if (item.id === phase.id) {
+              item.levelId = nextLevelId;
+              item.variantId = nextLevel.variants?.[0]?.id || null;
+            }
+          });
+
+          // Redibuja la técnica de inmediato: el cambio de nivel no es solo un dato
+          // de registro, también actualiza la instrucción visible del apoyo elegido.
+          syncActivePhase();
+
+          movementPreferences = movementPreferences.filter(entry => entry.id !== phase.id);
+          const preference = {
+            id: phase.id,
+            exerciseId: phase.id,
+            familyId: phase.familyId || null,
+            lastVariantId: nextLevel.variants?.[0]?.id || null,
+            lastLevelId: nextLevelId,
+            updatedAt: new Date().toISOString()
+          };
+          movementPreferences.push(preference);
+          try {
+            if (db?.objectStoreNames?.contains?.('movement_preferences')) {
+              await putData(db, 'movement_preferences', preference);
+            }
+          } catch (error) {
+            console.warn('[Yoga] No se pudo guardar el nivel seleccionado:', error);
+          }
+          levelSelect.value = nextLevelId;
+          levelSelect.setAttribute('aria-label', `Nivel de apoyo: ${nextLevel.name}`);
+          levelSelect.title = `Nivel de apoyo: ${nextLevel.name}`;
+        };
+      }
 
       // Separar nombre y subtítulo (ej. "Mariposa (Baddha Konasana)")
       const match = phase.name.match(/^([^(]+)(?:\(([^)]+)\))?/);
@@ -1181,7 +1308,7 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
         techniqueDetails.open = false;
         timerEl.classList.remove('yoga-technique-open');
         const techniqueContent = {
-          focus: phase.focus || phase.description || '',
+          focus: [phase.selectedLevel?.instruction, phase.focus || phase.description || ''].filter(Boolean).join(' '),
           preparation: phase.preparation || '',
           execution: phase.execution || ''
         };
@@ -1203,7 +1330,11 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
       const remainingCount = activePhases.length - (currentPhaseIdx + 1);
       stepRemaining.textContent = remainingCount;
 
-      if (phase.type === 'rebound') {
+      if (phase.type === 'transition') {
+        timerEl.style.backgroundColor = '#0A1D12';
+        poseSubname.textContent = 'TRANSICIÓN';
+        poseSubname.style.color = 'var(--color-accent-green)';
+      } else if (phase.type === 'rebound') {
         timerEl.style.backgroundColor = '#0A1D12';
         poseSubname.textContent = 'REBOTE';
         poseSubname.style.color = 'var(--color-accent-green)';
@@ -1214,7 +1345,10 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
       } else {
         timerEl.style.backgroundColor = '#0A0A0A';
         poseSubname.style.color = 'var(--color-text-muted)';
-        if (phase.isAsymmetric) {
+        if (phase.segmentInstruction) {
+          poseSubname.textContent = phase.segmentInstruction;
+          poseSubname.style.color = 'var(--color-accent-red)';
+        } else if (phase.isAsymmetric) {
           const half = Math.floor(phase.duration / 2);
           if (timeLeft > half) {
             poseSubname.textContent = '(LADO IZQUIERDO)';
@@ -1340,11 +1474,11 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
         if (timeLeft <= 0) {
           clearInterval(timerInterval);
           stopAnimationLoop();
-          playQuartzBowlRing(432, 3.5);
 
           if (currentPhaseIdx < activePhases.length - 1) {
             currentPhaseIdx++;
             const nextPhase = activePhases[currentPhaseIdx];
+            playTransitionChime({ segment: nextPhase.chime });
             timeLeft = nextPhase.duration;
             phaseDuration = nextPhase.duration;
             chimePlayedForCurrentPhase = false;
@@ -1373,7 +1507,8 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
       playQuartzBowlRing(432, 4.5);
       const result = createModuleResult('yoga', elapsedSeconds, {
         sequenceId,
-        sequenceName
+        sequenceName,
+        levels: activePhases.filter(phase => phase.levelId).map(phase => ({ name: phase.name, levelId: phase.levelId, variantId: phase.variantId || null }))
       });
       const durationMin = Math.max(1, Math.round(elapsedSeconds / 60));
 
@@ -1381,6 +1516,9 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
         try {
           await addData(db, 'sessions_log', {
             type: 'yoga',
+            sessionId: sequenceId,
+            variantId: currentSequenceItems.find(item => item.variantId)?.variantId || null,
+            tags: ['yoga', 'catalogo'],
             date: new Date().toISOString(),
             duration: durationMin,
             activeDurationSeconds: elapsedSeconds,
@@ -1423,7 +1561,12 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
         // Habilitar botón Saltar
         btnSkip.style.opacity = '1.0';
         btnSkip.style.pointerEvents = 'auto';
+        btnPrev.disabled = false;
+        btnPrev.style.opacity = '1';
 
+        // Preparar los avisos de transición desde el gesto de inicio; los
+        // cambios automáticos posteriores pueden ocurrir dentro de un intervalo.
+        prepareQuartzAudio().catch(() => {});
         // Iniciar audio local si corresponde
         if (localAudioActive) {
           synth.start(localBaseFreq, localFreq, localAudioMode);
@@ -1472,6 +1615,7 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
       if (currentPhaseIdx < activePhases.length - 1) {
         currentPhaseIdx++;
         const nextPhase = activePhases[currentPhaseIdx];
+        playTransitionChime({ segment: nextPhase.chime });
         timeLeft = nextPhase.duration;
         phaseDuration = nextPhase.duration;
         syncActivePhase();
@@ -1481,13 +1625,28 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
       }
     });
 
-    // BOTÓN DETENER (DERECHA - SALIDA)
-    btnStop.addEventListener('click', () => {
+    btnPrev.addEventListener('click', () => {
+      if (!isSessionStarted || currentPhaseIdx <= 0) return;
+      clearInterval(timerInterval); stopAnimationLoop();
+      currentPhaseIdx -= 1;
+      timeLeft = activePhases[currentPhaseIdx].duration;
+      phaseDuration = timeLeft; phaseElapsedBeforePause = 0; chimePlayedForCurrentPhase = false;
+      syncActivePhase(); runTimerInterval();
+    });
+    btnRestart.addEventListener('click', () => {
+      if (!isSessionStarted) return;
+      clearInterval(timerInterval); stopAnimationLoop();
+      timeLeft = activePhases[currentPhaseIdx].duration;
+      phaseDuration = timeLeft; phaseElapsedBeforePause = 0; chimePlayedForCurrentPhase = false;
+      syncActivePhase(); runTimerInterval();
+    });
+
+    btnStop.addEventListener('click', async () => {
       if (!isSessionStarted) {
         // Si no ha iniciado la sesión, vuelve directamente al lobby sin preguntar
         synth.destroy();
         if (orchestratorConfig) {
-          onNavigate('inicio');
+          onNavigate('sessions');
         } else {
           activeView = 'lobby';
           render();
@@ -1509,13 +1668,13 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
         showControls();
       }
 
-      if (confirm('¿Deseas detener y cancelar la sesión actual? (NO se guardará en el historial)')) {
+      if (await requestTimerExitConfirmation(timerEl)) {
         clearInterval(timerInterval);
         stopAnimationLoop();
         releaseWakeLock();
         synth.destroy();
         if (orchestratorConfig) {
-          onNavigate('inicio');
+          onNavigate('sessions');
         } else {
           activeView = 'lobby';
           render();

@@ -1,4 +1,4 @@
-import { addData, getAllData } from '../db.js';
+import { addData, getAllData, putData } from '../db.js';
 import { escapeHTML } from '../utils/sanitize.js';
 import { renderDotMatrix } from '../utils/dotmatrix.js';
 import {
@@ -15,7 +15,8 @@ import {
 } from '../utils/strengthUtils.js';
 import { renderLobbyAction, renderLobbyShell, renderPracticeRow } from './lobbyUi.js';
 import {
-  createWakeLockController
+  createWakeLockController,
+  requestTimerExitConfirmation
 } from './timerShell.js';
 import { createStrengthDotField } from './strengthDotField.js';
 import {
@@ -31,6 +32,7 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
   let activeView = 'lobby';
   let exercises = [];
   let circuits = [];
+  let movementPreferences = [];
   let currentCircuit = null;
   let timerInterval = null;
   let isPaused = false;
@@ -44,6 +46,7 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
     try {
       exercises = await getAllData(db, 'strength_exercises');
       circuits = await getAllData(db, 'strength_circuits');
+      movementPreferences = await getAllData(db, 'movement_preferences').catch(() => []);
     } catch (error) {
       console.error('[Strength] Error loading data:', error);
     }
@@ -121,7 +124,7 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
                 </div>
               </div>`;
 
-            const prescription = getEffectiveStrengthPrescription(entry, exercise);
+            const prescription = getEffectiveStrengthPrescription(entry, exercise, circuit);
             const modeLabel = prescription.mode === 'time' ? `${prescription.duration}s` : `${prescription.reps} reps`;
             return `
               <div class="practice-timeline__item">
@@ -199,10 +202,12 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
     const phases = buildStrengthPhaseList(currentCircuit, exercises);
     const totalExercises = currentCircuit.exercises.length;
     const totalRounds = Number(currentCircuit.rounds);
+    const warmupStepsCount = new Set(
+      phases.filter(phase => phase.type === 'warmup').map(phase => phase.warmupIndex)
+    ).size;
     let currentPhaseIndex = 0;
     let phaseElapsed = 0;
     let phaseTimeLeft = 0;
-    let waitingForRound = false;
     let skipResumeState = false;
     let result = createStrengthResult(currentCircuit);
     let finalResult = null;
@@ -212,7 +217,8 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
     timerScreen.innerHTML = renderStrengthTimerShell({
       circuitName: currentCircuit.name,
       totalRounds,
-      totalExercises
+      totalExercises,
+      warmupStepsCount
     });
     const root = timerScreen.firstElementChild;
     container.appendChild(root);
@@ -221,8 +227,11 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
     const skipConfirmation = root.querySelector('#strength-skip-confirm');
     const flowButton = root.querySelector('#btn-strength-flow');
     const flowIcon = root.querySelector('#strength-flow-icon');
-    const flowLabel = root.querySelector('#strength-flow-label');
     const exitButton = root.querySelector('#btn-strength-exit');
+    const restartButton = root.querySelector('#btn-strength-restart');
+    const previousButton = root.querySelector('#btn-strength-prev');
+    const nextButton = root.querySelector('#btn-strength-next');
+    const confirmButton = root.querySelector('#btn-strength-confirm');
     const sessionElapsed = root.querySelector('#strength-session-elapsed');
     const dotField = createStrengthDotField(root.querySelector('#strength-dots-grid'), {
       getElapsedSeconds: () => elapsedSeconds
@@ -243,25 +252,30 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
     }
 
     function syncFlowControl() {
-      if (waitingForRound || isFinishing) {
+      if (isFinishing) {
         flowButton.disabled = true;
         flowIcon.innerHTML = '';
-        flowLabel.textContent = waitingForRound ? 'EN ESPERA' : 'COMPLETADO';
-        flowButton.setAttribute('aria-label', flowLabel.textContent);
+        flowButton.setAttribute('aria-label', 'Completado');
         return;
       }
 
       const control = renderStrengthFlowControl({ started: isSessionStarted, paused: isPaused });
       flowButton.disabled = false;
       flowIcon.innerHTML = control.icon;
-      flowLabel.textContent = control.label;
       flowButton.setAttribute('aria-label', control.ariaLabel);
       flowButton.title = control.ariaLabel;
-      setPhaseControlsEnabled(isSessionStarted && !isPaused);
+      const enabled = isSessionStarted && !isPaused;
+      setPhaseControlsEnabled(enabled);
+      const phase = currentPhase();
+      previousButton.disabled = !enabled || currentPhaseIndex === 0;
+      nextButton.disabled = !enabled;
+      restartButton.disabled = !enabled;
+      confirmButton.hidden = !(phase?.type === 'exercise' && phase.mode === 'reps');
+      confirmButton.disabled = !enabled || confirmButton.hidden;
     }
 
     function setPhaseControlsEnabled(enabled) {
-      phaseContent.querySelectorAll('#strength-actual-reps, #btn-strength-rep-minus, #btn-strength-rep-plus, #strength-actual-weight, #btn-strength-weight-minus, #btn-strength-weight-plus, #btn-strength-register, #btn-strength-skip')
+      phaseContent.querySelectorAll('#strength-actual-reps, #btn-strength-rep-minus, #btn-strength-rep-plus, #strength-actual-weight, #btn-strength-weight-minus, #btn-strength-weight-plus')
         .forEach(control => { control.disabled = !enabled; });
     }
 
@@ -274,7 +288,6 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
     function bindPhaseControls() {
       const phase = currentPhase();
       if (!phase) return;
-      const boundPhaseIndex = currentPhaseIndex;
 
       if (phase.type === 'exercise' && phase.mode === 'reps') {
         const input = phaseContent.querySelector('#strength-actual-reps');
@@ -326,30 +339,6 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
           });
         }
 
-        phaseContent.querySelector('#btn-strength-register').addEventListener('click', () => {
-          if (currentPhaseIndex !== boundPhaseIndex) return;
-          const actualReps = Number(input.value);
-          if (!Number.isInteger(actualReps) || actualReps < 1 || actualReps > 999) {
-            input.setCustomValidity('Ingresa un número de repeticiones entre 1 y 999.');
-            input.reportValidity();
-            return;
-          }
-          input.setCustomValidity('');
-          const actualWeight = weightInput ? (parseFloat(weightInput.value) || 0) : 0;
-          if (recordCurrentExercise('completed', actualReps, actualWeight)) advancePhase();
-        });
-      }
-
-      const skipButton = phaseContent.querySelector('#btn-strength-skip');
-      if (skipButton) skipButton.addEventListener('click', showSkipConfirmation);
-
-      const nextRoundButton = phaseContent.querySelector('#btn-strength-next-round');
-      if (nextRoundButton) {
-        nextRoundButton.addEventListener('click', () => {
-          waitingForRound = false;
-          isPaused = false;
-          advancePhase();
-        });
       }
     }
 
@@ -360,9 +349,16 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
         phase: phase.type.startsWith('rest') ? { ...phase, nextExercise: getNextExercise() } : phase,
         totalExercises,
         totalRounds,
-        started: isSessionStarted && !isPaused,
-        waitingForRound
+        warmupStepsCount,
+        started: isSessionStarted && !isPaused
       });
+      const preference = movementPreferences.find(item => item.id === phase.exercise?.id);
+      const preferredWeight = preference?.lastLoadKg;
+      const weightInput = phaseContent.querySelector('#strength-actual-weight');
+      if (weightInput && preferredWeight != null) {
+        weightInput.value = preferredWeight;
+        weightInput.title = `Objetivo del programa: ${phase.weightKg || 0} kg · Último uso: ${preferredWeight} kg`;
+      }
       bindPhaseControls();
 
       const matrix = phaseContent.querySelector('#strength-countdown-matrix');
@@ -374,21 +370,48 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
     function initializeCurrentPhase() {
       const phase = currentPhase();
       phaseElapsed = 0;
-      waitingForRound = false;
-      if (phase.type === 'exercise' && phase.mode === 'time') phaseTimeLeft = Number(phase.duration);
-      else if (phase.type.startsWith('rest')) phaseTimeLeft = Number(phase.duration);
+      if ((phase.type === 'exercise' && phase.mode === 'time') || phase.type === 'warmup' || phase.type.startsWith('rest')) phaseTimeLeft = Number(phase.duration);
       else phaseTimeLeft = 0;
-
-      if (phase.type === 'rest-round' && phaseTimeLeft <= 0) {
-        waitingForRound = true;
-        isPaused = true;
-      }
       renderCurrentPhase();
 
-      if (phase.type === 'rest-exercise' && phaseTimeLeft <= 0) {
+      if ((phase.type === 'rest-exercise' || phase.type === 'rest-round') && phaseTimeLeft <= 0) {
         queueMicrotask(advancePhase);
       }
     }
+
+    restartButton?.addEventListener('click', () => {
+      if (!isSessionStarted || isFinishing) return;
+      phaseElapsed = 0;
+      initializeCurrentPhase();
+    });
+
+    previousButton.addEventListener('click', () => {
+      if (!isSessionStarted || isPaused || currentPhaseIndex === 0) return;
+      currentPhaseIndex -= 1;
+      initializeCurrentPhase();
+    });
+
+    nextButton.addEventListener('click', () => {
+      if (!isSessionStarted || isPaused) return;
+      if (currentPhase()?.type === 'exercise') showSkipConfirmation();
+      else advancePhase();
+    });
+
+    confirmButton.addEventListener('click', () => {
+      const phase = currentPhase();
+      if (!phase || phase.type !== 'exercise' || phase.mode !== 'reps' || isPaused) return;
+      const input = phaseContent.querySelector('#strength-actual-reps');
+      const weightInput = phaseContent.querySelector('#strength-actual-weight');
+      const actualReps = Number(input?.value);
+      if (!Number.isInteger(actualReps) || actualReps < 1 || actualReps > 999) {
+        input?.setCustomValidity('Ingresa un número de repeticiones entre 1 y 999.');
+        input?.reportValidity();
+        return;
+      }
+      input.setCustomValidity('');
+      const actualWeight = weightInput ? (parseFloat(weightInput.value) || 0) : 0;
+      if (recordCurrentExercise('completed', actualReps, actualWeight)) advancePhase();
+    });
 
     function recordCurrentExercise(status, actualValue = null, actualWeight = null) {
       const phase = currentPhase();
@@ -446,6 +469,33 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
       skipConfirmation.innerHTML = '';
     }
 
+    async function showExitConfirmation() {
+      if (isFinishing) return;
+      const wasPaused = isPaused;
+      isPaused = true;
+      syncFlowControl();
+
+      const shouldExit = await requestTimerExitConfirmation(root);
+      if (!shouldExit) {
+        isPaused = wasPaused;
+        syncFlowControl();
+        return;
+      }
+
+      try {
+        await cleanupTimer();
+      } catch (error) {
+        console.error('[Strength] Error al liberar el temporizador antes de salir:', error);
+      }
+      if (orchestratorConfig) {
+        onNavigate('sessions');
+      } else {
+        currentCircuit = null;
+        activeView = 'lobby';
+        refresh();
+      }
+    }
+
     async function finishSession() {
       if (isFinishing) return;
       isFinishing = true;
@@ -453,22 +503,40 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
       playQuartzBowlRing(432, 4.5);
       finalResult = finalizeStrengthResult(result, elapsedSeconds);
 
+      if (db.objectStoreNames?.contains?.('movement_preferences')) for (const entry of finalResult.entries || []) {
+        await putData(db, 'movement_preferences', {
+          id: entry.exerciseId,
+          exerciseId: entry.exerciseId,
+          familyId: entry.familyId || null,
+          lastVariantId: entry.variantId || null,
+          lastLevelId: entry.levelId || null,
+          lastLoadKg: entry.weightKg ?? null,
+          lastReps: entry.actualValue ?? null,
+          updatedAt: new Date().toISOString()
+        });
+      }
+
+      if (orchestratorConfig) {
+        orchestratorConfig.onComplete(finalResult);
+        return;
+      }
+
       let savedLogId = null;
-      if (!orchestratorConfig) {
-        try {
-          savedLogId = await addData(db, 'sessions_log', {
-            type: 'strength',
-            date: new Date().toISOString(),
-            duration: Math.max(1, Math.round(elapsedSeconds / 60)),
-            activeDurationSeconds: elapsedSeconds,
-            notes: `Circuito completado: ${currentCircuit.name} (${currentCircuit.rounds} rondas).`,
-            details: `Fuerza: ${escapeHTML(currentCircuit.name)}`,
-            strengthResult: finalResult,
-            vitality: null
-          });
-        } catch (error) {
-          console.error('[Strength] Error saving session log:', error);
-        }
+      try {
+        savedLogId = await addData(db, 'sessions_log', {
+          type: 'strength',
+          sessionId: currentCircuit.id,
+          tags: ['strength'],
+          date: new Date().toISOString(),
+          duration: Math.max(1, Math.round(elapsedSeconds / 60)),
+          activeDurationSeconds: elapsedSeconds,
+          notes: `Circuito completado: ${currentCircuit.name} (${currentCircuit.rounds} rondas).`,
+          details: `Fuerza: ${escapeHTML(currentCircuit.name)}`,
+          strengthResult: finalResult,
+          vitality: null
+        });
+      } catch (error) {
+        console.error('[Strength] Error saving session log:', error);
       }
 
       root.querySelector('.strength-timer__header').hidden = true;
@@ -477,19 +545,19 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
       phaseContent.innerHTML = renderStrengthCompletion({
         circuitName: currentCircuit.name,
         summary: summarizeStrengthResult(finalResult),
-        continueLabel: orchestratorConfig ? 'CONTINUAR SESIÓN' : 'VOLVER A FUERZA',
-        showVitality: !orchestratorConfig
+        continueLabel: 'VOLVER A FUERZA',
+        showVitality: true
       });
 
       const vitalityBtns = phaseContent.querySelectorAll('.btn-vitality-option');
       vitalityBtns.forEach(btn => {
         btn.addEventListener('click', async () => {
           vitalityBtns.forEach(b => {
-            b.style.borderColor = 'rgba(46,43,40,0.12)';
-            b.style.background = 'rgba(46,43,40,0.04)';
+            b.classList.remove('selected');
+            b.setAttribute('aria-pressed', 'false');
           });
-          btn.style.borderColor = 'var(--color-accent-green)';
-          btn.style.background = 'rgba(0, 230, 118, 0.1)';
+          btn.classList.add('selected');
+          btn.setAttribute('aria-pressed', 'true');
           const selectedVitality = btn.getAttribute('data-vitality');
 
           if (savedLogId && selectedVitality) {
@@ -512,13 +580,9 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
       });
 
       phaseContent.querySelector('#btn-strength-completion-continue').addEventListener('click', () => {
-        if (orchestratorConfig) {
-          orchestratorConfig.onComplete(finalResult);
-        } else {
-          currentCircuit = null;
-          activeView = 'lobby';
-          refresh();
-        }
+        currentCircuit = null;
+        activeView = 'lobby';
+        refresh();
       });
     }
 
@@ -540,13 +604,8 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
         if (phaseTimeLeft === 0) {
           if (phase.type === 'exercise') {
             if (recordCurrentExercise('completed', Number(phase.duration))) advancePhase();
-          } else if (phase.type === 'rest-exercise') {
+          } else if (phase.type === 'warmup' || phase.type.startsWith('rest')) {
             advancePhase();
-          } else if (phase.type === 'rest-round') {
-            waitingForRound = true;
-            isPaused = true;
-            playQuartzBowlRing(432, 2.5);
-            renderCurrentPhase();
           }
         }
       }
@@ -567,17 +626,7 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
       syncFlowControl();
     });
 
-    exitButton.addEventListener('click', async () => {
-      if (!isSessionStarted || confirm('¿Deseas detener y cancelar el circuito actual? No se guardará en el historial.')) {
-        await cleanupTimer();
-        if (orchestratorConfig) onNavigate('inicio');
-        else {
-          currentCircuit = null;
-          activeView = 'lobby';
-          refresh();
-        }
-      }
-    });
+    exitButton.addEventListener('click', showExitConfirmation);
 
     initializeCurrentPhase();
   }

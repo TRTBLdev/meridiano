@@ -1,10 +1,10 @@
-// MERIDIANO PWA - Service Worker con Estrategia de 3 Capas
-// 1. Cache-busting con BUILD_VERSION y cache: 'reload' en instalación
-// 2. Stale-While-Revalidate en tiempo de ejecución (offline instantáneo + actualización en segundo plano)
+// MERIDIANO PWA - Service Worker con actualización automática
+// 1. Network-first: la red entrega los assets actuales; la caché queda como respaldo offline.
+// 2. Caché estable: no depende de una versión escrita manualmente ni de scripts externos.
 // 3. skipWaiting y clients.claim para activación inmediata coordinada con app.js
 
-const BUILD_VERSION = '2026.09.25.0935';
-const CACHE_NAME = `meridiano-cache-v${BUILD_VERSION}`;
+// Cache estable: la app usa red primero y no requiere actualizar una version manual.
+const CACHE_NAME = 'meridiano-cache';
 
 const ASSETS = [
   './',
@@ -68,15 +68,14 @@ const ASSETS = [
 
 // Capa 1: Instalación con descarga limpia de assets evitando HTTP Cache
 self.addEventListener('install', (event) => {
-  console.log(`[Service Worker] Instalando versión: ${BUILD_VERSION}`);
+  console.log('[Service Worker] Instalando caché base');
   
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
-      // Descargamos cada asset con ?v= y cache: 'reload' para saltarse la caché HTTP de disco
+      // Descargamos cada asset ignorando la caché HTTP durante la instalación.
       const precachePromises = ASSETS.map(async (url) => {
         try {
-          const requestUrl = url.includes('?') ? `${url}&v=${BUILD_VERSION}` : `${url}?v=${BUILD_VERSION}`;
-          const response = await fetch(new Request(requestUrl, { cache: 'reload' }));
+          const response = await fetch(new Request(url, { cache: 'reload' }));
           if (response.ok) {
             // Guardamos bajo la clave canónica 'url' para que coincida con las peticiones de la app
             await cache.put(url, response);
@@ -89,14 +88,14 @@ self.addEventListener('install', (event) => {
       });
 
       await Promise.all(precachePromises);
-      console.log(`[Service Worker] Precaching completado para v${BUILD_VERSION}`);
+      console.log('[Service Worker] Precaching completado');
     }).then(() => self.skipWaiting())
   );
 });
 
 // Activación y purga de cachés obsoletas
 self.addEventListener('activate', (event) => {
-  console.log(`[Service Worker] Activando versión: ${BUILD_VERSION}`);
+  console.log('[Service Worker] Activando caché estable');
   
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -125,7 +124,7 @@ self.addEventListener('fetch', (event) => {
       (async () => {
         try {
           // Intentar red primero si el servidor está en línea
-          const networkResponse = await fetch(event.request);
+          const networkResponse = await fetch(event.request, { cache: 'no-store' });
           if (networkResponse && networkResponse.status === 200) {
             const cache = await caches.open(CACHE_NAME);
             cache.put(event.request, networkResponse.clone());
@@ -164,34 +163,24 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Peticiones de Assets (CSS, JS, iconos): Stale-While-Revalidate
+  // 2. Peticiones de assets (CSS, JS, iconos): red primero, caché solo si la red falla.
   event.respondWith(
-    caches.open(CACHE_NAME).then(async (cache) => {
-      const cachedResponse = await cache.match(event.request);
-
-      const revalidatePromise = fetch(event.request)
-        .then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            cache.put(event.request, networkResponse.clone());
-          }
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+      try {
+        const networkResponse = await fetch(event.request, { cache: 'no-store' });
+        if (networkResponse && networkResponse.status === 200) {
+          event.waitUntil(cache.put(event.request, networkResponse.clone()));
           return networkResponse;
-        })
-        .catch(() => null);
+        }
 
-      event.waitUntil(revalidatePromise);
-
-      // Si existe en caché, responder de inmediato
-      if (cachedResponse) {
-        return cachedResponse;
+        return await cache.match(event.request)
+          || networkResponse
+          || new Response('Recurso no disponible', { status: 404 });
+      } catch {
+        return await cache.match(event.request)
+          || new Response('Recurso no disponible', { status: 404 });
       }
-
-      // Si no estaba en caché, esperar a la red
-      const networkResponse = await revalidatePromise;
-      if (networkResponse && networkResponse.status === 200) {
-        return networkResponse;
-      }
-
-      return cachedResponse || new Response('Recurso no disponible', { status: 404 });
-    })
+    })()
   );
 });

@@ -430,17 +430,19 @@ async function loadHistoryAndCalendar(db, onNavigate) {
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(endOfWeek.getDate() + 7);
 
-    // Cargar meta semanal desde body_goals
+    // Cargar meta semanal desde el catálogo de metas integrales
     const bodyGoalsList = await getAllData(db, 'body_goals');
+    const integralGoalsList = await getAllData(db, 'goals').catch(() => []);
     const bodyGoals = (bodyGoalsList && bodyGoalsList.find(g => g.id === 'main')) || {};
-    const nuclearGoal = Number.isInteger(bodyGoals.nuclearSessionsWeekly) ? bodyGoals.nuclearSessionsWeekly : 2;
+    const integralGoal = integralGoalsList.find(goal => goal.id === 'main');
+    const nuclearGoal = integralGoal?.weeklyCoverageKeys?.length || (Number.isInteger(bodyGoals.nuclearSessionsWeekly) ? bodyGoals.nuclearSessionsWeekly : 10);
 
     const currentWeekLogs = logs.filter(l => {
       const d = new Date(l.date);
       return d >= startOfWeek && d < endOfWeek;
     });
 
-    const currentWeekNucleares = currentWeekLogs.filter(l => l.type === 'compound').length;
+    const currentWeekNucleares = new Set(currentWeekLogs.filter(l => l.type === 'compound' && (l.coverageKey || l.slot)).map(l => l.coverageKey || l.slot)).size;
     const currentWeekActivaciones = currentWeekLogs.filter(l => l.type === 'strength' || l.notes?.includes('Activación')).length;
 
     const progressValEl = document.getElementById('progress-col-val');

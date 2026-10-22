@@ -5,6 +5,7 @@ import { renderTechnicalTitle } from './ui.js';
 import { renderLobbyAction, renderLobbyShell } from './lobbyUi.js';
 import {
   createWakeLockController,
+  requestTimerExitConfirmation,
   populateTimerDots,
   renderSynthPanel,
   bindSynthPanel
@@ -16,7 +17,7 @@ import { createModuleResult } from '../utils/sessionResults.js';
 
 
 /**
- * Componente modular para el módulo de acupuntura TENS con Electro Pen.
+ * Componente modular para el módulo de acupuntura con lápiz eléctrico.
  * Maneja el Lobby, Constructor de Secuencias con formulario inline y el Timer Fullscreen.
  * 
  * @param {HTMLElement} container Contenedor principal de la SPA
@@ -25,6 +26,7 @@ import { createModuleResult } from '../utils/sessionResults.js';
  * @param {Object} appController Enlace para controlar el sintonizador de sonido global
  */
 export async function renderAcupunctureScreen(container, db, onNavigate, orchestratorConfig = null) {
+  let sessionConfig = orchestratorConfig;
   // Estado local del componente
   const synth = createSynthEngine();
   let catalogPoints = [];
@@ -114,11 +116,12 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
     container.innerHTML = '';
 
     // --- Integración con Orquestador ---
-    if (orchestratorConfig && !currentSequence) {
-      const seq = sequences.find(s => s.id === orchestratorConfig.presetId) || sequences[0];
+    if (sessionConfig && !currentSequence) {
+      const seq = sequences.find(s => s.id === sessionConfig.presetId) || sequences[0];
       if (seq) {
-        initializeSequence(seq);
-        activeView = 'timer';
+        currentSequence = seq;
+        if (sessionConfig.requireFicha) activeView = 'lobby';
+        else { initializeSequence(seq); activeView = 'timer'; }
       }
     }
 
@@ -152,7 +155,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
   function renderLobby() {
     const staging = document.createElement('div');
     staging.innerHTML = renderLobbyShell({
-      title: 'Acupuntura TENS',
+      title: 'Acupuntura — lápiz eléctrico',
       action: renderLobbyAction({ kind: 'text', label: '+ Crear Secuencia', id: 'btn-lobby-create' }),
       variant: 'list',
       className: 'acupuncture-lobby',
@@ -200,6 +203,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
 
         const accordionItem = document.createElement('div');
         accordionItem.className = 'practice-row acupuncture-practice-row';
+        accordionItem.dataset.sequenceId = seq.id;
 
         accordionItem.innerHTML = `
           <div class="practice-row__summary" role="button" tabindex="0" aria-expanded="false">
@@ -216,7 +220,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
             </div>
           </div>
           <div class="practice-row__details" style="display: none;">
-            <div class="practice-row__description">${escapeHTML(seq.description || 'Secuencia técnica de electroterapia TENS.')}</div>
+            <div class="practice-row__description">${escapeHTML(seq.description || 'Secuencia técnica para lápiz eléctrico de acupuntura.')}</div>
             
             <span class="practice-row__section-label">Puntos del protocolo</span>
             <div class="practice-timeline">
@@ -236,7 +240,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
                     <span class="practice-timeline__index">${idx + 1}</span>
                     <div class="practice-timeline__body">
                       <span class="practice-timeline__title">${escapeHTML(pointData.name)} (${escapeHTML(pointData.code)}${pointData.traditional_code && pointData.traditional_code !== pointData.code ? ` / ${escapeHTML(pointData.traditional_code)}` : ''}) ${step.side ? `[Lado: ${escapeHTML(step.side)}]` : ''}</span>
-                      <span class="practice-timeline__meta">${escapeHTML(durationLabel)} estímulo + ${escapeHTML(step.transitionAfter)}s transición (${escapeHTML(pointData.headType)})</span>
+                      <span class="practice-timeline__meta">${escapeHTML(durationLabel)} estímulo + ${escapeHTML(step.transitionAfter)}s transición (${escapeHTML(pointData.headType)})${pointData.caution ? ` · Precaución: ${escapeHTML(pointData.caution)}` : ''}</span>
                     </div>
                   </div>
                 `;
@@ -292,6 +296,10 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
         });
 
         seqList.appendChild(accordionItem);
+        if (sessionConfig?.requireFicha && sessionConfig.presetId === seq.id) {
+          toggleDetails();
+          accordionItem.scrollIntoView?.({ block: 'center' });
+        }
       });
     }
   }
@@ -831,6 +839,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
             <div style="margin-top: 4px;">
               <div class="acu-panel-info-label">Beneficios</div>
               <div class="acu-panel-info-text" id="timer-point-benefits" style="font-size: 0.75rem;">Cargando...</div>
+              <div id="timer-point-caution" style="margin-top: 8px; color: var(--color-accent-red); font-size: .72rem;"></div>
             </div>
           </div>
           
@@ -849,6 +858,9 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
           <!-- Controles de Timer (Iniciar/Pausar, Saltar, Detener con Iconos SVG) -->
           <div class="timer-icon-controls">
             <div class="timer-icon-control-group">
+              <button class="btn-acu-icon" id="btn-timer-prev" aria-label="Paso anterior" title="Paso anterior" disabled style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;opacity:.35;pointer-events:none;"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 5v14l10-7z"></path><rect x="18" y="5" width="2" height="14"></rect></svg></button>
+            </div>
+            <div class="timer-icon-control-group">
               <button class="btn-acu-icon btn-acu-active" id="btn-timer-play" title="Iniciar sesion" style="width:48px; height:48px; display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer;">
                 <svg id="svg-play-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                   <polygon points="5 3 19 12 5 21 5 3"></polygon>
@@ -866,14 +878,16 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
               </button>
               <span>Saltar</span>
             </div>
+            <div class="timer-icon-control-group">
+              <button class="btn-acu-icon" id="btn-timer-restart" aria-label="Reiniciar paso" title="Reiniciar paso" style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"></path><polyline points="3 4 3 10 9 10"></polyline></svg></button>
+            </div>
 
             <div class="timer-icon-control-group">
-              <button class="btn-acu-icon btn-acu-danger" id="btn-timer-exit" title="Detener sesion" style="width:48px; height:48px; display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer;">
+              <button class="btn-acu-icon btn-acu-danger" id="btn-timer-exit" aria-label="Salir sin guardar" title="Salir sin guardar" style="width:48px; height:48px; display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer;">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                   <rect x="5" y="5" width="14" height="14" rx="1"></rect>
                 </svg>
               </button>
-              <span>Detener</span>
             </div>
           </div>
         </div>
@@ -893,10 +907,13 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
     const pointHead = timerScreen.querySelector('#timer-point-head');
     const pointLocation = timerScreen.querySelector('#timer-point-location');
     const pointBenefits = timerScreen.querySelector('#timer-point-benefits');
+    const pointCaution = timerScreen.querySelector('#timer-point-caution');
     const countdownMatrix = timerScreen.querySelector('#timer-countdown-matrix');
     const progressEl = timerScreen.querySelector('#timer-step-progress');
     const btnPlay = timerScreen.querySelector('#btn-timer-play');
     const btnSkip = timerScreen.querySelector('#btn-timer-skip');
+    const btnPrev = timerScreen.querySelector('#btn-timer-prev');
+    const btnRestart = timerScreen.querySelector('#btn-timer-restart');
     const btnExit = timerScreen.querySelector('#btn-timer-exit');
     const lblFlow = timerScreen.querySelector('#lbl-timer-flow');
 
@@ -924,10 +941,12 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
           pointHead.textContent = `Siguiente Cabezal: ${nextPoint.headType}`;
           pointLocation.textContent = `Prepárate para colocar el electro-pen en el punto: ${nextPoint.name} (${nextPoint.code}${nextPoint.traditional_code && nextPoint.traditional_code !== nextPoint.code ? ` / ${nextPoint.traditional_code}` : ''}). Ubicado en: ${nextPoint.location}`;
           pointBenefits.textContent = `Limpia la zona y aplica gel conductor en la nueva ubicación. Configura la pluma al nivel 1.`;
+          if (pointCaution) pointCaution.textContent = nextPoint.caution ? `Precaución: ${nextPoint.caution}` : '';
         } else {
           pointHead.textContent = 'Finalizando';
           pointLocation.textContent = 'Última transición de relajación. Prepárate para apagar tu dispositivo.';
           pointBenefits.textContent = '';
+          if (pointCaution) pointCaution.textContent = '';
         }
       } else {
         stateBadge.textContent = 'Estimulando';
@@ -940,6 +959,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
           pointHead.textContent = `Cabezal Sugerido: ${point.headType}`;
           pointLocation.textContent = point.location;
           pointBenefits.textContent = point.benefits;
+          if (pointCaution) pointCaution.textContent = point.caution ? `Precaución: ${point.caution}` : '';
         }
       }
 
@@ -1097,10 +1117,13 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
         sequenceName: currentSequence.name
       });
 
-      if (!orchestratorConfig) {
+      if (!sessionConfig || sessionConfig.isComplement) {
         try {
           await addData(db, 'sessions_log', {
             type: 'acupuncture',
+            sessionId: currentSequence.id,
+            originLogId: sessionConfig?.originLogId || null,
+            tags: currentSequence.category === 'complement' ? ['complement'] : [],
             date: new Date().toISOString(),
             duration: Math.max(1, Math.round(elapsedSeconds / 60)),
             activeDurationSeconds: elapsedSeconds,
@@ -1112,10 +1135,10 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
         }
       }
 
-      if (orchestratorConfig) {
-        orchestratorConfig.onComplete(result);
+      if (sessionConfig && !sessionConfig.isComplement) {
+        sessionConfig.onComplete(result);
       } else {
-        alert('¡Secuencia de Electroterapia TENS completada con éxito!');
+        alert('¡Secuencia con lápiz eléctrico completada con éxito!');
         activeView = 'lobby';
         synth.destroy();
         refresh();
@@ -1151,6 +1174,9 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
       phaseElapsedBeforePause = 0;
       btnSkip.style.opacity = '1';
       btnSkip.style.pointerEvents = 'auto';
+      btnPrev.disabled = false;
+      btnPrev.style.opacity = '1';
+      btnPrev.style.pointerEvents = 'auto';
       if (lblFlow) lblFlow.textContent = 'Pausar';
       btnPlay.title = 'Pausar sesion';
       btnPlay.innerHTML = `
@@ -1227,12 +1253,30 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
       activeTimeLeft = 0;
       tick();
     });
+    const resetPoint = index => {
+      activeSeqIndex = Math.max(0, Math.min(index, currentSequence.points.length - 1));
+      activeState = 'stimulating';
+      activeTimeLeft = currentSequence.points[activeSeqIndex].duration;
+      activeStepDuration = activeTimeLeft;
+      phaseStartTime = Date.now();
+      phaseElapsedBeforePause = 0;
+      syncTimerDisplay();
+      updateCountdownDisplay();
+    };
+    btnPrev.addEventListener('click', () => {
+      if (!isSessionStarted || activeSeqIndex <= 0) return;
+      resetPoint(activeSeqIndex - 1);
+    });
+    btnRestart.addEventListener('click', () => {
+      if (!isSessionStarted) return;
+      resetPoint(activeSeqIndex);
+    });
 
     // Salir voluntariamente (Pausar primero, preguntar y volver a inicio sin guardar)
     btnExit.addEventListener('click', async () => {
       if (!isSessionStarted) {
-        if (orchestratorConfig) {
-          onNavigate('inicio');
+        if (sessionConfig && !sessionConfig.isComplement) {
+          onNavigate('sessions');
         } else {
           activeView = 'lobby';
           refresh();
@@ -1244,11 +1288,11 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
         btnPlay.click();
       }
 
-      if (confirm('¿Deseas detener y cancelar la sesión actual? (NO se guardará en el historial)')) {
+      if (await requestTimerExitConfirmation(timerScreen)) {
         await cleanupTimer();
         synth.destroy();
-        if (orchestratorConfig) {
-          onNavigate('inicio');
+        if (sessionConfig && !sessionConfig.isComplement) {
+          onNavigate('sessions');
         } else {
           activeView = 'lobby';
           refresh();

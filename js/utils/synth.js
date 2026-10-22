@@ -4,6 +4,20 @@
  * y funciones utilitarias de efectos de sonido temporales.
  */
 
+let quartzAudioContext = null;
+
+/** Prepara el contexto compartido de avisos sonoros desde un gesto del usuario. */
+export function prepareQuartzAudio() {
+  try {
+    if (!quartzAudioContext) quartzAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+    return quartzAudioContext.state === 'suspended'
+      ? quartzAudioContext.resume()
+      : Promise.resolve();
+  } catch (error) {
+    return Promise.reject(error);
+  }
+}
+
 export function createSynthEngine() {
   let audioCtx = null;
   let oscLeft = null;
@@ -193,38 +207,48 @@ export function createSynthEngine() {
  */
 export function playQuartzBowlRing(base = 432, duration = 3.5) {
   try {
-    const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
-    
-    const osc1 = tempCtx.createOscillator();
-    const osc2 = tempCtx.createOscillator();
-    const osc3 = tempCtx.createOscillator();
-    
-    const gainNode = tempCtx.createGain();
+    const tempCtx = quartzAudioContext || new (window.AudioContext || window.webkitAudioContext)();
+    quartzAudioContext = tempCtx;
+    const play = () => {
+      const osc1 = tempCtx.createOscillator();
+      const osc2 = tempCtx.createOscillator();
+      const osc3 = tempCtx.createOscillator();
+      const gainNode = tempCtx.createGain();
 
-    osc1.frequency.value = base;
-    osc2.frequency.value = base * 1.5; // Quinta
-    osc3.frequency.value = base * 2.0; // Octava
+      osc1.frequency.value = base;
+      osc2.frequency.value = base * 1.5; // Quinta
+      osc3.frequency.value = base * 2.0; // Octava
 
-    osc1.type = 'sine';
-    osc2.type = 'sine';
-    osc3.type = 'sine';
+      osc1.type = 'sine';
+      osc2.type = 'sine';
+      osc3.type = 'sine';
 
-    gainNode.gain.setValueAtTime(0.2, tempCtx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, tempCtx.currentTime + duration);
+      gainNode.gain.setValueAtTime(0.2, tempCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, tempCtx.currentTime + duration);
 
-    osc1.connect(gainNode);
-    osc2.connect(gainNode);
-    osc3.connect(gainNode);
+      osc1.connect(gainNode);
+      osc2.connect(gainNode);
+      osc3.connect(gainNode);
+      gainNode.connect(tempCtx.destination);
 
-    gainNode.connect(tempCtx.destination);
+      osc1.start();
+      osc2.start();
+      osc3.start();
 
-    osc1.start();
-    osc2.start();
-    osc3.start();
+      const stopAt = tempCtx.currentTime + duration + 0.5;
+      osc1.stop(stopAt);
+      osc2.stop(stopAt);
+      osc3.stop(stopAt);
+    };
 
-    osc1.stop(tempCtx.currentTime + duration + 0.5);
-    osc2.stop(tempCtx.currentTime + duration + 0.5);
-    osc3.stop(tempCtx.currentTime + duration + 0.5);
+    // Los timbres automáticos pueden ejecutarse desde un intervalo, fuera del
+    // gesto que inició la sesión; reanudar explícitamente evita el silencio del
+    // navegador en esos cambios de fase.
+    if (tempCtx.state === 'suspended') {
+      tempCtx.resume().then(play).catch(() => {});
+    } else {
+      play();
+    }
   } catch (e) {
     console.warn('[Audio] Failed to synthesise quartz bowl:', e);
   }

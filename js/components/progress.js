@@ -6,7 +6,7 @@ import { formatDurationSeconds } from '../utils/sessionResults.js';
 /**
  * Familias de movimiento para el análisis de sobrecarga en Fuerza
  */
-const STRENGTH_FAMILIES = {
+const LEGACY_STRENGTH_FAMILIES = {
   sentadilla: {
     name: 'Sentadilla (Rodilla/Cuádriceps)',
     ids: ['str-sentadilla-pelota'],
@@ -140,8 +140,12 @@ async function initProgressCharts(db, container) {
     const logs = await getAllData(db, 'sessions_log');
     const bodyMetrics = await getAllData(db, 'body_metrics');
     const bodyGoalsList = await getAllData(db, 'body_goals');
+    const goalsList = await getAllData(db, 'goals').catch(() => []);
+    const movementFamilies = await getAllData(db, 'movement_families').catch(() => []);
+    const strengthExercises = await getAllData(db, 'strength_exercises').catch(() => []);
     let bodyGoals = (bodyGoalsList && bodyGoalsList.find(g => g.id === 'main')) || { id: 'main' };
-    let nuclearGoal = Number.isInteger(bodyGoals.nuclearSessionsWeekly) ? bodyGoals.nuclearSessionsWeekly : 2;
+    const integralGoal = goalsList.find(goal => goal.id === 'main') || { weeklyCoverageKeys: ['B1','B2','B3','B4','B5','B6','B7','A','B','C'] };
+    let nuclearGoal = Array.isArray(integralGoal.weeklyCoverageKeys) ? integralGoal.weeklyCoverageKeys.length : (Number.isInteger(bodyGoals.nuclearSessionsWeekly) ? bodyGoals.nuclearSessionsWeekly : 10);
 
     // Configuración interactiva de la meta semanal en Sección 2
     const goalTextEl = container.querySelector('#nuclear-goal-text');
@@ -165,7 +169,7 @@ async function initProgressCharts(db, container) {
         }
       });
       btnGoalPlus.addEventListener('click', async () => {
-        if (nuclearGoal < 7) {
+        if (nuclearGoal < 10) {
           nuclearGoal++;
           bodyGoals.nuclearSessionsWeekly = nuclearGoal;
           await putData(db, 'body_goals', bodyGoals);
@@ -175,7 +179,15 @@ async function initProgressCharts(db, container) {
       });
     }
 
-    let activeFamily = 'sentadilla';
+    const familyCatalog = movementFamilies.length ? movementFamilies : Object.entries(LEGACY_STRENGTH_FAMILIES).map(([id, value]) => ({ id, name: value.name, category: 'strength', ids: value.ids }));
+    const familyById = new Map(familyCatalog.map(family => [family.id, family]));
+    const exerciseFamily = new Map(strengthExercises.map(exercise => [exercise.id, exercise.familyId]));
+    const familyPills = container.querySelector('#pattern-pills-container');
+    if (familyPills) {
+      const strengthFamilies = familyCatalog.filter(family => family.category === 'strength');
+      familyPills.innerHTML = strengthFamilies.map((family, index) => `<button class="btn-pattern-pill ${index === 0 ? 'active' : ''}" data-family="${escapeHTML(family.id)}">${escapeHTML(family.name)}</button>`).join('');
+    }
+    let activeFamily = familyCatalog.find(family => family.category === 'strength')?.id || 'sentadilla';
     let strengthChartInstance = null;
     let weeklyChartInstance = null;
     let bodyChartInstance = null;
@@ -195,7 +207,13 @@ async function initProgressCharts(db, container) {
     // GRÁFICO 1: SOBRECARGA EN FUERZA POR PATRÓN (ADAPTATIVO)
     // -------------------------------------------------------------
     function renderStrengthChart(familyKey) {
-      const familyConfig = STRENGTH_FAMILIES[familyKey];
+      const catalogFamily = familyById.get(familyKey);
+      const familyConfig = catalogFamily ? {
+        name: catalogFamily.name,
+        ids: catalogFamily.ids || strengthExercises.filter(exercise => exercise.familyId === familyKey).map(exercise => exercise.id),
+        metric: catalogFamily.metric || 'reps',
+        unitLabel: catalogFamily.unitLabel || 'reps'
+      } : null;
       if (!familyConfig) return;
 
       const entriesByDate = [];
@@ -215,7 +233,7 @@ async function initProgressCharts(db, container) {
           });
         }
 
-        const matchEntries = strengthEntries.filter(e => familyConfig.ids.includes(e.exerciseId));
+        const matchEntries = strengthEntries.filter(e => (e.familyId || exerciseFamily.get(e.exerciseId)) === familyKey || familyConfig.ids.includes(e.exerciseId));
         if (matchEntries.length > 0) {
           let totalReps = 0;
           let totalSeconds = 0;
@@ -421,12 +439,13 @@ async function initProgressCharts(db, container) {
         const weekKey = `${monday.getDate()} ${monday.toLocaleDateString('es-ES', { month: 'short' })}`;
 
         if (!weeksMap.has(weekKey)) {
-          weeksMap.set(weekKey, { compound: 0, activations: 0, order: monday.getTime() });
+          weeksMap.set(weekKey, { compound: 0, activations: 0, coverage: new Set(), order: monday.getTime() });
         }
 
         const weekData = weeksMap.get(weekKey);
         if (log.type === 'compound') {
           weekData.compound += 1;
+          if (log.coverageKey) weekData.coverage.add(log.coverageKey);
         } else if (log.type === 'strength' || log.notes?.includes('Activación')) {
           weekData.activations += 1;
         }
@@ -443,7 +462,7 @@ async function initProgressCharts(db, container) {
       const textColor = isDark ? '#E8E6E3' : '#2E2B28';
       const gridColor = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)';
 
-      const maxCompound = sortedWeeks.reduce((max, w) => Math.max(max, w[1].compound), 0);
+      const maxCompound = sortedWeeks.reduce((max, w) => Math.max(max, w[1].coverage.size), 0);
       const maxActivations = sortedWeeks.reduce((max, w) => Math.max(max, w[1].activations), 0);
       const yMax = Math.max(nuclearGoal + 1, maxCompound + 1, maxActivations + 1);
 
@@ -451,14 +470,14 @@ async function initProgressCharts(db, container) {
         type: 'bar',
         data: {
           labels: sortedWeeks.map(w => {
-            const isMet = w[1].compound >= nuclearGoal;
+            const isMet = w[1].coverage.size >= nuclearGoal;
             return isMet ? `${w[0]} ✓` : w[0];
           }),
           datasets: [
             {
               type: 'bar',
               label: 'Sesiones Nucleares (45-60 min)',
-              data: sortedWeeks.map(w => w[1].compound),
+              data: sortedWeeks.map(w => w[1].coverage.size),
               backgroundColor: '#10B981',
               borderRadius: 4,
               order: 2
@@ -569,7 +588,8 @@ async function initProgressCharts(db, container) {
 
       // 2. Antropometría: Hito y Delta hacia la meta
       const sortedMetrics = [...bodyMetrics].sort((a, b) => a.date.localeCompare(b.date));
-      const targetWeight = Number(bodyGoals?.weight) || 58;
+      const targetWeight = Number(bodyGoals?.weightRangeKg?.min) || Number(bodyGoals?.weight) || 55;
+      const targetWeightMax = Number(bodyGoals?.weightRangeKg?.max) || Number(bodyGoals?.weight) || 60;
       const latestMetric = sortedMetrics.length > 0 ? sortedMetrics[sortedMetrics.length - 1] : null;
       const currentWeight = latestMetric?.weight != null ? Number(latestMetric.weight) : null;
       const delta = currentWeight != null ? (currentWeight - targetWeight).toFixed(1) : null;
@@ -584,8 +604,8 @@ async function initProgressCharts(db, container) {
               <span class="progress-milestone-value">${currentWeight != null ? `${currentWeight} kg` : 'Sin registro'}</span>
             </div>
             <div class="progress-milestone-item">
-              <span class="progress-milestone-label">META SALUDABLE</span>
-              <span class="progress-milestone-value accent">${targetWeight} kg</span>
+              <span class="progress-milestone-label">RANGO META</span>
+              <span class="progress-milestone-value accent">${targetWeight}–${targetWeightMax} kg</span>
             </div>
             <div class="progress-milestone-item">
               <span class="progress-milestone-label">BRECHA / RESTANTE</span>
