@@ -132,6 +132,7 @@ export async function renderDashboard(container, session, db, onNavigate) {
               <div class="pilar-list-item strength" data-module="strength">
                 <span>Fuerza</span>
               </div>
+              <div class="pilar-list-item mobility" data-module="mobility"><span>Movilidad</span></div>
             </div>
           </section>
 
@@ -496,6 +497,7 @@ async function loadHistoryAndCalendar(db, onNavigate) {
         if (log.type === 'acupuncture') label = 'ACU';
         if (log.type === 'meditation') label = 'MED';
         if (log.type === 'strength') label = 'FUERZA';
+        if (log.type === 'mobility') label = 'MOVILIDAD';
         if (log.type === 'compound') label = 'INTEGRAL';
 
         let vitalityTag = '';

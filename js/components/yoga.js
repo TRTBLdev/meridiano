@@ -6,7 +6,9 @@ import {
   requestTimerExitConfirmation,
   populateTimerDots,
   renderSynthPanel,
-  bindSynthPanel
+  bindSynthPanel,
+  renderTimerIcon,
+  getTimerElapsedMs
 } from './timerShell.js';
 import { createSynthEngine, playQuartzBowlRing, prepareQuartzAudio } from '../utils/synth.js';
 import { startResolvedYogaSequence } from '../utils/yogaUtils.js';
@@ -1127,24 +1129,18 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
             <!-- Centro: Saltar (Navigation) -->
             <div class="timer-icon-control-group">
               <button class="btn-acu-icon" id="btn-yoga-prev" aria-label="Paso anterior" title="Paso anterior" disabled style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; pointer-events: auto; cursor: pointer; opacity: .4;">
-                <svg class="yoga-timer__previous-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <polygon points="4 3 13 12 4 21 4 3" fill="currentColor"></polygon>
-                  <line x1="17" y1="4" x2="17" y2="20"></line>
-                </svg>
+                ${renderTimerIcon('previous')}
               </button>
             </div>
             <div class="timer-icon-control-group">
               <button class="btn-acu-icon" id="btn-yoga-skip" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; pointer-events: auto; cursor: pointer; opacity: 0.4; pointer-events: none;">
-                <svg id="svg-skip-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <polygon points="4 3 13 12 4 21 4 3" fill="currentColor"></polygon>
-                  <line x1="17" y1="4" x2="17" y2="20"></line>
-                </svg>
+                ${renderTimerIcon('next').replace('<svg ', '<svg id="svg-skip-icon" ')}
               </button>
               <span id="lbl-yoga-skip">Saltar</span>
             </div>
             <div class="timer-icon-control-group">
               <button class="btn-acu-icon" id="btn-yoga-restart" aria-label="Reiniciar paso" title="Reiniciar paso" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; pointer-events: auto; cursor: pointer;">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"></path><polyline points="3 4 3 10 9 10"></polyline></svg>
+                ${renderTimerIcon('restart')}
               </button>
             </div>
 
@@ -1364,11 +1360,7 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
 
     const getElapsedMs = () => {
       if (!isSessionStarted) return 0;
-      if (isPaused) {
-        return phaseElapsedBeforePause;
-      } else {
-        return phaseElapsedBeforePause + (Date.now() - phaseStartTime);
-      }
+      return getTimerElapsedMs(phaseStartTime, phaseElapsedBeforePause, isPaused);
     };
 
     const getCompletedSessionSeconds = () => {

@@ -2,7 +2,7 @@ import { defaultAcupuncture } from './seeds/acupuncture_points_seed.js';
 import { defaultMeridians } from './seeds/meridians_seed.js';
 
 const DB_NAME = 'meridiano_db';
-export const DB_VERSION = 13;
+export const DB_VERSION = 14;
 
 /**
  * Abre la conexión a IndexedDB y crea las tablas/almacenes necesarios.
@@ -120,6 +120,8 @@ export function openDB() {
       if (!db.objectStoreNames.contains('movement_preferences')) {
         db.createObjectStore('movement_preferences', { keyPath: 'id' });
       }
+      if (!db.objectStoreNames.contains('mobility_exercises')) db.createObjectStore('mobility_exercises', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('mobility_routines')) db.createObjectStore('mobility_routines', { keyPath: 'id' });
     };
   });
 }

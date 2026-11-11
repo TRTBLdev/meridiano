@@ -9,6 +9,7 @@ import { renderMeditationScreen } from './components/meditation.js';
 import { renderYogaScreen } from './components/yoga.js';
 import { renderConfigScreen } from './components/config.js';
 import { renderStrengthScreen } from './components/strength.js';
+import { renderMobilityScreen } from './components/mobility.js';
 import { renderSessionsScreen } from './components/sessions.js';
 import { renderBodyScreen } from './components/body.js';
 import { renderProgressScreen } from './components/progress.js';
@@ -154,6 +155,8 @@ function handleNavigation(target, param = null) {
     renderYogaScreen(appContainer, state.db, handleNavigation);
   } else if (target === 'strength') {
     renderStrengthScreen(appContainer, state.db, handleNavigation);
+  } else if (target === 'mobility') {
+    renderMobilityScreen(appContainer, state.db, handleNavigation);
   } else if (target === 'sessions') {
     renderSessionsScreen(appContainer, state.db, handleNavigation, param);
   } else if (target === 'syllabus') {

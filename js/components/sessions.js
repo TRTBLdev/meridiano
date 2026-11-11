@@ -1,6 +1,8 @@
 import { getAllData, addData, putData, deleteData } from '../db.js';
 import { renderBreathworkScreen } from './breathwork.js';
 import { renderStrengthScreen } from './strength.js';
+import { renderMobilityScreen } from './mobility.js';
+import { validateMobilityRoutine, estimateMobilityDuration } from '../utils/mobilityUtils.js';
 import { renderYogaScreen } from './yoga.js';
 import { renderAcupunctureScreen } from './acupuncture.js';
 import { escapeHTML } from '../utils/sanitize.js';
@@ -26,6 +28,7 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
   let presetsCatalog = {
     breathwork: [],
     strength: [],
+    mobility: [],
     yoga: [],
     acupuncture: []
   };
@@ -39,6 +42,8 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
       const strengthExerciseCatalog = await getAllData(db, 'strength_exercises');
       const yg = await getAllData(db, 'yoga_sequences');
       const ac = await getAllData(db, 'acupuncture_sequences');
+      const mobilityRoutines = await getAllData(db, 'mobility_routines');
+      const mobilityExercises = await getAllData(db, 'mobility_exercises');
 
       presetsCatalog.breathwork = bw.map(p => ({ id: p.id, name: p.name, defaultDuration: (p.inhale + p.holdIn + p.exhale + p.holdOut) * 10 }));
       strengthCircuits = st;
@@ -52,6 +57,7 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
         }));
       presetsCatalog.yoga = yg.map(s => ({ id: s.id, name: s.name, defaultDuration: 600 }));
       presetsCatalog.acupuncture = ac.map(a => ({ id: a.id, name: a.name, defaultDuration: 420 }));
+      presetsCatalog.mobility = mobilityRoutines.filter(r => !validateMobilityRoutine(r, mobilityExercises)).map(r => ({ id: r.id, name: r.name, defaultDuration: estimateMobilityDuration(r) }));
 
       // Si nos pasaron un sessionId inicial para editar
       if (initialSessionId && !editingSession) {
@@ -81,10 +87,15 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
     return getCircuitValidation(circuit, strengthExercises).reason;
   }
 
+  function getBlockIssue(block) {
+    if (block.module === 'mobility' && !presetsCatalog.mobility.some(preset => preset.id === block.presetId)) return 'Rutina de movilidad no disponible o inválida';
+    return getStrengthBlockIssue(block);
+  }
+
   function getSessionIssue(session) {
     if (!Array.isArray(session.blocks) || session.blocks.length === 0) return 'Borrador sin bloques';
-    const invalidStrengthBlock = session.blocks.find(block => getStrengthBlockIssue(block));
-    return invalidStrengthBlock ? getStrengthBlockIssue(invalidStrengthBlock) : '';
+    const invalidBlock = session.blocks.find(block => getBlockIssue(block));
+    return invalidBlock ? getBlockIssue(invalidBlock) : '';
   }
 
   async function refresh() {
@@ -310,7 +321,7 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
 
       editingSession.blocks.forEach((block, index) => {
         const blockEl = document.createElement('div');
-        const invalidReason = getStrengthBlockIssue(block);
+        const invalidReason = getBlockIssue(block);
         blockEl.className = `compound-block${invalidReason ? ' compound-block--invalid' : ''}`;
 
         blockEl.innerHTML = renderCompoundSessionBlock(
@@ -429,6 +440,8 @@ export async function renderSessionsScreen(container, db, onNavigate, initialSes
           renderBreathworkScreen(container, db, onNavigate, orchestratorConfig);
         } else if (block.module === 'strength') {
           renderStrengthScreen(container, db, onNavigate, orchestratorConfig);
+        } else if (block.module === 'mobility') {
+          renderMobilityScreen(container, db, onNavigate, orchestratorConfig);
         } else if (block.module === 'yoga') {
           renderYogaScreen(container, db, onNavigate, orchestratorConfig);
         } else if (block.module === 'acupuncture') {

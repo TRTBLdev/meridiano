@@ -6,7 +6,9 @@
   "main": "index.html",
   "scripts": {
     "dev": "http-server -p 8080 -c-1 -s",
-    "test": "node --test tests/strengthUtils.test.mjs tests/strengthTimerUi.test.mjs tests/strengthDotField.test.mjs tests/breathworkUtils.test.mjs tests/acupunctureUtils.test.mjs tests/yogaUtils.test.mjs tests/techniqueDetails.test.mjs tests/sessionResults.test.mjs tests/compoundSessionSeeds.test.mjs tests/meditationUtils.test.mjs tests/wakeLockController.test.mjs"
+    "test": "node --test tests/appSyntax.test.mjs tests/mobilityUtils.test.mjs tests/strengthUtils.test.mjs tests/strengthTimerUi.test.mjs tests/strengthDotField.test.mjs tests/breathworkUtils.test.mjs tests/acupunctureUtils.test.mjs tests/yogaUtils.test.mjs tests/techniqueDetails.test.mjs tests/sessionResults.test.mjs tests/compoundSessionSeeds.test.mjs tests/meditationUtils.test.mjs tests/wakeLockController.test.mjs",
+    "vault:verify": "node data_vault/scripts/validate_vault.js",
+    "vault:build": "node data_vault/scripts/sync_vault_to_seeds.js"
   },
   "keywords": [
     "pwa",

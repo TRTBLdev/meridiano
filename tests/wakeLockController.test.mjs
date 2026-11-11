@@ -1,6 +1,36 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createWakeLockController, renderWakeLockPreference, bindWakeLockPreference } from '../js/components/timerShell.js';
+import { createWakeLockController, renderWakeLockPreference, bindWakeLockPreference, requestTimerExitConfirmation } from '../js/components/timerShell.js';
+
+test('el diálogo de salida devuelve la decisión y se retira en ambas opciones', async () => {
+  const originalDocument = globalThis.document;
+  try {
+    for (const [choice, expected] of [['continue', false], ['discard', true]]) {
+      const handlers = {};
+      let removed = false;
+      let focused = false;
+      const dialog = {
+        setAttribute() {},
+        remove() { removed = true; },
+        querySelector(selector) {
+          const key = selector.includes('continue') ? 'continue' : 'discard';
+          return { addEventListener(event, handler) { handlers[key] = handler; }, focus() { focused = true; } };
+        }
+      };
+      globalThis.document = { createElement() { return dialog; } };
+      let appended = null;
+      const result = requestTimerExitConfirmation({ appendChild(element) { appended = element; } });
+      assert.equal(appended, dialog);
+      assert.equal(focused, true);
+      handlers[choice]();
+      assert.equal(await result, expected);
+      assert.equal(removed, true);
+    }
+  } finally {
+    if (originalDocument === undefined) delete globalThis.document;
+    else globalThis.document = originalDocument;
+  }
+});
 
 test('renderWakeLockPreference: retorna cadena vacía (switch eliminado de la UI)', () => {
   assert.equal(renderWakeLockPreference(), '');

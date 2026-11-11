@@ -27,6 +27,8 @@ export async function renderConfigScreen(container, db, onNavigate) {
     { id: 'meridians', label: 'Canales de Meridianos' },
     { id: 'strength_exercises', label: 'Ejercicios de Fuerza' },
     { id: 'strength_circuits', label: 'Circuitos de Fuerza' },
+    { id: 'mobility_exercises', label: 'Ejercicios de Movilidad' },
+    { id: 'mobility_routines', label: 'Rutinas de Movilidad' },
     { id: 'compound_sessions', label: 'Sesiones Compuestas' },
     { id: 'movement_families', label: 'Familias de Movimiento' },
     { id: 'goals', label: 'Metas del Programa' },

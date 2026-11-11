@@ -2,6 +2,8 @@ import { getAllData, putData, deleteData, addData } from '../db.js';
 import { escapeAttribute, escapeHTML } from '../utils/sanitize.js';
 import { renderTechnicalTitle } from './ui.js';
 import { renderStrengthManager } from './strengthManager.js';
+import { renderMobilityManager } from './mobilityManager.js';
+import { ACUPUNCTURE_HEAD_TYPES, normalizeAcupunctureHead } from '../utils/acupunctureUtils.js';
 import {
   calculateSequenceDuration,
   validateMeditationSequence,
@@ -100,6 +102,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
               <button id="tab-breathwork" class="btn-braun-tab ${activeTab === 'breathwork' ? 'active' : ''}">Respiración</button>
               <button id="tab-yoga" class="btn-braun-tab ${activeTab === 'yoga' ? 'active' : ''}">Yin Yoga</button>
               <button id="tab-strength" class="btn-braun-tab ${activeTab === 'strength' ? 'active' : ''}">Fuerza</button>
+              <button id="tab-mobility" class="btn-braun-tab ${activeTab === 'mobility' ? 'active' : ''}">Movilidad</button>
               <button id="tab-meditation" class="btn-braun-tab ${activeTab === 'meditation' ? 'active' : ''}">Meditación</button>
               <button id="tab-sessions" class="btn-braun-tab ${activeTab === 'sessions' ? 'active' : ''}">Sesiones</button>
               <button id="tab-synth" class="btn-braun-tab ${activeTab === 'synth' ? 'active' : ''}">Sintetizador</button>
@@ -121,6 +124,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
     layout.querySelector('#tab-breathwork').addEventListener('click', () => { activeTab = 'breathwork'; editingItem = null; refresh(); });
     layout.querySelector('#tab-yoga').addEventListener('click', () => { activeTab = 'yoga'; editingItem = null; refresh(); });
     layout.querySelector('#tab-strength').addEventListener('click', () => { activeTab = 'strength'; editingItem = null; refresh(); });
+    layout.querySelector('#tab-mobility').addEventListener('click', () => { activeTab = 'mobility'; editingItem = null; refresh(); });
     layout.querySelector('#tab-meditation').addEventListener('click', () => { activeTab = 'meditation'; editingItem = null; refresh(); });
     layout.querySelector('#tab-sessions').addEventListener('click', () => { activeTab = 'sessions'; editingItem = null; refresh(); });
     layout.querySelector('#tab-synth').addEventListener('click', () => { activeTab = 'synth'; editingItem = null; refresh(); });
@@ -144,6 +148,8 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
         console.error('[Syllabus] Error al renderizar Fuerza:', error);
         targetEl.innerHTML = '<p class="strength-manager__warning">No se pudo cargar el catálogo de Fuerza.</p>';
       });
+    } else if (activeTab === 'mobility') {
+      renderMobilityManager(targetEl, db).catch(error => { console.error('[Syllabus] Error al cargar Movilidad:', error); targetEl.textContent = 'No se pudo cargar el catálogo de Movilidad.'; });
     } else if (activeTab === 'meditation') {
       renderMeditationManager(targetEl);
     } else if (activeTab === 'sessions') {
@@ -210,9 +216,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
                 <div style="width:140px; display:flex; flex-direction:column; gap:4px;">
                   <label style="font-size:0.6rem; color:var(--color-text-muted); text-transform:uppercase;">Cabezal de Electro Pen</label>
                   <select id="acu-p-head" class="acu-select-flat" style="padding: 6px;">
-                    <option value="Esferoidal">Esferoidal (Ball)</option>
-                    <option value="Domo">Domo (Plano)</option>
-                    <option value="Nodo">Nodo (Sin Cabezal)</option>
+                    ${ACUPUNCTURE_HEAD_TYPES.map(head => `<option value="${escapeAttribute(head)}">${escapeHTML(head === 'Nodo' ? 'Nodo (punta)' : head)}</option>`).join('')}
                   </select>
                 </div>
                 <div style="width:100px; display:flex; flex-direction:column; gap:4px;">
@@ -274,7 +278,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
         layout.querySelector('#acu-p-name').value = editingItem.name || '';
         layout.querySelector('#acu-p-code').value = editingItem.code || '';
         layout.querySelector('#acu-p-trad-code').value = editingItem.traditional_code || '';
-        layout.querySelector('#acu-p-head').value = editingItem.headType || 'Esferoidal';
+        layout.querySelector('#acu-p-head').value = normalizeAcupunctureHead(editingItem.headType) || 'Esferoidal';
         layout.querySelector('#acu-p-dur').value = editingItem.duration || 120;
         layout.querySelector('#acu-p-loc').value = editingItem.location || '';
         layout.querySelector('#acu-p-benefits').value = editingItem.benefits || '';
@@ -388,7 +392,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
             <span style="font-family:var(--font-mono); color:var(--color-accent-red); font-size:0.75rem; font-weight:600;">
               ${escapeHTML(p.code)}${p.traditional_code && p.traditional_code !== p.code ? ` / ${escapeHTML(p.traditional_code)}` : ''}
             </span>
-            <span style="font-size:0.62rem; color:var(--color-text-muted); font-family:var(--font-mono); text-transform:uppercase;">${escapeHTML(p.headType)}</span>
+            <span style="font-size:0.62rem; color:var(--color-text-muted); font-family:var(--font-mono); text-transform:uppercase;">${escapeHTML(normalizeAcupunctureHead(p.headType))}</span>
           </div>
         </div>
         <div class="acu-point-card-content" style="display:none; padding:16px 0 0 0; margin-top:12px; border-top:1px dashed rgba(46,43,40,0.06); flex-direction:column; gap:10px;">
@@ -1502,9 +1506,11 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
               <td>Punta esférica estándar. Distribuye la estimulación TENS de forma profunda y concéntrica. Idóneo para la búsqueda de puntos gatillo y estímulo de contracción muscular.</td>
             </tr>
             <tr>
-              <td class="acu-head-name-col">Cabezal de Domo (Plano)</td>
+              <td class="acu-head-name-col">Cabezal Plano</td>
               <td>El cabezal plano o de cúpula ancha, ideal para dispersar la corriente, suavizar el estímulo en zonas muy sensibles (como la cara, el cuello o el pliegue transversal de la muñeca) y calmar el sistema nervioso de manera gentil.</td>
             </tr>
+            <tr><td class="acu-head-name-col">Cabezal Espátula</td><td>Accesorio de superficie ancha para trabajo de barrido.</td></tr>
+            <tr><td class="acu-head-name-col">Cabezal Rodillo</td><td>Accesorio rodante para trabajo sobre un área.</td></tr>
           </tbody>
         </table>
       </div>

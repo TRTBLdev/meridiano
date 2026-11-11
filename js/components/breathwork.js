@@ -6,7 +6,9 @@ import {
   createWakeLockController,
   requestTimerExitConfirmation,
   renderSynthPanel,
-  populateTimerDots
+  populateTimerDots,
+  renderTimerIcon,
+  getTimerElapsedMs
 } from './timerShell.js';
 import { createSynthEngine, playQuartzBowlRing } from '../utils/synth.js';
 import { getFreqLabel, valueToFreq, freqToValue } from '../utils/freqUtils.js';
@@ -374,10 +376,7 @@ export async function renderBreathworkScreen(container, db, onNavigate, orchestr
 
               <div class="timer-icon-control-group">
                 <button class="btn-acu-icon" id="btn-breath-skip" title="Saltar paso" ${canSkip ? '' : 'disabled'} style="width:48px; height:48px; display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer; ${canSkip ? '' : 'opacity:0.35; pointer-events:none;'}">
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <polygon points="4 3 13 12 4 21 4 3" fill="currentColor"></polygon>
-                    <line x1="17" y1="4" x2="17" y2="20"></line>
-                  </svg>
+                  ${renderTimerIcon('next')}
                 </button>
                 <span>Saltar</span>
               </div>
@@ -425,7 +424,7 @@ export async function renderBreathworkScreen(container, db, onNavigate, orchestr
     });
 
     function getElapsedMs() {
-      return isPaused ? phaseElapsedBeforePause : phaseElapsedBeforePause + (Date.now() - phaseStartTime);
+      return getTimerElapsedMs(phaseStartTime, phaseElapsedBeforePause, isPaused);
     }
 
     function updateDisplay() {

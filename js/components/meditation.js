@@ -7,7 +7,8 @@ import {
   createWakeLockController,
   requestTimerExitConfirmation,
   populateTimerDots,
-  renderSynthPanel
+  renderSynthPanel,
+  getTimerElapsedMs
 } from './timerShell.js';
 import { createSynthEngine, playQuartzBowlRing } from '../utils/synth.js';
 import { getFreqLabel, valueToFreq, freqToValue } from '../utils/freqUtils.js';
@@ -477,9 +478,7 @@ export async function renderMeditationScreen(container, db, onNavigate) {
 
 
 
-    const getElapsedMs = () => (
-      isPaused ? phaseElapsedBeforePause : phaseElapsedBeforePause + (Date.now() - phaseStartTime)
-    );
+    const getElapsedMs = () => getTimerElapsedMs(phaseStartTime, phaseElapsedBeforePause, isPaused);
 
     const getSequentialIndex = () => {
       const activeBlockIndex = blockBoundaries.findIndex(boundary => elapsedSeconds < boundary);

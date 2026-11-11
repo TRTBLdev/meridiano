@@ -6,6 +6,21 @@ import {
   freqToValue
 } from '../utils/freqUtils.js';
 
+const TIMER_ICONS = {
+  previous: '<polygon points="20 3 11 12 20 21 20 3" fill="currentColor"></polygon><line x1="7" y1="4" x2="7" y2="20"></line>',
+  next: '<polygon points="4 3 13 12 4 21 4 3" fill="currentColor"></polygon><line x1="17" y1="4" x2="17" y2="20"></line>',
+  restart: '<path d="M3 12a9 9 0 1 0 3-6.7"></path><polyline points="3 4 3 10 9 10"></polyline>'
+};
+
+export function renderTimerIcon(name) {
+  if (!TIMER_ICONS[name]) throw new RangeError(`Icono de temporizador desconocido: ${name}`);
+  return `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${TIMER_ICONS[name]}</svg>`;
+}
+
+export function getTimerElapsedMs(startedAt, elapsedBeforePause, paused, now = Date.now()) {
+  return elapsedBeforePause + (paused ? 0 : now - startedAt);
+}
+
 // Node expone navigator como getter de solo lectura; hacerlo reemplazable solo en
 // ese entorno mantiene los tests del controlador compatibles sin tocar el navegador.
 if (typeof process !== 'undefined' && process.versions?.node && typeof globalThis !== 'undefined') {

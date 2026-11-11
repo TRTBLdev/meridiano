@@ -59,13 +59,14 @@ export function renderCompoundSessionBlock(block, index, totalBlocks, presetsCat
         <button type="button" class="btn-action-icon delete-icon btn-remove-block" title="Eliminar bloque" aria-label="Eliminar bloque">${deleteIcon}</button>
       </div>
     </div>
-    ${invalidReason ? `<div class="compound-session-warning compound-session-warning--block" role="status">${escapeHTML(invalidReason)}. Puedes seleccionar otro circuito o eliminar este bloque.</div>` : ''}
+    ${invalidReason ? `<div class="compound-session-warning compound-session-warning--block" role="status">${escapeHTML(invalidReason)}. Puedes seleccionar otro preset o eliminar este bloque.</div>` : ''}
     <div class="compound-block__fields">
       <label class="compound-field compound-field--module">
         <span>Módulo</span>
         <select class="block-module-select acu-select-flat">
           <option value="breathwork" ${block.module === 'breathwork' ? 'selected' : ''}>Breathwork</option>
           <option value="strength" ${block.module === 'strength' ? 'selected' : ''}>Fuerza</option>
+          <option value="mobility" ${block.module === 'mobility' ? 'selected' : ''}>Movilidad</option>
           <option value="yoga" ${block.module === 'yoga' ? 'selected' : ''}>Yin Yoga</option>
           <option value="acupuncture" ${block.module === 'acupuncture' ? 'selected' : ''}>Acupuntura</option>
         </select>

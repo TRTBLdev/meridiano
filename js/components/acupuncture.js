@@ -8,12 +8,14 @@ import {
   requestTimerExitConfirmation,
   populateTimerDots,
   renderSynthPanel,
-  bindSynthPanel
+  bindSynthPanel,
+  renderTimerIcon,
+  getTimerElapsedMs
 } from './timerShell.js';
 import { createSynthEngine, playQuartzBowlRing } from '../utils/synth.js';
 import { getFreqLabel, valueToFreq, freqToValue } from '../utils/freqUtils.js';
-import { createAcupunctureTiming } from '../utils/acupunctureUtils.js';
-import { createModuleResult } from '../utils/sessionResults.js';
+import { createAcupunctureTiming, ACUPUNCTURE_HEAD_TYPES, normalizeAcupunctureHead, resolveAcupunctureHead, cleanAcupunctureStep, getAcupunctureControls, nextAcupuncturePhase } from '../utils/acupunctureUtils.js';
+import { createModuleResult, formatDurationSeconds } from '../utils/sessionResults.js';
 
 
 /**
@@ -240,7 +242,8 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
                     <span class="practice-timeline__index">${idx + 1}</span>
                     <div class="practice-timeline__body">
                       <span class="practice-timeline__title">${escapeHTML(pointData.name)} (${escapeHTML(pointData.code)}${pointData.traditional_code && pointData.traditional_code !== pointData.code ? ` / ${escapeHTML(pointData.traditional_code)}` : ''}) ${step.side ? `[Lado: ${escapeHTML(step.side)}]` : ''}</span>
-                      <span class="practice-timeline__meta">${escapeHTML(durationLabel)} estímulo + ${escapeHTML(step.transitionAfter)}s transición (${escapeHTML(pointData.headType)})${pointData.caution ? ` · Precaución: ${escapeHTML(pointData.caution)}` : ''}</span>
+                      <span class="practice-timeline__meta">${escapeHTML(durationLabel)} estímulo + ${escapeHTML(step.transitionAfter)}s transición (${escapeHTML(resolveAcupunctureHead(step, pointData))})${pointData.caution ? ` · Precaución: ${escapeHTML(pointData.caution)}` : ''}</span>
+                      ${step.notes ? `<span class="practice-timeline__meta">Técnica: ${escapeHTML(step.notes)}</span>` : ''}
                     </div>
                   </div>
                 `;
@@ -434,11 +437,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
     let selectedPointId = null;
 
     // Helper para formatear tiempo MM:SS
-    function formatTimeMMSS(seconds) {
-      const m = Math.floor(seconds / 60);
-      const s = seconds % 60;
-      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-    }
+    const formatTimeMMSS = formatDurationSeconds;
 
     // Reactividad de los sliders principales
     durSlider.addEventListener('input', () => {
@@ -632,8 +631,14 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
           <div class="acu-step-details" style="display:flex; flex-wrap:wrap; gap:16px; width:100%; align-items:center;">
             <div style="flex:2; min-width:140px; display:flex; flex-direction:column; gap:2px;">
               <span class="acu-step-point-title" style="font-size:0.85rem; font-weight:600;">${escapeHTML(pointData.name)} (${escapeHTML(pointData.code)}${pointData.traditional_code && pointData.traditional_code !== pointData.code ? ` / ${escapeHTML(pointData.traditional_code)}` : ''})</span>
-              <span style="font-size:0.6rem; color:var(--color-text-muted);">${escapeHTML(pointData.headType)}</span>
             </div>
+
+            <label class="acu-step-input-wrap" style="min-width:140px;"><span>Cabezal</span>
+              <select class="acu-select-flat select-head-change">
+                <option value="">Catálogo — ${escapeHTML(normalizeAcupunctureHead(pointData.headType))}</option>
+                ${ACUPUNCTURE_HEAD_TYPES.map(head => `<option value="${escapeAttribute(head)}" ${normalizeAcupunctureHead(step.headTypeOverride) === head ? 'selected' : ''}>${escapeHTML(head === 'Nodo' ? 'Nodo (punta)' : head)}</option>`).join('')}
+              </select>
+            </label>
 
             <!-- Cambio de lado directo -->
             <div class="acu-step-input-wrap" style="width:90px;">
@@ -662,6 +667,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
               </div>
               <input type="range" class="step-transition-slider tuner-slider" min="0" max="60" step="5" value="${step.transitionAfter}" style="margin: 4px 0;">
             </div>
+            <label class="acu-step-input-wrap" style="flex-basis:100%;"><span>Técnica / recorrido</span><textarea class="acu-input-flat step-notes" rows="2" placeholder="Ej. Barrido desde la nuca hacia el acromion">${escapeHTML(step.notes || '')}</textarea></label>
           </div>
 
           <!-- Borrar paso (X simple sin bordes) -->
@@ -692,6 +698,8 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
         stepEl.querySelector('.select-side-change').addEventListener('change', (e) => {
           step.side = e.target.value === 'none' ? null : e.target.value;
         });
+        stepEl.querySelector('.select-head-change').addEventListener('change', e => { step.headTypeOverride = e.target.value || null; });
+        stepEl.querySelector('.step-notes').addEventListener('input', e => { step.notes = e.target.value; });
 
         const stepDurSlider = stepEl.querySelector('.step-duration-slider');
         const stepDurReadout = stepEl.querySelector('.step-duration-readout');
@@ -774,6 +782,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
       currentSequence.description = desc;
       currentSequence.suggestedFreq = currentSequence.suggestedFreq || 6.0; // por defecto Theta
       currentSequence.baseFreq = currentSequence.baseFreq || 432;
+      currentSequence.points = currentSequence.points.map(cleanAcupunctureStep);
 
       try {
         await putData(db, 'acupuncture_sequences', currentSequence);
@@ -832,6 +841,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
           
           <!-- Detalles de texto -->
           <div class="acu-panel-info-box" style="margin-bottom: 16px; background: none; padding: 8px 0; gap: 8px; border: none; border-top: 1px dashed rgba(46, 43, 40, 0.1);">
+            <div id="timer-step-notes-block" class="acu-step-notes-highlight" hidden><div class="acu-panel-info-label">Técnica / recorrido</div><div id="timer-step-notes" class="acu-panel-info-text"></div></div>
             <div>
               <div class="acu-panel-info-label">Ubicación</div>
               <div class="acu-panel-info-text" id="timer-point-location" style="font-size: 0.75rem;">Cargando...</div>
@@ -858,7 +868,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
           <!-- Controles de Timer (Iniciar/Pausar, Saltar, Detener con Iconos SVG) -->
           <div class="timer-icon-controls">
             <div class="timer-icon-control-group">
-              <button class="btn-acu-icon" id="btn-timer-prev" aria-label="Paso anterior" title="Paso anterior" disabled style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;opacity:.35;pointer-events:none;"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 5v14l10-7z"></path><rect x="18" y="5" width="2" height="14"></rect></svg></button>
+              <button class="btn-acu-icon" id="btn-timer-prev" aria-label="Paso anterior" title="Paso anterior" disabled>${renderTimerIcon('previous')}</button>
             </div>
             <div class="timer-icon-control-group">
               <button class="btn-acu-icon btn-acu-active" id="btn-timer-play" title="Iniciar sesion" style="width:48px; height:48px; display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer;">
@@ -870,16 +880,11 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
             </div>
 
             <div class="timer-icon-control-group">
-              <button class="btn-acu-icon" id="btn-timer-skip" title="Saltar paso" style="width:48px; height:48px; display:flex; align-items:center; justify-content:center; opacity:0.35; pointer-events:none; cursor:pointer;">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <polygon points="4 3 13 12 4 21 4 3" fill="currentColor"></polygon>
-                  <line x1="17" y1="4" x2="17" y2="20"></line>
-                </svg>
-              </button>
+              <button class="btn-acu-icon" id="btn-timer-skip" aria-label="Saltar fase" title="Saltar fase" disabled>${renderTimerIcon('next')}</button>
               <span>Saltar</span>
             </div>
             <div class="timer-icon-control-group">
-              <button class="btn-acu-icon" id="btn-timer-restart" aria-label="Reiniciar paso" title="Reiniciar paso" style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"></path><polyline points="3 4 3 10 9 10"></polyline></svg></button>
+              <button class="btn-acu-icon" id="btn-timer-restart" aria-label="Reiniciar paso" title="Reiniciar paso" disabled>${renderTimerIcon('restart')}</button>
             </div>
 
             <div class="timer-icon-control-group">
@@ -906,6 +911,8 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
     const pointMeridian = timerScreen.querySelector('#timer-point-meridian');
     const pointHead = timerScreen.querySelector('#timer-point-head');
     const pointLocation = timerScreen.querySelector('#timer-point-location');
+    const notesBlock = timerScreen.querySelector('#timer-step-notes-block');
+    const notesText = timerScreen.querySelector('#timer-step-notes');
     const pointBenefits = timerScreen.querySelector('#timer-point-benefits');
     const pointCaution = timerScreen.querySelector('#timer-point-caution');
     const countdownMatrix = timerScreen.querySelector('#timer-countdown-matrix');
@@ -923,6 +930,10 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
       const point = catalogPoints.find(p => p.id === step.pointId);
 
       const isTransition = activeState === 'transition';
+      syncTimerControls();
+      const notes = !isTransition && typeof step.notes === 'string' ? step.notes.trim() : '';
+      notesText.textContent = notes;
+      notesBlock.hidden = !notes;
 
       if (isTransition) {
         stateBadge.textContent = 'Cambio de Punto';
@@ -938,7 +949,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
         pointMeridian.textContent = 'Transición y Cambio de Cabezal';
 
         if (nextPoint) {
-          pointHead.textContent = `Siguiente Cabezal: ${nextPoint.headType}`;
+          pointHead.textContent = `Siguiente Cabezal: ${resolveAcupunctureHead(nextStep, nextPoint)}`;
           pointLocation.textContent = `Prepárate para colocar el electro-pen en el punto: ${nextPoint.name} (${nextPoint.code}${nextPoint.traditional_code && nextPoint.traditional_code !== nextPoint.code ? ` / ${nextPoint.traditional_code}` : ''}). Ubicado en: ${nextPoint.location}`;
           pointBenefits.textContent = `Limpia la zona y aplica gel conductor en la nueva ubicación. Configura la pluma al nivel 1.`;
           if (pointCaution) pointCaution.textContent = nextPoint.caution ? `Precaución: ${nextPoint.caution}` : '';
@@ -956,7 +967,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
           pointCode.textContent = point.traditional_code && point.traditional_code !== point.code ? `${point.code} / ${point.traditional_code}` : point.code;
           pointName.textContent = `${point.name} ${step.side ? `(${step.side})` : ''}`;
           pointMeridian.textContent = point.meridian || 'Canal Energético';
-          pointHead.textContent = `Cabezal Sugerido: ${point.headType}`;
+          pointHead.textContent = `Cabezal Sugerido: ${resolveAcupunctureHead(step, point)}`;
           pointLocation.textContent = point.location;
           pointBenefits.textContent = point.benefits;
           if (pointCaution) pointCaution.textContent = point.caution ? `Precaución: ${point.caution}` : '';
@@ -1045,56 +1056,32 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
 
     // Formatear el contador digital usando dotmatrix.js
     function updateCountdownDisplay() {
-      const mins = String(Math.floor(activeTimeLeft / 60)).padStart(2, '0');
-      const secs = String(activeTimeLeft % 60).padStart(2, '0');
-      const timeString = `${mins}:${secs}`;
+      const timeString = formatDurationSeconds(activeTimeLeft);
 
       // Dibujar usando renderDotMatrix en el contenedor
       renderDotMatrix(countdownMatrix, timeString);
     }
 
-    // Lógica del Reloj
+    function advancePhase() {
+      const next = nextAcupuncturePhase(currentSequence, activeSeqIndex, activeState);
+      playQuartzBowlRing();
+      if (!next) { finishSequence(); return; }
+      activeSeqIndex = next.index;
+      activeState = next.state;
+      activeTimeLeft = next.duration;
+      activeStepDuration = next.duration;
+      phaseStartTime = Date.now();
+      phaseElapsedBeforePause = 0;
+      syncTimerDisplay();
+      updateCountdownDisplay();
+    }
+
     function tick() {
       if (isTimerPaused) return;
-
       activeTimeLeft--;
       elapsedSeconds++;
-      updateCountdownDisplay();
-
-      if (activeTimeLeft <= 0) {
-        // Tocar campana tibetana corta al cambiar de fase
-        playQuartzBowlRing();
-
-        const step = currentSequence.points[activeSeqIndex];
-
-        if (activeState === 'stimulating' && step.transitionAfter > 0 && activeSeqIndex < currentSequence.points.length - 1) {
-          // Entrar en fase de transición
-          activeState = 'transition';
-          activeTimeLeft = step.transitionAfter;
-          activeStepDuration = step.transitionAfter;
-          phaseStartTime = Date.now();
-          phaseElapsedBeforePause = 0;
-          syncTimerDisplay();
-          updateCountdownDisplay();
-        } else {
-          // Ir al siguiente paso o terminar
-          activeSeqIndex++;
-          if (activeSeqIndex >= currentSequence.points.length) {
-            // Completado con éxito
-            finishSequence();
-          } else {
-            // Cargar siguiente punto
-            const nextStep = currentSequence.points[activeSeqIndex];
-            activeState = 'stimulating';
-            activeTimeLeft = nextStep.duration;
-            activeStepDuration = nextStep.duration;
-            phaseStartTime = Date.now();
-            phaseElapsedBeforePause = 0;
-            syncTimerDisplay();
-            updateCountdownDisplay();
-          }
-        }
-      }
+      if (activeTimeLeft <= 0) advancePhase();
+      else updateCountdownDisplay();
     }
 
     const cleanupTimer = async () => {
@@ -1151,10 +1138,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
     // Obtener tiempo transcurrido exacto en milisegundos
     function getElapsedMs() {
       if (!isSessionStarted) return 0;
-      if (isTimerPaused) {
-        return phaseElapsedBeforePause;
-      }
-      return phaseElapsedBeforePause + (Date.now() - phaseStartTime);
+      return getTimerElapsedMs(phaseStartTime, phaseElapsedBeforePause, isTimerPaused);
     }
 
     function animationLoop() {
@@ -1172,11 +1156,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
       isTimerPaused = false;
       phaseStartTime = Date.now();
       phaseElapsedBeforePause = 0;
-      btnSkip.style.opacity = '1';
-      btnSkip.style.pointerEvents = 'auto';
-      btnPrev.disabled = false;
-      btnPrev.style.opacity = '1';
-      btnPrev.style.pointerEvents = 'auto';
+      syncTimerControls();
       if (lblFlow) lblFlow.textContent = 'Pausar';
       btnPlay.title = 'Pausar sesion';
       btnPlay.innerHTML = `
@@ -1247,11 +1227,17 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
       }
     });
 
-    // Saltar paso
+    function syncTimerControls() {
+      const controls = getAcupunctureControls(isSessionStarted, activeSeqIndex);
+      btnPrev.disabled = !controls.previous;
+      btnSkip.disabled = !controls.next;
+      btnRestart.disabled = !controls.restart;
+    }
+
+    // Saltar la fase actual sin contar tiempo artificial y sin reanudar la pausa.
     btnSkip.addEventListener('click', () => {
       if (!isSessionStarted) return;
-      activeTimeLeft = 0;
-      tick();
+      advancePhase();
     });
     const resetPoint = index => {
       activeSeqIndex = Math.max(0, Math.min(index, currentSequence.points.length - 1));
