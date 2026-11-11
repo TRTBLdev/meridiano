@@ -1,11 +1,20 @@
 import { getAllData, putData, deleteData, addData } from '../db.js';
 import { escapeHTML, escapeAttribute } from '../utils/sanitize.js';
-import { createWakeLockController, createTimerShell, requestTimerExitConfirmation } from './timerShell.js';
+import { createWakeLockController, createTimerShell, requestTimerExitConfirmation, renderTimerIcon } from './timerShell.js';
 import { renderTechniqueDetails } from './techniqueDetails.js';
-import { renderLobbyAction, renderLobbyShell } from './lobbyUi.js';
+import { renderLobbyAction, renderLobbyShell, renderPracticeRow } from './lobbyUi.js';
+import { renderTechnicalTitle } from './ui.js';
+import { renderDotMatrix } from '../utils/dotmatrix.js';
 import { playQuartzBowlRing } from '../utils/synth.js';
 import { createModuleResult, formatDurationSeconds } from '../utils/sessionResults.js';
 import { MOBILITY_MODES, MOBILITY_MODE_LABELS, MOBILITY_SIDES, MOBILITY_SIDE_LABELS, validateMobilityRoutine, buildMobilityPhases, estimateMobilityDuration, recordMobilityEntry } from '../utils/mobilityUtils.js';
+
+const playIcon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><polygon points="5 3 19 12 5 21"></polygon></svg>';
+const pauseIcon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="3" height="16" rx="1"></rect><rect x="15" y="4" width="3" height="16" rx="1"></rect></svg>';
+
+export function renderMobilityTimerContent() {
+  return `<div class="mobility-timer-panel"><button class="mobility-timer__exit" id="mobility-exit" type="button" aria-label="Salir sin guardar" title="Salir sin guardar">×</button><div id="mobility-phase"></div><div id="mobility-clock" class="mobility-clock acu-timer-dot-display" role="timer" aria-label="Tiempo del paso"></div><div id="mobility-technique"></div><div class="timer-icon-controls mobility-controls"><button class="btn-acu-icon" id="mobility-prev" type="button" aria-label="Paso anterior" title="Paso anterior">${renderTimerIcon('previous')}</button><button class="btn-acu-icon btn-acu-active" id="mobility-play" type="button" aria-label="Iniciar" title="Iniciar">${playIcon}</button><button class="btn-acu-icon" id="mobility-skip" type="button" aria-label="Saltar fase" title="Saltar fase">${renderTimerIcon('next')}</button><button class="btn-acu-icon" id="mobility-restart" type="button" aria-label="Reiniciar paso" title="Reiniciar paso">${renderTimerIcon('restart')}</button></div><button class="strength-manager__text-action mobility-complete" id="mobility-complete" type="button">Completar paso</button></div>`;
+}
 
 export async function renderMobilityScreen(container, db, onNavigate, orchestratorConfig = null) {
   let exercises = await getAllData(db, 'mobility_exercises');
@@ -13,19 +22,23 @@ export async function renderMobilityScreen(container, db, onNavigate, orchestrat
   let draft = null;
   const wake = createWakeLockController();
   const options = (values, labels, selected) => values.map(value => `<option value="${value}" ${selected === value ? 'selected' : ''}>${labels[value]}</option>`).join('');
-  const shell = (title, body) => `<div class="dashboard-layout fade-in"><nav class="nav-bar"><div class="nav-logo dot-digital">M.</div><button class="mobility-action" id="mobility-back">Volver</button></nav><main class="main-viewport"><div class="viewport-inner mobility-page"><h1>${title}</h1>${body}</div></main></div>`;
+  const shell = (title, body) => `<div class="dashboard-layout fade-in"><nav class="nav-bar"><div class="nav-logo dot-digital">M.</div><button class="nav-item mobility-back" id="mobility-back" type="button" aria-label="Volver">← Volver</button></nav><main class="main-viewport"><div class="viewport-inner mobility-page">${renderTechnicalTitle(title)}${body}</div></main></div>`;
 
   async function reload() { exercises = await getAllData(db, 'mobility_exercises'); routines = await getAllData(db, 'mobility_routines'); }
   function lobby() {
-    container.innerHTML = renderLobbyShell({ title: 'Movilidad', action: renderLobbyAction({ kind: 'text', label: '+ Crear rutina', id: 'mobility-create' }), variant: 'list', content: '<div id="mobility-routines"></div>' });
+    container.innerHTML = renderLobbyShell({ title: 'Movilidad', action: renderLobbyAction({ kind: 'text', label: '+ Crear rutina', id: 'mobility-create' }), variant: 'list', content: '<div id="mobility-routines" class="practice-list"></div>' });
     container.querySelector('#btn-back-home').onclick = () => onNavigate('inicio');
     container.querySelector('#mobility-create').onclick = () => { draft = { id: `mobility-routine-${Date.now()}`, name: '', description: '', steps: [] }; builder(); };
     const list = container.querySelector('#mobility-routines');
-    if (!routines.length) list.innerHTML = '<p>No hay rutinas. Crea ejercicios en Base de Datos y construye una rutina aquí.</p>';
+    if (!routines.length) list.innerHTML = '<p class="lobby-empty">No hay rutinas. Crea ejercicios en Base de Datos y construye una rutina aquí.</p>';
     routines.forEach(routine => {
       const issue = validateMobilityRoutine(routine, exercises);
-      const row = document.createElement('article'); row.className = 'mobility-list-item';
-      row.innerHTML = `<div><strong>${escapeHTML(routine.name)}</strong><p>${escapeHTML(routine.description || '')}</p><small>${routine.steps?.length || 0} pasos · ${Math.ceil(estimateMobilityDuration(routine) / 60)} min estimados ${issue ? `· ${escapeHTML(issue)}` : ''}</small></div><div><button class="mobility-action play" ${issue ? 'disabled' : ''}>Iniciar</button><button class="mobility-action edit">Editar</button><button class="mobility-action remove">Eliminar</button></div>`;
+      const staging = document.createElement('div');
+      const actions = renderLobbyAction({ kind: 'icon', icon: 'play', label: 'Iniciar rutina', className: 'play', disabled: Boolean(issue) });
+      const details = `<p class="practice-row__description">${escapeHTML(routine.description || '')}</p>${issue ? `<p class="strength-manager__warning">${escapeHTML(issue)}</p>` : ''}<div class="practice-row__actions">${renderLobbyAction({ kind: 'icon', icon: 'edit', label: 'Editar rutina', className: 'edit' })}${renderLobbyAction({ kind: 'icon', icon: 'delete', label: 'Eliminar rutina', className: 'remove' })}</div>`;
+      staging.innerHTML = renderPracticeRow({ title: routine.name, metadata: `${routine.steps?.length || 0} pasos`, duration: `${Math.ceil(estimateMobilityDuration(routine) / 60)} min`, details, actions, state: issue ? 'invalid' : '' });
+      const row = staging.firstElementChild;
+      row.querySelector('.practice-row__expand').onclick = event => { const expanded = row.classList.toggle('is-expanded'); event.currentTarget.setAttribute('aria-expanded', String(expanded)); event.currentTarget.querySelector('.disclosure-mark').textContent = expanded ? '−' : '+'; row.querySelector('.practice-row__details').hidden = !expanded; };
       row.querySelector('.play').onclick = () => timer(routine);
       row.querySelector('.edit').onclick = () => { draft = structuredClone(routine); builder(); };
       row.querySelector('.remove').onclick = async () => {
@@ -40,7 +53,7 @@ export async function renderMobilityScreen(container, db, onNavigate, orchestrat
   }
 
   function builder() {
-    container.innerHTML = shell('Constructor de movilidad', `<div class="mobility-form"><label class="mobility-wide">Nombre<input id="routine-name" class="acu-input-flat" value="${escapeAttribute(draft.name)}"></label><label class="mobility-wide">Descripción<textarea id="routine-description" class="acu-input-flat">${escapeHTML(draft.description || '')}</textarea></label></div><div id="mobility-steps"></div><div class="mobility-add"><select id="mobility-add-select" class="acu-select-flat"><option value="">Seleccionar ejercicio</option>${exercises.map(e => `<option value="${escapeAttribute(e.id)}">${escapeHTML(e.name)}</option>`).join('')}</select><button class="mobility-action" id="mobility-add">+ Añadir paso</button></div><p id="mobility-estimate"></p><button class="mobility-action" id="mobility-save">Guardar rutina</button>`);
+    container.innerHTML = shell('Constructor de movilidad', `<div class="mobility-form"><label class="mobility-wide">Nombre<input id="routine-name" class="acu-input-flat" value="${escapeAttribute(draft.name)}"></label><label class="mobility-wide">Descripción<textarea id="routine-description" class="acu-input-flat">${escapeHTML(draft.description || '')}</textarea></label></div><div id="mobility-steps"></div><div class="mobility-add"><select id="mobility-add-select" class="acu-select-flat"><option value="">Seleccionar ejercicio</option>${exercises.map(e => `<option value="${escapeAttribute(e.id)}">${escapeHTML(e.name)}</option>`).join('')}</select><button class="strength-manager__text-action" id="mobility-add">+ Añadir paso</button></div><p id="mobility-estimate" class="mobility-estimate"></p><button class="strength-manager__text-action" id="mobility-save">Guardar rutina</button>`);
     container.querySelector('#mobility-back').onclick = lobby;
     container.querySelector('#routine-name').oninput = e => { draft.name = e.target.value; };
     container.querySelector('#routine-description').oninput = e => { draft.description = e.target.value; };
@@ -49,7 +62,7 @@ export async function renderMobilityScreen(container, db, onNavigate, orchestrat
       draft.steps.forEach((step, index) => {
         const exercise = exercises.find(e => e.id === step.exerciseId);
         const row = document.createElement('section'); row.className = 'mobility-step';
-        row.innerHTML = `<div class="mobility-step-header"><strong>${index + 1}. ${escapeHTML(exercise?.name || 'Ejercicio no disponible')}</strong><div><button class="mobility-action up" ${index === 0 ? 'disabled' : ''}>↑</button><button class="mobility-action down" ${index === draft.steps.length - 1 ? 'disabled' : ''}>↓</button><button class="mobility-action remove">Quitar</button></div></div><div class="mobility-form"><label>Modo<select class="acu-select-flat mode">${options(MOBILITY_MODES, MOBILITY_MODE_LABELS, step.mode)}</select></label><label>Objetivo (segundos o repeticiones)<input class="acu-input-flat target" type="number" min="1" step="1" value="${escapeAttribute(step.targetValue)}"></label><label>Lado<select class="acu-select-flat side">${options(MOBILITY_SIDES, MOBILITY_SIDE_LABELS, step.side)}</select></label><label>Transición posterior (s)<input class="acu-input-flat transition" type="number" min="0" step="1" value="${escapeAttribute(step.transitionAfter)}"></label><label class="mobility-wide">Notas<textarea class="acu-input-flat notes" rows="2">${escapeHTML(step.notes || '')}</textarea></label></div>`;
+        row.innerHTML = `<div class="mobility-step-header"><strong>${index + 1}. ${escapeHTML(exercise?.name || 'Ejercicio no disponible')}</strong><div><button class="mobility-action up" type="button" aria-label="Subir paso" ${index === 0 ? 'disabled' : ''}>↑</button><button class="mobility-action down" type="button" aria-label="Bajar paso" ${index === draft.steps.length - 1 ? 'disabled' : ''}>↓</button>${renderLobbyAction({ kind: 'icon', icon: 'delete', label: 'Quitar paso', className: 'remove' })}</div></div><div class="mobility-form"><label>Modo<select class="acu-select-flat mode">${options(MOBILITY_MODES, MOBILITY_MODE_LABELS, step.mode)}</select></label><label>Objetivo (segundos o repeticiones)<input class="acu-input-flat target" type="number" min="1" step="1" value="${escapeAttribute(step.targetValue)}"></label><label>Lado<select class="acu-select-flat side">${options(MOBILITY_SIDES, MOBILITY_SIDE_LABELS, step.side)}</select></label><label>Transición posterior (s)<input class="acu-input-flat transition" type="number" min="0" step="1" value="${escapeAttribute(step.transitionAfter)}"></label><label class="mobility-wide">Notas<textarea class="acu-input-flat notes" rows="2">${escapeHTML(step.notes || '')}</textarea></label></div>`;
         row.querySelector('.up').onclick = () => { [draft.steps[index - 1], draft.steps[index]] = [draft.steps[index], draft.steps[index - 1]]; renderSteps(); };
         row.querySelector('.down').onclick = () => { [draft.steps[index + 1], draft.steps[index]] = [draft.steps[index], draft.steps[index + 1]]; renderSteps(); };
         row.querySelector('.remove').onclick = () => { draft.steps.splice(index, 1); renderSteps(); };
@@ -66,7 +79,7 @@ export async function renderMobilityScreen(container, db, onNavigate, orchestrat
   function timer(routine) {
     const issue = validateMobilityRoutine(routine, exercises); if (issue) { alert(issue); if (!orchestratorConfig) lobby(); return; }
     const phases = buildMobilityPhases(routine, exercises); let index = 0; let shownIndex = -1; let entries = []; let running = false; let started = false; let elapsed = 0; let phaseElapsed = 0; let lastTick = 0; let interval = null; let finishing = false;
-    const root = createTimerShell({ gridId: 'mobility-timer-grid', className: 'mobility-timer', content: `<div class="mobility-timer-panel"><div id="mobility-phase"></div><div id="mobility-clock" class="mobility-clock"></div><div id="mobility-technique"></div><div class="mobility-controls"><button id="mobility-prev">Anterior</button><button id="mobility-play">Iniciar</button><button id="mobility-restart">Reiniciar</button><button id="mobility-complete">Completar paso</button><button id="mobility-skip">Saltar</button><button id="mobility-exit">Salir</button></div></div>` });
+    const root = createTimerShell({ gridId: 'mobility-timer-grid', className: 'mobility-timer', content: renderMobilityTimerContent() });
     container.innerHTML = ''; container.appendChild(root);
     const phaseEl = root.querySelector('#mobility-phase'); const clockEl = root.querySelector('#mobility-clock'); const techniqueEl = root.querySelector('#mobility-technique'); const play = root.querySelector('#mobility-play'); const complete = root.querySelector('#mobility-complete');
     const phaseDuration = phase => phase.type === 'transition' ? phase.duration : phase.step.mode === 'repetitions' ? null : Number(phase.step.targetValue);
@@ -77,9 +90,12 @@ export async function renderMobilityScreen(container, db, onNavigate, orchestrat
         techniqueEl.innerHTML = phase.type === 'exercise' ? renderTechniqueDetails({ open: true, sections: [{ title: 'Enfoque', content: phase.exercise.focus }, { title: 'Preparación', content: phase.exercise.preparation }, { title: 'Ejecución', content: phase.exercise.execution }, { title: 'Precauciones', content: phase.exercise.precautions }] }) : '';
         shownIndex = index;
       }
-      clockEl.textContent = formatDurationSeconds(duration === null ? phaseElapsed : Math.max(0, duration - phaseElapsed));
+      const clockValue = formatDurationSeconds(duration === null ? phaseElapsed : Math.max(0, duration - phaseElapsed));
+      if (clockEl.dataset.value !== clockValue) { renderDotMatrix(clockEl, clockValue); clockEl.dataset.value = clockValue; clockEl.setAttribute('aria-label', `Tiempo del paso ${clockValue}`); }
       complete.disabled = !started || phase.type !== 'exercise'; root.querySelector('#mobility-skip').disabled = !started; root.querySelector('#mobility-prev').disabled = !started || index === 0; root.querySelector('#mobility-restart').disabled = !started;
-      play.textContent = !started ? 'Iniciar' : running ? 'Pausar' : 'Continuar';
+      const playLabel = !started ? 'Iniciar' : running ? 'Pausar' : 'Continuar';
+      play.innerHTML = running ? pauseIcon : playIcon;
+      play.setAttribute('aria-label', playLabel); play.title = playLabel;
     }
     function capture() { if (!running) return; const now = Date.now(); const delta = Math.max(0, (now - lastTick) / 1000); lastTick = now; elapsed += delta; phaseElapsed += delta; }
     async function finish() {
@@ -88,7 +104,7 @@ export async function renderMobilityScreen(container, db, onNavigate, orchestrat
       if (orchestratorConfig?.onComplete) { orchestratorConfig.onComplete(result); return; }
       try { await addData(db, 'sessions_log', { type: 'mobility', sessionId: routine.id, tags: ['mobility'], date: new Date().toISOString(), duration: Math.max(1, Math.round(elapsed / 60)), activeDurationSeconds: Math.round(elapsed), notes: `Rutina de movilidad completada: ${routine.name}.`, details: `Movilidad: ${routine.name}`, mobilityResult: result }); }
       catch (error) { console.error('[Mobility] Error al guardar historial:', error); alert('La rutina terminó, pero no se pudo guardar en el historial.'); }
-      container.innerHTML = shell('Rutina completada', `<p>${escapeHTML(routine.name)} · ${formatDurationSeconds(elapsed)}</p><button id="mobility-done" class="mobility-action">Volver a Movilidad</button>`); container.querySelector('#mobility-back').onclick = lobby; container.querySelector('#mobility-done').onclick = lobby;
+      container.innerHTML = shell('Rutina completada', `<p class="mobility-estimate">${escapeHTML(routine.name)} · ${formatDurationSeconds(elapsed)}</p><button id="mobility-done" class="strength-manager__text-action">Volver a Movilidad</button>`); container.querySelector('#mobility-back').onclick = lobby; container.querySelector('#mobility-done').onclick = lobby;
     }
     function advance(status = 'completed') {
       const phase = phases[index]; if (phase.type === 'exercise') entries = recordMobilityEntry(entries, phase, status, phaseElapsed);

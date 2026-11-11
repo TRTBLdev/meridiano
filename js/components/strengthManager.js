@@ -5,6 +5,7 @@ import {
   putData
 } from '../db.js';
 import { escapeAttribute, escapeHTML } from '../utils/sanitize.js';
+import { setAccordionExpanded } from './ui.js';
 import {
   deriveCircuitEquipment,
   estimateStrengthCircuitDuration,
@@ -87,7 +88,7 @@ export async function renderStrengthManager(container, db) {
     target.innerHTML = `
       <div class="strength-manager__accordion">
         <button type="button" class="strength-manager__accordion-trigger" id="strength-toggle-exercise-form" aria-expanded="${exerciseFormOpen}">
-          <span>${editingExercise ? '✎ EDITAR EJERCICIO' : '+ REGISTRAR EJERCICIO'}</span>
+          <span>${editingExercise ? 'EDITAR EJERCICIO' : 'REGISTRAR EJERCICIO'}</span>
           <span class="disclosure-mark" aria-hidden="true">${exerciseFormOpen ? '−' : '+'}</span>
         </button>
         <div class="strength-manager__accordion-body" style="display:${exerciseFormOpen ? 'block' : 'none'}">
@@ -114,8 +115,11 @@ export async function renderStrengthManager(container, db) {
 
     target.querySelector('#strength-toggle-exercise-form').addEventListener('click', () => {
       exerciseFormOpen = !exerciseFormOpen;
-      renderExercises();
+      const body = target.querySelector('.strength-manager__accordion-body');
+      body.style.display = '';
+      setAccordionExpanded(target.querySelector('#strength-toggle-exercise-form'), body, exerciseFormOpen);
     });
+    setAccordionExpanded(target.querySelector('#strength-toggle-exercise-form'), target.querySelector('.strength-manager__accordion-body'), exerciseFormOpen);
 
     const modeSelect = target.querySelector('#strength-ex-mode');
     if (editingExercise) {
@@ -216,7 +220,7 @@ export async function renderStrengthManager(container, db) {
     target.innerHTML = `
       <div class="strength-manager__accordion">
         <button type="button" class="strength-manager__accordion-trigger" id="strength-toggle-circuit-form" aria-expanded="${circuitFormOpen}">
-          <span>${editingCircuit ? '✎ EDITAR CIRCUITO' : '+ CREAR CIRCUITO'}</span>
+          <span>${editingCircuit ? 'EDITAR CIRCUITO' : 'CREAR CIRCUITO'}</span>
           <span class="disclosure-mark" aria-hidden="true">${circuitFormOpen ? '−' : '+'}</span>
         </button>
         <div class="strength-manager__accordion-body" style="display:${circuitFormOpen ? 'block' : 'none'}">
@@ -250,8 +254,11 @@ export async function renderStrengthManager(container, db) {
 
     target.querySelector('#strength-toggle-circuit-form').addEventListener('click', () => {
       circuitFormOpen = !circuitFormOpen;
-      renderCircuits();
+      const body = target.querySelector('.strength-manager__accordion-body');
+      body.style.display = '';
+      setAccordionExpanded(target.querySelector('#strength-toggle-circuit-form'), body, circuitFormOpen);
     });
+    setAccordionExpanded(target.querySelector('#strength-toggle-circuit-form'), target.querySelector('.strength-manager__accordion-body'), circuitFormOpen);
 
     if (editingCircuit) {
       target.querySelector('#strength-circuit-name').value = editingCircuit.name || '';

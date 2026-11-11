@@ -1,6 +1,6 @@
 import { getAllData, putData, deleteData, addData } from '../db.js';
 import { escapeAttribute, escapeHTML } from '../utils/sanitize.js';
-import { renderTechnicalTitle } from './ui.js';
+import { renderTechnicalTitle, setAccordionExpanded } from './ui.js';
 import { renderStrengthManager } from './strengthManager.js';
 import { renderMobilityManager } from './mobilityManager.js';
 import { ACUPUNCTURE_HEAD_TYPES, normalizeAcupunctureHead } from '../utils/acupunctureUtils.js';
@@ -179,16 +179,13 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
     const subContentEl = container.querySelector('#acupuncture-sub-content');
 
     if (activeAcuSubTab === 'points') {
-      if (editingItem && editingStore === 'acupuncture_points') {
-        isPointFormOpen = true;
-      }
 
       // --- SUB-PESTAÑA PUNTOS ---
       subContentEl.innerHTML = `
         <!-- Acordeón Formulario para Agregar/Editar Punto Extra -->
         <div style="margin-bottom: 24px;">
           <button id="btn-toggle-point-form" type="button" style="background:transparent; border:none; border-bottom:1px solid rgba(46,43,40,0.12); width:100%; text-align:left; padding:10px 0; font-family:var(--font-digital); font-size:0.78rem; font-weight:600; cursor:pointer; color:var(--color-text-main); display:flex; justify-content:space-between; align-items:center;">
-            <span>${editingItem && editingStore === 'acupuncture_points' ? '✏ EDITAR PUNTO EXTRA' : '+ AGREGAR NUEVO PUNTO EXTRA'}</span>
+            <span>${editingItem && editingStore === 'acupuncture_points' ? 'EDITAR PUNTO EXTRA' : 'AGREGAR NUEVO PUNTO EXTRA'}</span>
             <span id="point-form-icon" class="disclosure-mark" aria-hidden="true">${isPointFormOpen ? '−' : '+'}</span>
           </button>
 
@@ -267,11 +264,10 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
         toggleBtn.addEventListener('click', () => {
           isPointFormOpen = !isPointFormOpen;
           const body = layout.querySelector('#point-form-accordion-body');
-          const icon = layout.querySelector('#point-form-icon');
-          if (body) body.style.display = isPointFormOpen ? 'block' : 'none';
-          if (icon) icon.textContent = isPointFormOpen ? '−' : '+';
+          if (body) { body.style.display = ''; setAccordionExpanded(toggleBtn, body, isPointFormOpen); }
         });
       }
+      setAccordionExpanded(toggleBtn, layout.querySelector('#point-form-accordion-body'), isPointFormOpen);
 
       // Cargar valores si estamos editando
       if (editingItem && editingStore === 'acupuncture_points') {
@@ -495,15 +491,12 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
      MÓDULO 2: RESPIRACIÓN (BREATHWORK)
      ========================================================================= */
   function renderBreathworkManager(container) {
-    if (editingItem && editingStore === 'breathwork_patterns') {
-      isBreathFormOpen = true;
-    }
 
     container.innerHTML = `
       <!-- Acordeón Formulario para Registrar/Editar Técnica de Respiración -->
       <div style="margin-bottom: 24px;">
         <button id="btn-toggle-breath-form" type="button" style="background:transparent; border:none; border-bottom:1px solid rgba(46,43,40,0.12); width:100%; text-align:left; padding:10px 0; font-family:var(--font-digital); font-size:0.78rem; font-weight:600; cursor:pointer; color:var(--color-text-main); display:flex; justify-content:space-between; align-items:center;">
-          <span>${editingItem && editingStore === 'breathwork_patterns' ? '✏ EDITAR TÉCNICA DE RESPIRACIÓN' : '+ REGISTRAR NUEVA TÉCNICA DE RESPIRACIÓN'}</span>
+          <span>${editingItem && editingStore === 'breathwork_patterns' ? 'EDITAR TÉCNICA DE RESPIRACIÓN' : 'REGISTRAR NUEVA TÉCNICA DE RESPIRACIÓN'}</span>
           <span id="breath-form-icon" class="disclosure-mark" aria-hidden="true">${isBreathFormOpen ? '−' : '+'}</span>
         </button>
 
@@ -566,11 +559,10 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
       toggleBreathBtn.addEventListener('click', () => {
         isBreathFormOpen = !isBreathFormOpen;
         const body = layout.querySelector('#breath-form-accordion-body');
-        const icon = layout.querySelector('#breath-form-icon');
-        if (body) body.style.display = isBreathFormOpen ? 'block' : 'none';
-        if (icon) icon.textContent = isBreathFormOpen ? '−' : '+';
+        if (body) { body.style.display = ''; setAccordionExpanded(toggleBreathBtn, body, isBreathFormOpen); }
       });
     }
+    setAccordionExpanded(toggleBreathBtn, layout.querySelector('#breath-form-accordion-body'), isBreathFormOpen);
 
     if (editingItem && editingStore === 'breathwork_patterns') {
       layout.querySelector('#breath-id').value = editingItem.id || '';
@@ -691,16 +683,13 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
     const subContentEl = container.querySelector('#yoga-sub-content');
 
     if (activeYogaSubTab === 'postures') {
-      if (editingItem && editingStore === 'yoga_postures') {
-        isAsanaFormOpen = true;
-      }
 
       // --- SUB-PESTAÑA ASANAS ---
       subContentEl.innerHTML = `
         <!-- Acordeón Formulario Asanas -->
         <div style="margin-bottom: 24px;">
           <button id="btn-toggle-asana-form" type="button" style="background:transparent; border:none; border-bottom:1px solid rgba(46,43,40,0.12); width:100%; text-align:left; padding:10px 0; font-family:var(--font-digital); font-size:0.78rem; font-weight:600; cursor:pointer; color:var(--color-text-main); display:flex; justify-content:space-between; align-items:center;">
-            <span>${editingItem && editingStore === 'yoga_postures' ? '✏ EDITAR ASANA (POSTURA)' : '+ REGISTRAR NUEVA ASANA DE YIN YOGA'}</span>
+            <span>${editingItem && editingStore === 'yoga_postures' ? 'EDITAR ASANA (POSTURA)' : 'REGISTRAR NUEVA ASANA DE YIN YOGA'}</span>
             <span id="asana-form-icon" class="disclosure-mark" aria-hidden="true">${isAsanaFormOpen ? '−' : '+'}</span>
           </button>
 
@@ -763,11 +752,10 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
         toggleAsanaBtn.addEventListener('click', () => {
           isAsanaFormOpen = !isAsanaFormOpen;
           const body = layout.querySelector('#asana-form-accordion-body');
-          const icon = layout.querySelector('#asana-form-icon');
-          if (body) body.style.display = isAsanaFormOpen ? 'block' : 'none';
-          if (icon) icon.textContent = isAsanaFormOpen ? '−' : '+';
+          if (body) { body.style.display = ''; setAccordionExpanded(toggleAsanaBtn, body, isAsanaFormOpen); }
         });
       }
+      setAccordionExpanded(toggleAsanaBtn, layout.querySelector('#asana-form-accordion-body'), isAsanaFormOpen);
 
       if (editingItem && editingStore === 'yoga_postures') {
         layout.querySelector('#asana-id').value = editingItem.id || '';
@@ -819,9 +807,6 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
       renderPosturesList(subContentEl.querySelector('#postures-editor-list'));
     } else {
       // --- SUB-PESTAÑA BLOQUES ---
-      if (editingItem && editingStore === 'yoga_blocks') {
-        isYogaBlockFormOpen = true;
-      }
 
       let blockPosturesList = [];
       if (editingItem && editingStore === 'yoga_blocks') {
@@ -832,7 +817,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
         <!-- Acordeón Formulario Bloques -->
         <div style="margin-bottom: 24px;">
           <button id="btn-toggle-yogablock-form" type="button" style="background:transparent; border:none; border-bottom:1px solid rgba(46,43,40,0.12); width:100%; text-align:left; padding:10px 0; font-family:var(--font-digital); font-size:0.78rem; font-weight:600; cursor:pointer; color:var(--color-text-main); display:flex; justify-content:space-between; align-items:center;">
-            <span>${editingItem && editingStore === 'yoga_blocks' ? '✏ EDITAR BLOQUE DE SECUENCIA' : '+ CREAR NUEVO BLOQUE DE YOGA'}</span>
+            <span>${editingItem && editingStore === 'yoga_blocks' ? 'EDITAR BLOQUE DE SECUENCIA' : 'CREAR NUEVO BLOQUE DE YOGA'}</span>
             <span id="yogablock-form-icon" class="disclosure-mark" aria-hidden="true">${isYogaBlockFormOpen ? '−' : '+'}</span>
           </button>
 
@@ -905,11 +890,10 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
         toggleBlockBtn.addEventListener('click', () => {
           isYogaBlockFormOpen = !isYogaBlockFormOpen;
           const body = layout.querySelector('#yogablock-form-accordion-body');
-          const icon = layout.querySelector('#yogablock-form-icon');
-          if (body) body.style.display = isYogaBlockFormOpen ? 'block' : 'none';
-          if (icon) icon.textContent = isYogaBlockFormOpen ? '−' : '+';
+          if (body) { body.style.display = ''; setAccordionExpanded(toggleBlockBtn, body, isYogaBlockFormOpen); }
         });
       }
+      setAccordionExpanded(toggleBlockBtn, layout.querySelector('#yogablock-form-accordion-body'), isYogaBlockFormOpen);
 
       const blockPosturesBuilderEl = subContentEl.querySelector('#block-postures-builder');
 
@@ -1254,7 +1238,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
     wrapper.innerHTML = `
       <div class="strength-manager__accordion" style="margin-bottom: 24px;">
         <button type="button" class="strength-manager__accordion-trigger" id="btn-toggle-med-form" aria-expanded="${isMeditationFormOpen}">
-          <span>${isEditing ? '✎ EDITAR SECUENCIA DE MEDITACIÓN' : '+ REGISTRAR SECUENCIA DE MEDITACIÓN'}</span>
+          <span>${isEditing ? 'EDITAR SECUENCIA DE MEDITACIÓN' : 'REGISTRAR SECUENCIA DE MEDITACIÓN'}</span>
           <span class="disclosure-mark" aria-hidden="true">${isMeditationFormOpen ? '−' : '+'}</span>
         </button>
         <div class="strength-manager__accordion-body" style="display:${isMeditationFormOpen ? 'block' : 'none'}">
@@ -1296,8 +1280,12 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
     // Toggle acordeón
     wrapper.querySelector('#btn-toggle-med-form').addEventListener('click', () => {
       isMeditationFormOpen = !isMeditationFormOpen;
-      renderMeditationManager(container);
+      const button = wrapper.querySelector('#btn-toggle-med-form');
+      const body = wrapper.querySelector('.strength-manager__accordion-body');
+      body.style.display = '';
+      setAccordionExpanded(button, body, isMeditationFormOpen);
     });
+    setAccordionExpanded(wrapper.querySelector('#btn-toggle-med-form'), wrapper.querySelector('.strength-manager__accordion-body'), isMeditationFormOpen);
 
     const blocksContainer = wrapper.querySelector('#syllabus-med-blocks-container');
     const totalTimeLabel = wrapper.querySelector('#syllabus-med-total-time');
