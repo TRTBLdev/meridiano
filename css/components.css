@@ -3676,8 +3676,24 @@ body.dark-theme .acu-fullscreen-bg.grid-36 .acu-dot.dot-on {
   transition: transform 0.2s ease;
 }
 .acu-point-card.expanded .acu-point-card-arrow {
-  transform: rotate(90deg);
   color: var(--color-text-main);
+}
+
+.disclosure-mark,
+.practice-row__indicator.disclosure-mark,
+.acu-point-card-arrow.disclosure-mark,
+.timer-synth-panel .tuner-arrow.disclosure-mark {
+  display: inline-flex;
+  width: 1rem;
+  min-width: 1rem;
+  height: 1rem;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  font-family: var(--font-main);
+  font-size: 1rem;
+  font-weight: 300;
+  line-height: 1;
 }
 
 /* Botones de Acción Táctiles Braun (Editar / Borrar con íconos) */

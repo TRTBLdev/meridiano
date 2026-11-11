@@ -189,7 +189,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
         <div style="margin-bottom: 24px;">
           <button id="btn-toggle-point-form" type="button" style="background:transparent; border:none; border-bottom:1px solid rgba(46,43,40,0.12); width:100%; text-align:left; padding:10px 0; font-family:var(--font-digital); font-size:0.78rem; font-weight:600; cursor:pointer; color:var(--color-text-main); display:flex; justify-content:space-between; align-items:center;">
             <span>${editingItem && editingStore === 'acupuncture_points' ? '✏ EDITAR PUNTO EXTRA' : '+ AGREGAR NUEVO PUNTO EXTRA'}</span>
-            <span id="point-form-icon" style="font-size:0.65rem; transition:transform 0.2s;">${isPointFormOpen ? '▼' : '▶'}</span>
+            <span id="point-form-icon" class="disclosure-mark" aria-hidden="true">${isPointFormOpen ? '−' : '+'}</span>
           </button>
 
           <div id="point-form-accordion-body" style="display:${isPointFormOpen ? 'block' : 'none'}; padding-top: 16px; border-bottom: 1px solid rgba(46,43,40,0.08); padding-bottom: 16px;">
@@ -269,7 +269,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
           const body = layout.querySelector('#point-form-accordion-body');
           const icon = layout.querySelector('#point-form-icon');
           if (body) body.style.display = isPointFormOpen ? 'block' : 'none';
-          if (icon) icon.textContent = isPointFormOpen ? '▼' : '▶';
+          if (icon) icon.textContent = isPointFormOpen ? '−' : '+';
         });
       }
 
@@ -385,7 +385,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
       card.innerHTML = `
         <div class="acu-point-card-header" style="cursor: pointer; display:flex; justify-content:space-between; align-items:center;">
           <div style="display:flex; align-items:center; gap:8px;">
-            <span class="acu-point-card-arrow" style="transition: transform 0.2s;">▶</span>
+            <span class="acu-point-card-arrow disclosure-mark" aria-hidden="true">+</span>
             <span style="font-weight:600; font-size:0.88rem; color:var(--color-text-main);">${escapeHTML(p.name)}</span>
           </div>
           <div style="display:flex; align-items:center; gap:12px;">
@@ -433,7 +433,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
       header.addEventListener('click', () => {
         const isExpanded = card.classList.toggle('expanded');
         content.style.display = isExpanded ? 'flex' : 'none';
-        arrow.style.transform = isExpanded ? 'rotate(90deg)' : 'none';
+        arrow.textContent = isExpanded ? '−' : '+';
       });
 
       const btnEdit = card.querySelector('.btn-edit-pt');
@@ -504,7 +504,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
       <div style="margin-bottom: 24px;">
         <button id="btn-toggle-breath-form" type="button" style="background:transparent; border:none; border-bottom:1px solid rgba(46,43,40,0.12); width:100%; text-align:left; padding:10px 0; font-family:var(--font-digital); font-size:0.78rem; font-weight:600; cursor:pointer; color:var(--color-text-main); display:flex; justify-content:space-between; align-items:center;">
           <span>${editingItem && editingStore === 'breathwork_patterns' ? '✏ EDITAR TÉCNICA DE RESPIRACIÓN' : '+ REGISTRAR NUEVA TÉCNICA DE RESPIRACIÓN'}</span>
-          <span id="breath-form-icon" style="font-size:0.65rem; transition:transform 0.2s;">${isBreathFormOpen ? '▼' : '▶'}</span>
+          <span id="breath-form-icon" class="disclosure-mark" aria-hidden="true">${isBreathFormOpen ? '−' : '+'}</span>
         </button>
 
         <div id="breath-form-accordion-body" style="display:${isBreathFormOpen ? 'block' : 'none'}; padding-top: 16px; border-bottom: 1px solid rgba(46,43,40,0.08); padding-bottom: 16px;">
@@ -568,7 +568,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
         const body = layout.querySelector('#breath-form-accordion-body');
         const icon = layout.querySelector('#breath-form-icon');
         if (body) body.style.display = isBreathFormOpen ? 'block' : 'none';
-        if (icon) icon.textContent = isBreathFormOpen ? '▼' : '▶';
+        if (icon) icon.textContent = isBreathFormOpen ? '−' : '+';
       });
     }
 
@@ -701,7 +701,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
         <div style="margin-bottom: 24px;">
           <button id="btn-toggle-asana-form" type="button" style="background:transparent; border:none; border-bottom:1px solid rgba(46,43,40,0.12); width:100%; text-align:left; padding:10px 0; font-family:var(--font-digital); font-size:0.78rem; font-weight:600; cursor:pointer; color:var(--color-text-main); display:flex; justify-content:space-between; align-items:center;">
             <span>${editingItem && editingStore === 'yoga_postures' ? '✏ EDITAR ASANA (POSTURA)' : '+ REGISTRAR NUEVA ASANA DE YIN YOGA'}</span>
-            <span id="asana-form-icon" style="font-size:0.65rem; transition:transform 0.2s;">${isAsanaFormOpen ? '▼' : '▶'}</span>
+            <span id="asana-form-icon" class="disclosure-mark" aria-hidden="true">${isAsanaFormOpen ? '−' : '+'}</span>
           </button>
 
           <div id="asana-form-accordion-body" style="display:${isAsanaFormOpen ? 'block' : 'none'}; padding-top: 16px; border-bottom: 1px solid rgba(46,43,40,0.08); padding-bottom: 16px;">
@@ -765,7 +765,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
           const body = layout.querySelector('#asana-form-accordion-body');
           const icon = layout.querySelector('#asana-form-icon');
           if (body) body.style.display = isAsanaFormOpen ? 'block' : 'none';
-          if (icon) icon.textContent = isAsanaFormOpen ? '▼' : '▶';
+          if (icon) icon.textContent = isAsanaFormOpen ? '−' : '+';
         });
       }
 
@@ -833,7 +833,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
         <div style="margin-bottom: 24px;">
           <button id="btn-toggle-yogablock-form" type="button" style="background:transparent; border:none; border-bottom:1px solid rgba(46,43,40,0.12); width:100%; text-align:left; padding:10px 0; font-family:var(--font-digital); font-size:0.78rem; font-weight:600; cursor:pointer; color:var(--color-text-main); display:flex; justify-content:space-between; align-items:center;">
             <span>${editingItem && editingStore === 'yoga_blocks' ? '✏ EDITAR BLOQUE DE SECUENCIA' : '+ CREAR NUEVO BLOQUE DE YOGA'}</span>
-            <span id="yogablock-form-icon" style="font-size:0.65rem; transition:transform 0.2s;">${isYogaBlockFormOpen ? '▼' : '▶'}</span>
+            <span id="yogablock-form-icon" class="disclosure-mark" aria-hidden="true">${isYogaBlockFormOpen ? '−' : '+'}</span>
           </button>
 
           <div id="yogablock-form-accordion-body" style="display:${isYogaBlockFormOpen ? 'block' : 'none'}; padding-top: 16px; border-bottom: 1px solid rgba(46,43,40,0.08); padding-bottom: 16px;">
@@ -907,7 +907,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
           const body = layout.querySelector('#yogablock-form-accordion-body');
           const icon = layout.querySelector('#yogablock-form-icon');
           if (body) body.style.display = isYogaBlockFormOpen ? 'block' : 'none';
-          if (icon) icon.textContent = isYogaBlockFormOpen ? '▼' : '▶';
+          if (icon) icon.textContent = isYogaBlockFormOpen ? '−' : '+';
         });
       }
 
@@ -1255,7 +1255,7 @@ export async function renderSyllabusScreen(container, db, onNavigate) {
       <div class="strength-manager__accordion" style="margin-bottom: 24px;">
         <button type="button" class="strength-manager__accordion-trigger" id="btn-toggle-med-form" aria-expanded="${isMeditationFormOpen}">
           <span>${isEditing ? '✎ EDITAR SECUENCIA DE MEDITACIÓN' : '+ REGISTRAR SECUENCIA DE MEDITACIÓN'}</span>
-          <span>${isMeditationFormOpen ? '▼' : '▶'}</span>
+          <span class="disclosure-mark" aria-hidden="true">${isMeditationFormOpen ? '−' : '+'}</span>
         </button>
         <div class="strength-manager__accordion-body" style="display:${isMeditationFormOpen ? 'block' : 'none'}">
           <form id="meditation-syllabus-form" class="strength-manager__form">

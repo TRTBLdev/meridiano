@@ -179,11 +179,9 @@ export async function renderDashboard(container, session, db, onNavigate) {
           <!-- 3. Panel de Historial Integrado en el Scroll Continuo -->
           <aside class="hilo-agua-panel">
             <!-- Acordeón 1: Calendario de Práctica -->
-            <div id="header-accordion-calendar" class="section-accordion-header" title="Plegar / desplegar calendario">
+            <div id="header-accordion-calendar" class="section-accordion-header" title="Plegar / desplegar calendario" role="button" tabindex="0" aria-expanded="true">
               ${renderTechnicalTitle('Calendario', { className: 'hilo-agua-title', style: 'margin: 0;' })}
-              <svg id="chevron-accordion-calendar" class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
+              <span id="chevron-accordion-calendar" class="disclosure-mark" aria-hidden="true">−</span>
             </div>
             
             <div id="calendar-accordion-content" class="accordion-content">
@@ -195,11 +193,9 @@ export async function renderDashboard(container, session, db, onNavigate) {
             </div>
 
             <!-- Acordeón 2: El Hilo de Agua -->
-            <div id="header-accordion-timeline" class="section-accordion-header" style="margin-top: 24px;" title="Plegar / desplegar Hilo de Agua">
+            <div id="header-accordion-timeline" class="section-accordion-header" style="margin-top: 24px;" title="Plegar / desplegar Hilo de Agua" role="button" tabindex="0" aria-expanded="true">
               ${renderTechnicalTitle('El Hilo de Agua', { className: 'hilo-agua-title', style: 'margin: 0;' })}
-              <svg id="chevron-accordion-timeline" class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
+              <span id="chevron-accordion-timeline" class="disclosure-mark" aria-hidden="true">−</span>
             </div>
 
             <div id="timeline-accordion-content" class="accordion-content">
@@ -299,12 +295,15 @@ async function loadHistoryAndCalendar(db, onNavigate) {
   const calendarContent = document.getElementById('calendar-accordion-content');
 
   if (headerAccordionCalendar && calendarContent) {
-    headerAccordionCalendar.addEventListener('click', () => {
+    const toggleCalendar = () => {
       const isCollapsed = calendarContent.classList.toggle('collapsed');
       if (chevronAccordionCalendar) {
-        chevronAccordionCalendar.classList.toggle('collapsed', isCollapsed);
+        chevronAccordionCalendar.textContent = isCollapsed ? '+' : '−';
       }
-    });
+      headerAccordionCalendar.setAttribute('aria-expanded', String(!isCollapsed));
+    };
+    headerAccordionCalendar.addEventListener('click', toggleCalendar);
+    headerAccordionCalendar.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleCalendar(); } });
   }
 
   // Acordeón de Hilo de Agua
@@ -313,12 +312,15 @@ async function loadHistoryAndCalendar(db, onNavigate) {
   const timelineContent = document.getElementById('timeline-accordion-content');
 
   if (headerAccordionTimeline && timelineContent) {
-    headerAccordionTimeline.addEventListener('click', () => {
+    const toggleTimeline = () => {
       const isCollapsed = timelineContent.classList.toggle('collapsed');
       if (chevronAccordionTimeline) {
-        chevronAccordionTimeline.classList.toggle('collapsed', isCollapsed);
+        chevronAccordionTimeline.textContent = isCollapsed ? '+' : '−';
       }
-    });
+      headerAccordionTimeline.setAttribute('aria-expanded', String(!isCollapsed));
+    };
+    headerAccordionTimeline.addEventListener('click', toggleTimeline);
+    headerAccordionTimeline.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleTimeline(); } });
   }
 
   // Estado local para paginación y filtro
@@ -518,11 +520,9 @@ async function loadHistoryAndCalendar(db, onNavigate) {
         let compoundBlocksHtml = '';
         if (log.type === 'compound' && log.blocks && log.blocks.length > 0) {
           compoundBlocksHtml = `
-            <button class="compound-accordion-toggle" data-log-id="${log.id}">
+            <button class="compound-accordion-toggle" data-log-id="${log.id}" aria-expanded="false">
               <span>Desglose de bloques (${log.blocks.length})</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
+              <span class="disclosure-mark" aria-hidden="true">+</span>
             </button>
             <div id="compound-blocks-${log.id}" class="stream-blocks-detail">
               ${log.blocks.map(b => `
@@ -577,6 +577,8 @@ async function loadHistoryAndCalendar(db, onNavigate) {
           if (detailEl) {
             const isExpanded = detailEl.classList.toggle('expanded');
             btn.classList.toggle('expanded', isExpanded);
+            btn.setAttribute('aria-expanded', String(isExpanded));
+            btn.querySelector('.disclosure-mark').textContent = isExpanded ? '−' : '+';
           }
         });
       });

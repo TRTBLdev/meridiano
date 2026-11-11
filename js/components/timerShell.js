@@ -232,7 +232,7 @@ export function renderSynthPanel({
     <div class="acu-tuner-accordion timer-synth-panel ${compact ? 'is-compact' : ''} ${dark ? 'is-dark' : ''}" id="${idPrefix}-tuner-panel">
       <div class="tuner-accordion-header timer-synth-header">
         <div class="timer-synth-title">
-          <span class="tuner-arrow">&#9656;</span>
+          <span class="tuner-arrow disclosure-mark" aria-hidden="true">+</span>
           <span>${label}</span>
         </div>
         <div class="timer-synth-status" ${headerRightId ? `id="${headerRightId}"` : ''} onclick="event.stopPropagation();">
@@ -356,7 +356,7 @@ export function bindSynthPanel({
       if (event.target.closest('.braun-switch') || event.target.closest('input')) return;
       const isVisible = content.style.display === 'flex';
       content.style.display = isVisible ? 'none' : 'flex';
-      if (arrow) arrow.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(90deg)';
+      if (arrow) arrow.textContent = isVisible ? '+' : '−';
       const panel = header.closest('.acu-tuner-accordion');
       if (panel) {
         panel.classList.toggle('is-expanded', !isVisible);

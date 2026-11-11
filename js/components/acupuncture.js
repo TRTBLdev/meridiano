@@ -210,7 +210,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
         accordionItem.innerHTML = `
           <div class="practice-row__summary" role="button" tabindex="0" aria-expanded="false">
             <div class="practice-row__lead">
-              <span class="practice-row__indicator">▶</span>
+              <span class="practice-row__indicator disclosure-mark" aria-hidden="true">+</span>
               <span class="practice-row__title">${escapeHTML(seq.name)}</span>
             </div>
             <div class="practice-row__meta">
@@ -265,6 +265,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
         const toggleDetails = () => {
           const isExpanded = accordionItem.classList.toggle('expanded');
           accordionItem.classList.toggle('is-expanded', isExpanded);
+          headerEl.querySelector('.disclosure-mark').textContent = isExpanded ? '−' : '+';
           contentEl.style.display = isExpanded ? 'block' : 'none';
           headerEl.setAttribute('aria-expanded', String(isExpanded));
         };
@@ -492,7 +493,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
         groupEl.innerHTML = `
           <div class="dropdown-group-header" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding:6px; font-family:var(--font-digital); font-size:0.75rem; text-transform:uppercase; color:var(--color-text-muted);">
             <span>${escapeHTML(m.name)}</span>
-            <span class="group-arrow" style="font-size:0.6rem; transition:transform 0.2s;">▶</span>
+            <span class="group-arrow disclosure-mark" aria-hidden="true">+</span>
           </div>
           <div class="dropdown-group-points" style="display:none; flex-direction:column; gap:4px; padding-left:12px;">
             ${pointsInMeridian.map(p => `
@@ -514,7 +515,7 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
           e.stopPropagation();
           const isCollapsed = pointsEl.style.display === 'none';
           pointsEl.style.display = isCollapsed ? 'flex' : 'none';
-          arrowEl.style.transform = isCollapsed ? 'rotate(90deg)' : 'none';
+          arrowEl.textContent = isCollapsed ? '−' : '+';
           arrowEl.style.color = isCollapsed ? 'var(--color-text-main)' : 'var(--color-text-muted)';
         });
 
@@ -588,11 +589,11 @@ export async function renderAcupunctureScreen(container, db, onNavigate, orchest
           if (q.length > 0) {
             // Auto expandir grupos con coincidencias
             pointsEl.style.display = 'flex';
-            arrowEl.style.transform = 'rotate(90deg)';
+            arrowEl.textContent = '−';
           } else {
             // Contraer si se borró la búsqueda
             pointsEl.style.display = 'none';
-            arrowEl.style.transform = 'none';
+            arrowEl.textContent = '+';
           }
         } else {
           group.style.display = 'none';

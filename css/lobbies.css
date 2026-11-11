@@ -237,24 +237,16 @@ body.dark-theme {
   transition: transform 180ms ease;
 }
 
-.practice-row.is-expanded .practice-row__indicator {
-  transform: rotate(90deg);
-}
-
 .practice-row__expand {
   cursor: pointer;
   font: inherit;
 }
 
-.practice-row__expand > svg {
+.practice-row__expand > .disclosure-mark {
   width: 0.85rem;
   height: 0.85rem;
   color: var(--color-icon);
-  transition: transform 180ms ease, color 180ms ease;
-}
-
-.practice-row.is-expanded .practice-row__expand > svg {
-  transform: rotate(90deg);
+  transition: color 180ms ease;
 }
 
 .practice-row__title-stack,

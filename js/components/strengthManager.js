@@ -88,7 +88,7 @@ export async function renderStrengthManager(container, db) {
       <div class="strength-manager__accordion">
         <button type="button" class="strength-manager__accordion-trigger" id="strength-toggle-exercise-form" aria-expanded="${exerciseFormOpen}">
           <span>${editingExercise ? '✎ EDITAR EJERCICIO' : '+ REGISTRAR EJERCICIO'}</span>
-          <span>${exerciseFormOpen ? '▼' : '▶'}</span>
+          <span class="disclosure-mark" aria-hidden="true">${exerciseFormOpen ? '−' : '+'}</span>
         </button>
         <div class="strength-manager__accordion-body" style="display:${exerciseFormOpen ? 'block' : 'none'}">
           <form id="strength-exercise-form" class="strength-manager__form">
@@ -217,7 +217,7 @@ export async function renderStrengthManager(container, db) {
       <div class="strength-manager__accordion">
         <button type="button" class="strength-manager__accordion-trigger" id="strength-toggle-circuit-form" aria-expanded="${circuitFormOpen}">
           <span>${editingCircuit ? '✎ EDITAR CIRCUITO' : '+ CREAR CIRCUITO'}</span>
-          <span>${circuitFormOpen ? '▼' : '▶'}</span>
+          <span class="disclosure-mark" aria-hidden="true">${circuitFormOpen ? '−' : '+'}</span>
         </button>
         <div class="strength-manager__accordion-body" style="display:${circuitFormOpen ? 'block' : 'none'}">
           <form id="strength-circuit-form" class="strength-manager__form">

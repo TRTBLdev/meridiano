@@ -30,12 +30,14 @@
   display: inline-block;
   width: 1rem;
   color: var(--color-accent-red);
-  content: '›';
-  transition: transform 180ms ease;
+  content: '+';
+  font-family: var(--font-main);
+  font-size: 1rem;
+  font-weight: 300;
 }
 
 .timer-technique[open] summary::before {
-  transform: rotate(90deg);
+  content: '−';
 }
 
 .timer-technique__content {

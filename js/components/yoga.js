@@ -476,7 +476,7 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
       accordionItem.innerHTML = `
         <div class="practice-row__summary" role="button" tabindex="0" aria-expanded="false">
           <div class="practice-row__lead">
-            <span class="practice-row__indicator">▶</span>
+            <span class="practice-row__indicator disclosure-mark" aria-hidden="true">+</span>
             <div class="practice-row__title-stack yoga-seq-title-stack">
               <span class="practice-row__title">${escapeHTML(seq.name)}</span>
               <span class="practice-row__kind yoga-seq-kind">${isCustom ? 'PERSONALIZADA' : 'PRESET'}</span>
@@ -538,7 +538,7 @@ export async function renderYogaScreen(container, db, onNavigate, orchestratorCo
       const toggleDetails = () => {
         const isOpen = content.style.display === 'block';
         content.style.display = isOpen ? 'none' : 'block';
-        arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(90deg)';
+        arrow.textContent = isOpen ? '+' : '−';
         accordionItem.classList.toggle('is-expanded', !isOpen);
         header.setAttribute('aria-expanded', String(!isOpen));
       };

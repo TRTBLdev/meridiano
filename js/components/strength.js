@@ -163,6 +163,7 @@ export async function renderStrengthScreen(container, db, onNavigate, orchestrat
 
       header.addEventListener('click', () => {
         const expanded = row.classList.toggle('is-expanded');
+        header.querySelector('.disclosure-mark').textContent = expanded ? '−' : '+';
         header.setAttribute('aria-expanded', String(expanded));
         content.hidden = !expanded;
       });
